@@ -1,8 +1,12 @@
-
 package com.adeptum.questai;
 
+import com.adeptum.questai.utility.EnumUtil;
 import com.adeptum.questai.world.quest.Quest;
 import com.adeptum.questai.world.quest.QuestObjective;
+import static com.adeptum.questai.world.quest.QuestObjective.Type.COLLECT;
+import static com.adeptum.questai.world.quest.QuestObjective.Type.FIND_NPC;
+import static com.adeptum.questai.world.quest.QuestObjective.Type.KILL;
+import static com.adeptum.questai.world.quest.QuestObjective.Type.TREASURE;
 import com.gmail.nossr50.api.ExperienceAPI;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.request.ChatRequest;
@@ -44,6 +48,7 @@ import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
+import lombok.extern.slf4j.Slf4j;
 import org.bukkit.ChatColor;
 import org.bukkit.Sound;
 import org.bukkit.boss.BarColor;
@@ -226,10 +231,11 @@ public class RandomQuestPlugin implements SubPlugin {
 			QuestProgress progress = new QuestProgress(quest);
 
 			// Initialize maxDistance for "FIND_NPC" or "TREASURE" quests
-			if ("FIND_NPC".equalsIgnoreCase(quest.getCategory()) || "TREASURE".equalsIgnoreCase(quest.getCategory())) {
-				Location playerLoc = player.getLocation();
-				Location dest = quest.getDestination();
-				double distance = playerLoc.distance(dest);
+			if (EnumSet.of(FIND_NPC, TREASURE).contains(quest.getObjective().getType())) {
+				final Location playerLocation = player.getLocation();
+				final Location destination = quest.getDestination();
+				final double distance = playerLocation.distance(destination);
+
 				progress.setMaxDistance(distance);
 			}
 
@@ -283,8 +289,8 @@ public class RandomQuestPlugin implements SubPlugin {
 				progress.getTimerBossBar().setTitle("Time Remaining: " + formatTime(remainingTime));
 			});
 
-			// Update Objective BossBar
-			if ("FIND_NPC".equalsIgnoreCase(quest.getCategory()) || "TREASURE".equalsIgnoreCase(quest.getCategory())) {
+			// Update Objective
+			if (EnumSet.of(FIND_NPC, TREASURE).contains(quest.getObjective().getType())) {
 				Location dest = quest.getDestination();
 				Location playerLoc = player.getLocation();
 				double distance = playerLoc.distance(dest);
@@ -304,7 +310,7 @@ public class RandomQuestPlugin implements SubPlugin {
 					});
 					cancelQuestTask(player);
 				}
-			} else if ("KILL".equalsIgnoreCase(quest.getCategory()) || "COLLECT".equalsIgnoreCase(quest.getCategory())) {
+			} else if (EnumSet.of(KILL, COLLECT).contains(quest.getObjective().getType())) {
 				int current = progress.getCurrent();
 				int required = quest.getObjective().getAmount();
 				final double progressPercent = Math.min(Math.max((double) current / required, 0.0), 1.0);
@@ -767,29 +773,22 @@ public class RandomQuestPlugin implements SubPlugin {
 	// ------------------- Generate Quest (Async) -------------------
 	private void generateQuest(Player player, Villager villager, String uniqueName) {
 		Logger logger = plugin.getLogger();
-		logger.info("[generateQuest] Start for player " + player.getName()
-			+ ", villager " + villager.getUniqueId());
+		logger.info("[generateQuest] Start for player " + player.getName() + ", villager " + villager.getUniqueId());
 
-		// 1. Determine random quest data (category, objective, reward)
-		logger.info("[generateQuest] Determining random quest data (category, objective, reward).");
-
-		String[] possibleCats = {"TREASURE", "FIND_NPC", "KILL", "COLLECT"};
-		String category = possibleCats[ThreadLocalRandom.current().nextInt(possibleCats.length)];
+		logger.info("[generateQuest] Determining random quest data (objective, reward).");
 
 		QuestObjective objective = new QuestObjective();
-		if ("KILL".equalsIgnoreCase(category)) {
-			objective.setType(QuestObjective.Type.KILL);
+		objective.setType(EnumUtil.random(QuestObjective.Type.class));
+
+		if (objective.getType() == KILL) {
 			String[] mobs = {"ZOMBIE", "SKELETON", "SPIDER", "CREEPER"};
 			objective.setTarget(mobs[ThreadLocalRandom.current().nextInt(mobs.length)]);
-			objective.setAmount(ThreadLocalRandom.current().nextInt(3, 11));
-		} else if ("COLLECT".equalsIgnoreCase(category)) {
-			objective.setType(QuestObjective.Type.COLLECT);
+			objective.setAmount(ThreadLocalRandom.current().nextInt(3, 51));
+		} else if (objective.getType() == COLLECT) {
 			String[] items = {"IRON_INGOT", "WHEAT", "CARROT", "BONE"};
 			objective.setTarget(items[ThreadLocalRandom.current().nextInt(items.length)]);
-			objective.setAmount(ThreadLocalRandom.current().nextInt(3, 11));
+			objective.setAmount(ThreadLocalRandom.current().nextInt(3, 51));
 		} else {
-			// TREASURE or FIND_NPC
-			objective.setType(QuestObjective.Type.COLLECT);
 			objective.setTarget("NONE");
 			objective.setAmount(1);
 		}
@@ -802,7 +801,6 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		// Create the Quest object
 		Quest quest = new Quest();
-		quest.setCategory(category);
 		quest.setObjective(objective);
 		quest.setRewardType(rewardType);
 		quest.setRewardTarget(rewardSkill);
@@ -810,19 +808,18 @@ public class RandomQuestPlugin implements SubPlugin {
 		quest.setVillagerUuid(villager.getUniqueId());
 
 		// If category is TREASURE or FIND_NPC, assign a random location
-		if ("TREASURE".equalsIgnoreCase(category) || "FIND_NPC".equalsIgnoreCase(category)) {
+		if (EnumSet.of(FIND_NPC, TREASURE).contains(quest.getObjective().getType())) {
 			Location loc = getLogarithmicLocation(villager.getWorld(), logger);
 			quest.setDestination(loc);
 		}
 
-		logger.info("[generateQuest] Chosen quest data -> category=" + category
-			+ ", objective=" + objective.getType() + " " + objective.getTarget());
+		logger.info("[generateQuest] Chosen quest data -> objective=" + objective.getType() + " " + objective.getTarget());
 
 		// 2. Prompt ChatGPT in async to get both shortTitle and description
 		Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
 			logger.info("[generateQuest - Async] Building ChatGPT prompt & calling model...");
 			try {
-				String prompt = buildQuestDescriptionPrompt(category, objective, rewardSkill, rewardXP);
+				String prompt = quest.prompt();
 				ChatRequest req = ChatRequest.builder()
 					.messages(UserMessage.from(prompt))
 					.build();
@@ -852,12 +849,12 @@ public class RandomQuestPlugin implements SubPlugin {
 					openQuestDialogue(player, quest);
 
 					// If TREASURE or FIND_NPC, spawn chest or NPC and give map
-					if ("TREASURE".equalsIgnoreCase(category)) {
+					if (objective.getType() == TREASURE) {
 						spawnTreasureChest(quest.getDestination(), logger);
 						ItemStack mapItem = createMapItem(quest.getDestination(), "Treasure Hunt", logger);
 						player.getInventory().addItem(mapItem);
 						logger.info("[generateQuest] Given Treasure Hunt map to player " + player.getName());
-					} else if ("FIND_NPC".equalsIgnoreCase(category)) {
+					} else if (objective.getType() == FIND_NPC) {
 						spawnHiddenVillager(quest.getDestination(), "Hidden NPC", logger);
 						ItemStack mapItem = createMapItem(quest.getDestination(), "Find NPC", logger);
 						player.getInventory().addItem(mapItem);
@@ -876,38 +873,6 @@ public class RandomQuestPlugin implements SubPlugin {
 		});
 
 		logger.info("[generateQuest] end (async call triggered).");
-	}
-
-	/**
-	 * Builds a natural-language prompt for ChatGPT describing the quest data, so it can produce a short quest
-	 * story/description.
-	 */
-	private String buildQuestDescriptionPrompt(String category, QuestObjective objective,
-		String rewardSkill, int rewardXP) {
-		StringBuilder sb = new StringBuilder();
-		sb.append("You are a creative quest description generator. ");
-		sb.append("Please provide a short title (max 5 words) and a short, engaging quest description (1-2 sentences). ");
-		sb.append("No JSON or code. ");
-		sb.append("Quest data:\n");
-		sb.append("- Category: ").append(category).append("\n");
-
-		if ("KILL".equalsIgnoreCase(category)) {
-			sb.append("- Objective: Kill ").append(objective.getAmount())
-				.append(" ").append(objective.getTarget()).append("\n");
-		} else if ("COLLECT".equalsIgnoreCase(category)) {
-			sb.append("- Objective: Collect ").append(objective.getAmount())
-				.append(" ").append(objective.getTarget()).append("\n");
-		} else if ("TREASURE".equalsIgnoreCase(category)) {
-			sb.append("- Objective: Find a hidden chest in the world.\n");
-		} else if ("FIND_NPC".equalsIgnoreCase(category)) {
-			sb.append("- Objective: Locate a hidden NPC.\n");
-		}
-
-		sb.append("- Reward: ").append(rewardXP).append(" MCMMO XP in ")
-			.append(rewardSkill).append("\n");
-		sb.append("\nProvide the short title and description separated by a newline.");
-
-		return sb.toString();
 	}
 
 	// ------------------- AI "Nonsense" Lines -------------------
@@ -1132,13 +1097,9 @@ public class RandomQuestPlugin implements SubPlugin {
 		// quest.getTitle() is the AI-generated storyline
 		player.sendMessage("§7§lQuest: §f" + quest.getTitle());
 
-		if ("TREASURE".equalsIgnoreCase(quest.getCategory())
-			|| "FIND_NPC".equalsIgnoreCase(quest.getCategory())) {
-
+		if (EnumSet.of(TREASURE, FIND_NPC).contains(quest.getObjective().getType())) {
 			player.sendMessage("§7Destination: Check your new map!");
-		} else if ("KILL".equalsIgnoreCase(quest.getCategory())
-			|| "COLLECT".equalsIgnoreCase(quest.getCategory())) {
-
+		} else if (EnumSet.of(KILL, COLLECT).contains(quest.getObjective().getType())) {
 			player.sendMessage("§7Objective: "
 				+ quest.getObjective().getType()
 				+ " " + quest.getObjective().getTarget()
@@ -1484,12 +1445,9 @@ public class RandomQuestPlugin implements SubPlugin {
 			pages.add(ChatColor.GOLD + "Quest: " + quest.getShortTitle());
 			pages.add(ChatColor.GREEN + "Description: " + quest.getTitle());
 
-			if ("TREASURE".equalsIgnoreCase(quest.getCategory())
-				|| "FIND_NPC".equalsIgnoreCase(quest.getCategory())) {
-
+			if (EnumSet.of(TREASURE, FIND_NPC).contains(quest.getObjective().getType())) {
 				pages.add(ChatColor.BLUE + "Destination: " + ChatColor.WHITE + "Check your quest map for the location.");
-			} else if ("KILL".equalsIgnoreCase(quest.getCategory())
-				|| "COLLECT".equalsIgnoreCase(quest.getCategory())) {
+			} else if (EnumSet.of(KILL, COLLECT).contains(quest.getObjective().getType())) {
 
 				String objectiveText = quest.getObjective().getType() + " " + quest.getObjective().getTarget()
 					+ " x" + quest.getObjective().getAmount();
@@ -1604,7 +1562,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		}
 
 		// Check if the quest is of type TREASURE or FIND_NPC and the player has reached the destination
-		if (("TREASURE".equalsIgnoreCase(quest.getCategory()) || "FIND_NPC".equalsIgnoreCase(quest.getCategory()))
+		if (EnumSet.of(TREASURE, FIND_NPC).contains(quest.getObjective().getType())
 			&& quest.getDestination().distance(player.getLocation()) <= 10) {
 
 			// Complete the quest
@@ -1616,11 +1574,11 @@ public class RandomQuestPlugin implements SubPlugin {
 			removeQuestBook(player);
 
 			// Optionally, remove the chest or hidden NPC
-			if ("TREASURE".equalsIgnoreCase(quest.getCategory())) {
+			if (quest.getObjective().getType() == TREASURE) {
 				// Remove the treasure chest
 				quest.getDestination().getBlock().setType(Material.AIR);
 				logger.info("[onPlayerInteractVillagerCompletion] Removed treasure chest at " + quest.getDestination());
-			} else if ("FIND_NPC".equalsIgnoreCase(quest.getCategory())) {
+			} else if (quest.getObjective().getType() == FIND_NPC) {
 				// Remove the hidden NPC
 				// This requires tracking the hidden NPC's UUID when spawned
 				// For simplicity, this part is omitted

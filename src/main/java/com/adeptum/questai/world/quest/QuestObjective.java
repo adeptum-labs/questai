@@ -5,7 +5,7 @@ import lombok.Data;
 @Data
 public class QuestObjective {
 	public enum Type {
-		KILL, COLLECT
+		TREASURE, FIND_NPC, KILL, COLLECT
 	}
 
 	private Type type;
