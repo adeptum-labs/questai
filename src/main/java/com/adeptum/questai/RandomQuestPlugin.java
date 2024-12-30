@@ -1,5 +1,6 @@
 package com.adeptum.questai;
 
+import com.adeptum.questai.model.world.Npc;
 import com.adeptum.questai.utility.EnumUtil;
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
@@ -70,11 +71,6 @@ public class RandomQuestPlugin implements SubPlugin {
 	private static final String INVENTORY_TITLE = "§6Quest Offered";
 	private static final int ACCEPT_BUTTON_SLOT = 4;
 	private static final int REJECT_BUTTON_SLOT = 5;
-
-	private static final String[] PERSONALITIES = {
-		"Kindly", "Surly", "Mysterious", "Eccentric", "Royal",
-		"Shy", "Brash", "Chatty", "Stoic", "Bookish"
-	};
 
 	private static final Villager.Profession[] PROFESSIONS = {
 		Villager.Profession.NITWIT, Villager.Profession.ARMORER, Villager.Profession.BUTCHER,
@@ -165,52 +161,10 @@ public class RandomQuestPlugin implements SubPlugin {
 		}
 	}
 
-	// ------------------- VillagerData Class -------------------
-	/**
-	 * Class to store either a Quest or a Nonsense Phrase along with a timestamp.
-	 */
-	public static class VillagerData {
-		private Quest quest;
-		private String nonsensePhrase;
-		private long timestamp;
-
-		public VillagerData(Quest quest, long timestamp) {
-			this.quest = quest;
-			this.nonsensePhrase = null;
-			this.timestamp = timestamp;
-		}
-
-		public VillagerData(String nonsensePhrase, long timestamp) {
-			this.quest = null;
-			this.nonsensePhrase = nonsensePhrase;
-			this.timestamp = timestamp;
-		}
-
-		public boolean isQuest() {
-			return quest != null;
-		}
-
-		public boolean isPhrase() {
-			return nonsensePhrase != null;
-		}
-
-		public Quest getQuest() {
-			return quest;
-		}
-
-		public String getNonsensePhrase() {
-			return nonsensePhrase;
-		}
-
-		public long getTimestamp() {
-			return timestamp;
-		}
-	}
-
 	public class QuestManager {
 		private final Map<UUID, QuestProgress> playerQuests = new HashMap<>();
 		// Modified to store VillagerData instead of only Quest
-		private final Map<UUID, VillagerData> villagerDataMap = new HashMap<>();
+		private final Map<UUID, Npc> npcs = new HashMap<>();
 		private final Map<UUID, UUID> villagerIndicators = new HashMap<>();
 		private final Map<UUID, String> villagerPersonality = new HashMap<>();
 		private final Map<UUID, BukkitTask> questTasks = new HashMap<>(); // Tracks scheduled tasks per player
@@ -429,8 +383,8 @@ public class RandomQuestPlugin implements SubPlugin {
 		 * @param logger The logger for logging.
 		 * @return The VillagerData assigned to the villager or null if none exists.
 		 */
-		public VillagerData getVillagerData(UUID villagerId, Logger logger) {
-			return villagerDataMap.get(villagerId);
+		public Npc getVillagerData(UUID villagerId, Logger logger) {
+			return npcs.get(villagerId);
 		}
 
 		/**
@@ -440,13 +394,13 @@ public class RandomQuestPlugin implements SubPlugin {
 		 * @param data The VillagerData to assign or null to remove the assignment.
 		 * @param logger The logger for logging.
 		 */
-		public void setVillagerData(UUID villagerId, VillagerData data, Logger logger) {
-			if (data == null) {
-				villagerDataMap.remove(villagerId);
+		public void setVillagerData(UUID villagerId, Npc npc, Logger logger) {
+			if (npc == null) {
+				npcs.remove(villagerId);
 				removeQuestIndicator(villagerId, logger);
 				return;
 			}
-			villagerDataMap.put(villagerId, data);
+			npcs.put(villagerId, npc);
 		}
 
 		/**
@@ -519,7 +473,7 @@ public class RandomQuestPlugin implements SubPlugin {
 			}
 			playerQuests.clear();
 			questTasks.clear();
-			villagerDataMap.clear(); // Clear all VillagerData
+			npcs.clear(); // Clear all VillagerData
 		}
 	}
 
@@ -612,19 +566,19 @@ public class RandomQuestPlugin implements SubPlugin {
 		}
 
 		// Retrieve VillagerData
-		VillagerData villagerData = questManager.getVillagerData(villager.getUniqueId(), logger);
+		Npc npc = questManager.getVillagerData(villager.getUniqueId(), logger);
 		long currentTime = System.currentTimeMillis();
 		long twoHoursMillis = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
 
-		if (villagerData != null) {
-			if (currentTime - villagerData.getTimestamp() <= twoHoursMillis) {
+		if (npc != null) {
+			if (currentTime - npc.getTimestamp() <= twoHoursMillis) {
 				// Data is still valid
-				if (villagerData.isQuest()) {
+				if (npc.isQuest()) {
 					logger.info("[onVillagerClick] Villager has an active quest. Opening GUI to offer quest to player.");
-					openQuestDialogue(player, villagerData.getQuest());
-				} else if (villagerData.isPhrase()) {
+					openQuestDialogue(player, npc.getQuest());
+				} else if (npc.isPhrase()) {
 					logger.info("[onVillagerClick] Villager has a stored nonsense phrase. Sending to player.");
-					player.sendMessage("§e" + uniqueName + ": \"" + villagerData.getNonsensePhrase() + "\"");
+					player.sendMessage("§e" + uniqueName + ": \"" + npc.getNonsensePhrase() + "\"");
 				}
 				return;
 			} else {
@@ -837,9 +791,11 @@ public class RandomQuestPlugin implements SubPlugin {
 
 				// 5. Schedule a synchronous task to update the game state
 				Bukkit.getScheduler().runTask(plugin, () -> {
+					final Npc npc = Npc.builder().quest(quest).timestamp(System.currentTimeMillis()).build();
+
 					logger.info("[generateQuest - SyncCallback] Storing quest & opening GUI for player "
 						+ player.getName());
-					questManager.setVillagerData(villager.getUniqueId(), new VillagerData(quest, System.currentTimeMillis()), logger);
+					questManager.setVillagerData(villager.getUniqueId(), npc, logger);
 
 					// Open the dialogue GUI to let player accept or reject
 					openQuestDialogue(player, quest);
@@ -889,8 +845,9 @@ public class RandomQuestPlugin implements SubPlugin {
 				}
 
 				final String finalLine = response;
+				final Npc npc = Npc.builder().nonsensePhrase(finalLine).timestamp(System.currentTimeMillis()).build();
 				// Store the nonsense phrase with timestamp
-				questManager.setVillagerData(villager.getUniqueId(), new VillagerData(finalLine, System.currentTimeMillis()), logger);
+				questManager.setVillagerData(villager.getUniqueId(), npc, logger);
 
 				Bukkit.getScheduler().runTask(plugin, ()
 					-> player.sendMessage("§e" + uniqueName + ": \"" + finalLine + "\"")
@@ -1546,12 +1503,12 @@ public class RandomQuestPlugin implements SubPlugin {
 		Player player = event.getPlayer();
 
 		// Check if the player has an active quest assigned by this villager
-		VillagerData villagerData = questManager.getVillagerData(villager.getUniqueId(), logger);
-		if (villagerData == null || !villagerData.isQuest()) {
+		final Npc npc = questManager.getVillagerData(villager.getUniqueId(), logger);
+		if (npc == null || !npc.isQuest()) {
 			return; // No active quest from this villager
 		}
 
-		Quest quest = villagerData.getQuest();
+		Quest quest = npc.getQuest();
 		QuestProgress progress = questManager.getQuestProgress(player, logger);
 		if (progress == null) {
 			return; // Player has no active quest
