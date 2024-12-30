@@ -1,4 +1,4 @@
-package com.adeptum.questai.world;
+package com.adeptum.questai.model.world;
 
 import org.bukkit.Location;
 import org.bukkit.Material;

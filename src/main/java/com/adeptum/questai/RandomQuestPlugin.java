@@ -1,12 +1,12 @@
 package com.adeptum.questai;
 
 import com.adeptum.questai.utility.EnumUtil;
-import com.adeptum.questai.world.quest.Quest;
-import com.adeptum.questai.world.quest.QuestObjective;
-import static com.adeptum.questai.world.quest.QuestObjective.Type.COLLECT;
-import static com.adeptum.questai.world.quest.QuestObjective.Type.FIND_NPC;
-import static com.adeptum.questai.world.quest.QuestObjective.Type.KILL;
-import static com.adeptum.questai.world.quest.QuestObjective.Type.TREASURE;
+import com.adeptum.questai.model.world.quest.Quest;
+import com.adeptum.questai.model.world.quest.QuestObjective;
+import static com.adeptum.questai.model.world.quest.QuestObjective.Type.COLLECT;
+import static com.adeptum.questai.model.world.quest.QuestObjective.Type.FIND_NPC;
+import static com.adeptum.questai.model.world.quest.QuestObjective.Type.KILL;
+import static com.adeptum.questai.model.world.quest.QuestObjective.Type.TREASURE;
 import com.gmail.nossr50.api.ExperienceAPI;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.request.ChatRequest;

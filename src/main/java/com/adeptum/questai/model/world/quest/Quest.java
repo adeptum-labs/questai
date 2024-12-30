@@ -1,4 +1,4 @@
-package com.adeptum.questai.world.quest;
+package com.adeptum.questai.model.world.quest;
 
 import java.util.UUID;
 import lombok.Data;
