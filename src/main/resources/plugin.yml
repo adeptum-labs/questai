@@ -1,0 +1,4 @@
+main: com.adeptum.questai.Plugin
+name: questai
+version: 1.0
+api-version: 1.21
