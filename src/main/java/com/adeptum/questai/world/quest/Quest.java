@@ -1,4 +1,3 @@
-
 package com.adeptum.questai.world.quest;
 
 import java.util.UUID;
