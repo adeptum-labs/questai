@@ -47,6 +47,9 @@ import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Logger;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.Style;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.ChatColor;
 import org.bukkit.Sound;
 import org.bukkit.boss.BarColor;
@@ -376,24 +379,10 @@ public class RandomQuestPlugin implements SubPlugin {
 		}
 
 		// ------------------- Villager Quest Management -------------------
-		/**
-		 * Retrieves the VillagerData assigned to a villager.
-		 *
-		 * @param villagerId The UUID of the villager.
-		 * @param logger The logger for logging.
-		 * @return The VillagerData assigned to the villager or null if none exists.
-		 */
 		public Npc getVillagerData(UUID villagerId, Logger logger) {
 			return npcs.get(villagerId);
 		}
 
-		/**
-		 * Sets or updates the VillagerData for a villager.
-		 *
-		 * @param villagerId The UUID of the villager.
-		 * @param data The VillagerData to assign or null to remove the assignment.
-		 * @param logger The logger for logging.
-		 */
 		public void setVillagerData(UUID villagerId, Npc npc, Logger logger) {
 			if (npc == null) {
 				npcs.remove(villagerId);
@@ -904,7 +893,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		logger.info("[spawnHiddenVillager] at " + loc + ", questTitle=" + questTitle);
 		loc.getWorld().spawn(loc, Villager.class, v -> {
 			v.setPersistent(true);
-			v.setCustomName("§6Hidden NPC: " + questTitle);
+			v.customName(Component.text("§6Hidden NPC: " + questTitle));
 			v.setCustomNameVisible(true);
 			v.setProfession(Villager.Profession.NITWIT);
 			logger.info("[spawnHiddenVillager] Spawned Hidden NPC: " + v.getUniqueId());
@@ -962,7 +951,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		mapView.setCenterZ(dest.getBlockZ());
 
 		meta.setMapView(mapView);
-		meta.setDisplayName("§6Quest Map: " + title);
+		meta.displayName(Component.text("§6Quest Map: " + title));
 		mapItem.setItemMeta(meta);
 
 		logger.info("[createMapItem] end -> returning map item");
@@ -1067,7 +1056,7 @@ public class RandomQuestPlugin implements SubPlugin {
 	private ItemStack createBorderItem() {
 		ItemStack border = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
 		ItemMeta borderMeta = border.getItemMeta();
-		borderMeta.setDisplayName(" "); // Empty name to avoid clutter
+		borderMeta.displayName(Component.text(" "));
 		border.setItemMeta(borderMeta);
 		return border;
 	}

@@ -16,6 +16,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Logger;
+import net.kyori.adventure.text.Component;
 import static org.bukkit.Material.BLACK_BED;
 import static org.bukkit.Material.BLUE_BED;
 import static org.bukkit.Material.BROWN_BED;
@@ -158,7 +159,7 @@ public class AutoVillagerPlugin implements SubPlugin {
 
 			villager.setPersistent(true);
 			villager.setProfession(prof);
-			villager.setCustomName("§a[" + mood + " " + prof.name() + "]");
+			villager.customName(Component.text("§a[" + mood + " " + prof.name() + "]"));
 			villager.setCustomNameVisible(true);
 		}
 	}
