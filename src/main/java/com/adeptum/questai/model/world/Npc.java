@@ -10,7 +10,7 @@ import lombok.RequiredArgsConstructor;
 @Builder
 public class Npc {
 	@RequiredArgsConstructor
-	public static enum Personality {
+	public enum Mood {
 		BOOKISH("Nerdy & bookish"),
 		BRASH("Brash"),
 		CHATTY("Chatty"),
@@ -23,7 +23,24 @@ public class Npc {
 		SURLY("Surly");
 
 		@Getter
-		final String description;
+		private final String description;
+	}
+
+	@RequiredArgsConstructor
+	public enum Personality {
+		BOOKISH("Nerdy & bookish"),
+		BRASH("Brash"),
+		CHATTY("Chatty"),
+		ECCENTRIC("Extremely eccentric"),
+		KINDLY("Very kindly"),
+		MYSTIC("Dark & mysterious"),
+		ROYAL("Snoby & royal"),
+		SHY("Shy & careful"),
+		STOIC("Stoic"),
+		SURLY("Surly");
+
+		@Getter
+		private final String description;
 	}
 
 	private Quest quest;

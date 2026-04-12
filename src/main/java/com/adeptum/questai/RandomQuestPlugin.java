@@ -46,10 +46,10 @@ import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.Style;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.ChatColor;
 import org.bukkit.Sound;
 import org.bukkit.boss.BarColor;
@@ -62,11 +62,9 @@ import org.bukkit.inventory.meta.BookMeta;
 import org.bukkit.scheduler.BukkitTask;
 
 /**
- * Plugin that: 1) Chooses quest data (category, objective, reward) randomly in code with logarithmic location selection, 2) Uses
- * ChatGPT to generate a short textual quest description, 3) Presents quests via a GUI dialogue with Accept/Reject options, 4)
- * Assigns quests based on player acceptance, 5) Spawns indicators, chests, or NPCs as needed, 6) Awards MCMMO XP upon quest
- * completion, 7) Includes extensive debug logging.
+ * Plugin that creates generated villager quests and short villager dialogue.
  */
+@SuppressWarnings("PMD.ExcessiveImports")
 public class RandomQuestPlugin implements SubPlugin {
 
 	// ------------------- Constants -------------------
@@ -75,14 +73,7 @@ public class RandomQuestPlugin implements SubPlugin {
 	private static final int ACCEPT_BUTTON_SLOT = 4;
 	private static final int REJECT_BUTTON_SLOT = 5;
 
-	private static final Villager.Profession[] PROFESSIONS = {
-		Villager.Profession.NITWIT, Villager.Profession.ARMORER, Villager.Profession.BUTCHER,
-		Villager.Profession.CARTOGRAPHER, Villager.Profession.CLERIC, Villager.Profession.FARMER,
-		Villager.Profession.FISHERMAN, Villager.Profession.FLETCHER, Villager.Profession.LIBRARIAN,
-		Villager.Profession.TOOLSMITH
-	};
-
-	private double questChance = 0.3; // 30% chance for quest vs nonsense
+	private static final double QUEST_CHANCE = 0.3;
 
 	private OpenAiChatModel chatModel;
 	private QuestManager questManager;
@@ -92,6 +83,7 @@ public class RandomQuestPlugin implements SubPlugin {
 
 	// Cache for villager unique names (loaded from config)
 	private final Map<UUID, String> villagerUniqueNames = Collections.synchronizedMap(new HashMap<>());
+	private final ReentrantLock villagerUniqueNamesLock = new ReentrantLock();
 
 	private final JavaPlugin plugin;
 
@@ -100,6 +92,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		this.plugin = plugin;
 	}
 
+	@SuppressWarnings("PMD.DataClass")
 	public static class QuestProgress {
 		private Quest quest;
 		private int current;
@@ -247,16 +240,21 @@ public class RandomQuestPlugin implements SubPlugin {
 				Location dest = quest.getDestination();
 				Location playerLoc = player.getLocation();
 				double distance = playerLoc.distance(dest);
-				final double progressPercent = Math.min(Math.max(1.0 - (distance / progress.getMaxDistance()), 0.0), 1.0);
+				final double progressPercent = Math.min(
+					Math.max(1.0 - (distance / progress.getMaxDistance()), 0.0), 1.0
+				);
 				Bukkit.getScheduler().runTask(plugin, () -> {
 					progress.getObjectiveBossBar().setProgress(progressPercent);
-					progress.getObjectiveBossBar().setTitle("Distance to Destination: " + String.format("%.2f", distance) + " blocks");
+					progress.getObjectiveBossBar().setTitle(
+						"Distance to Destination: " + String.format("%.2f", distance) + " blocks"
+					);
 				});
 
 				// Check if player has reached the destination
 				if (distance <= 10) { // Threshold distance
 					Bukkit.getScheduler().runTask(plugin, () -> {
-						player.sendMessage("§aYou have reached the destination for quest '" + quest.getShortTitle() + "'.");
+						player.sendMessage("§aYou have reached the destination for quest '"
+							+ quest.getShortTitle() + "'.");
 						completeQuest(player, logger);
 						removeBossBars(player, progress);
 						removeQuestBook(player);
@@ -266,16 +264,21 @@ public class RandomQuestPlugin implements SubPlugin {
 			} else if (EnumSet.of(KILL, COLLECT).contains(quest.getObjective().getType())) {
 				int current = progress.getCurrent();
 				int required = quest.getObjective().getAmount();
-				final double progressPercent = Math.min(Math.max((double) current / required, 0.0), 1.0);
+				final double progressPercent = Math.min(
+					Math.max((double) current / required, 0.0), 1.0
+				);
 				Bukkit.getScheduler().runTask(plugin, () -> {
 					progress.getObjectiveBossBar().setProgress(progressPercent);
-					progress.getObjectiveBossBar().setTitle("Objective Progress: " + current + "/" + required);
+					progress.getObjectiveBossBar().setTitle(
+						"Objective Progress: " + current + "/" + required
+					);
 				});
 
 				// Check if objective is completed
 				if (current >= required) {
 					Bukkit.getScheduler().runTask(plugin, () -> {
-						player.sendMessage("§aYou have completed the objective for quest '" + quest.getShortTitle() + "'.");
+						player.sendMessage("§aYou have completed the objective for quest '"
+							+ quest.getShortTitle() + "'.");
 						completeQuest(player, logger);
 						removeBossBars(player, progress);
 						removeQuestBook(player);
@@ -294,7 +297,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		private String formatTime(long millis) {
 			long seconds = millis / 1000;
 			long hours = seconds / 3600;
-			long minutes = (seconds % 3600) / 60;
+			long minutes = seconds % 3600 / 60;
 			long secs = seconds % 60;
 			return String.format("%02dh %02dm %02ds", hours, minutes, secs);
 		}
@@ -371,7 +374,8 @@ public class RandomQuestPlugin implements SubPlugin {
 			if (objective.getType() == QuestObjective.Type.KILL
 				|| objective.getType() == QuestObjective.Type.COLLECT) {
 				progress.setCurrent(progress.getCurrent() + amount);
-				logger.info("[QuestManager] Player " + player.getName() + " progress updated: " + progress.getCurrent() + "/" + objective.getAmount());
+				logger.info("[QuestManager] Player " + player.getName()
+					+ " progress updated: " + progress.getCurrent() + "/" + objective.getAmount());
 				return progress.getCurrent() >= objective.getAmount();
 			}
 
@@ -493,7 +497,8 @@ public class RandomQuestPlugin implements SubPlugin {
 					villagerUniqueNames.put(villagerId, name);
 				}
 			}
-			logger.info("[onEnable] Loaded " + villagerUniqueNames.size() + " villager unique names from config.");
+			logger.info("[onEnable] Loaded " + villagerUniqueNames.size()
+				+ " villager unique names from config.");
 		}
 
 		// Initialize ChatGPT model
@@ -533,6 +538,7 @@ public class RandomQuestPlugin implements SubPlugin {
 
 	// ------------------- Villager Interaction -------------------
 	@EventHandler
+	@SuppressWarnings({"PMD.CognitiveComplexity", "checkstyle:CyclomaticComplexity"})
 	public void onVillagerClick(PlayerInteractEntityEvent event) {
 		Logger logger = plugin.getLogger();
 		logger.info("[onVillagerClick] Event triggered.");
@@ -550,7 +556,8 @@ public class RandomQuestPlugin implements SubPlugin {
 		// Get the unique name
 		String uniqueName = villagerUniqueNames.get(villager.getUniqueId());
 		if (uniqueName == null) {
-			logger.warning("[onVillagerClick] Villager " + villager.getUniqueId() + " does not have a unique name.");
+			logger.warning("[onVillagerClick] Villager " + villager.getUniqueId()
+				+ " does not have a unique name.");
 			return; // Villager should already have a unique name on startup
 		}
 
@@ -563,10 +570,10 @@ public class RandomQuestPlugin implements SubPlugin {
 			if (currentTime - npc.getTimestamp() <= twoHoursMillis) {
 				// Data is still valid
 				if (npc.isQuest()) {
-					logger.info("[onVillagerClick] Villager has an active quest. Opening GUI to offer quest to player.");
+					logger.info("[onVillagerClick] Villager has an active quest. Opening GUI.");
 					openQuestDialogue(player, npc.getQuest());
 				} else if (npc.isPhrase()) {
-					logger.info("[onVillagerClick] Villager has a stored nonsense phrase. Sending to player.");
+					logger.info("[onVillagerClick] Sending stored nonsense phrase to player.");
 					player.sendMessage("§e" + uniqueName + ": \"" + npc.getNonsensePhrase() + "\"");
 				}
 				return;
@@ -579,10 +586,10 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		// If no valid data, decide randomly to offer a quest or generate a nonsense phrase
 		double randomVal = Math.random();
-		logger.info("[onVillagerClick] randomVal=" + randomVal + " questChance=" + questChance);
-		if (randomVal <= questChance) {
+		logger.info("[onVillagerClick] randomVal=" + randomVal + " questChance=" + QUEST_CHANCE);
+		if (randomVal <= QUEST_CHANCE) {
 			logger.info("[onVillagerClick] Decided to generate a new quest for the player.");
-			generateQuest(player, villager, uniqueName);
+			generateQuest(player, villager);
 		} else {
 			logger.info("[onVillagerClick] Decided to generate a nonsense line instead of a quest.");
 			generateNonsenseLine(player, villager, uniqueName);
@@ -600,15 +607,14 @@ public class RandomQuestPlugin implements SubPlugin {
 		for (World world : Bukkit.getWorlds()) {
 			for (Villager villager : world.getEntitiesByClass(Villager.class)) {
 				UUID villagerId = villager.getUniqueId();
-				if (!villagerUniqueNames.containsKey(villagerId)) {
-					// Generate unique name for villager
-					generateUniqueNameForVillager(villager);
-				} else {
-					// Assign the existing unique name
+				if (villagerUniqueNames.containsKey(villagerId)) {
 					String uniqueName = villagerUniqueNames.get(villagerId);
 					villager.setCustomName("§a" + uniqueName);
 					villager.setCustomNameVisible(true);
-					logger.info("[assignUniqueNamesToAllVillagers] Assigned existing name '" + uniqueName + "' to villager " + villagerId);
+					logger.info("[assignUniqueNamesToAllVillagers] Assigned existing name '"
+						+ uniqueName + "' to villager " + villagerId);
+				} else {
+					generateUniqueNameForVillager(villager);
 				}
 			}
 		}
@@ -624,13 +630,13 @@ public class RandomQuestPlugin implements SubPlugin {
 	 */
 	@EventHandler
 	public void onCreatureSpawn(CreatureSpawnEvent event) {
-		Logger logger = plugin.getLogger();
 		if (!(event.getEntity() instanceof Villager villager)) {
 			return; // Not a villager
 		}
 
 		UUID villagerId = villager.getUniqueId();
 		if (!villagerUniqueNames.containsKey(villagerId)) {
+			Logger logger = plugin.getLogger();
 			logger.info("[onCreatureSpawn] Assigning unique name to newly spawned villager " + villagerId);
 			generateUniqueNameForVillager(villager);
 		}
@@ -644,10 +650,12 @@ public class RandomQuestPlugin implements SubPlugin {
 	private void generateUniqueNameForVillager(Villager villager) {
 		Logger logger = plugin.getLogger();
 		Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-			logger.info("[generateUniqueNameForVillager - Async] Generating unique name for villager " + villager.getUniqueId());
+			logger.info("[generateUniqueNameForVillager - Async] Generating unique name for villager "
+				+ villager.getUniqueId());
 			try {
-				String prompt = "Provide a unique and creative name for a Minecraft villager with UUID: " + villager.getUniqueId()
-					+ ". This villager is a " + villager.getProfession().name() + ". *Output only first name and surname*";
+				String prompt = "Provide a unique and creative name for a Minecraft villager with UUID: "
+					+ villager.getUniqueId() + ". This villager is a " + villager.getProfession().name()
+					+ ". *Output only first name and surname*";
 				ChatRequest req = ChatRequest.builder()
 					.messages(UserMessage.from(prompt))
 					.build();
@@ -658,24 +666,31 @@ public class RandomQuestPlugin implements SubPlugin {
 				AtomicReference<String> uniqueName = new AtomicReference<>(response);
 
 				// Ensure the name is unique across all villagers
-				synchronized (villagerUniqueNames) {
+				villagerUniqueNamesLock.lock();
+				try {
 					if (villagerUniqueNames.containsValue(uniqueName.get())) {
 						// If name already exists, append a number or regenerate
-						uniqueName.set(uniqueName.get() + "_" + ThreadLocalRandom.current().nextInt(1000, 10000));
+						uniqueName.set(uniqueName.get() + "_"
+							+ ThreadLocalRandom.current().nextInt(1000, 10000));
 					}
 					villagerUniqueNames.put(villager.getUniqueId(), uniqueName.get());
+				} finally {
+					villagerUniqueNamesLock.unlock();
 				}
 
 				// Assign the unique name to the villager
 				Bukkit.getScheduler().runTask(plugin, () -> {
 					villager.setCustomName("§a" + uniqueName.get());
 					villager.setCustomNameVisible(true);
-					logger.info("[generateUniqueNameForVillager - SyncCallback] Set unique name for villager " + villager.getUniqueId() + " to " + uniqueName.get());
+					logger.info("[generateUniqueNameForVillager - SyncCallback] Set name for villager "
+						+ villager.getUniqueId() + " to " + uniqueName.get());
 					// Save the updated names to config
 					saveVillagerUniqueNames();
 				});
 			} catch (Exception e) {
-				e.printStackTrace();
+				logger.log(
+					Level.SEVERE, "[generateUniqueNameForVillager] Failed to generate villager name.", e
+				);
 				Bukkit.getScheduler().runTask(plugin, ()
 					-> villager.setCustomName("§a")
 				);
@@ -694,10 +709,13 @@ public class RandomQuestPlugin implements SubPlugin {
 		FileConfiguration cfg = YamlConfiguration.loadConfiguration(configFile);
 		ConfigurationSection nameSection = cfg.createSection("villagerUniqueNames");
 
-		synchronized (villagerUniqueNames) {
+		villagerUniqueNamesLock.lock();
+		try {
 			for (Map.Entry<UUID, String> entry : villagerUniqueNames.entrySet()) {
 				nameSection.set(entry.getKey().toString(), entry.getValue());
 			}
+		} finally {
+			villagerUniqueNamesLock.unlock();
 		}
 
 		try {
@@ -705,12 +723,13 @@ public class RandomQuestPlugin implements SubPlugin {
 			logger.info("[saveVillagerUniqueNames] Successfully saved villager unique names to config.");
 		} catch (IOException e) {
 			logger.severe("[saveVillagerUniqueNames] Failed to save villager unique names to config.");
-			e.printStackTrace();
+			logger.log(Level.SEVERE, "[saveVillagerUniqueNames] Failed to save config.", e);
 		}
 	}
 
 	// ------------------- Generate Quest (Async) -------------------
-	private void generateQuest(Player player, Villager villager, String uniqueName) {
+	@SuppressWarnings({"PMD.CognitiveComplexity", "checkstyle:CyclomaticComplexity"})
+	private void generateQuest(Player player, Villager villager) {
 		Logger logger = plugin.getLogger();
 		logger.info("[generateQuest] Start for player " + player.getName() + ", villager " + villager.getUniqueId());
 
@@ -752,7 +771,8 @@ public class RandomQuestPlugin implements SubPlugin {
 			quest.setDestination(loc);
 		}
 
-		logger.info("[generateQuest] Chosen quest data -> objective=" + objective.getType() + " " + objective.getTarget());
+		logger.info("[generateQuest] Chosen quest data -> objective="
+			+ objective.getType() + " " + objective.getTarget());
 
 		// 2. Prompt ChatGPT in async to get both shortTitle and description
 		Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
@@ -780,7 +800,10 @@ public class RandomQuestPlugin implements SubPlugin {
 
 				// 5. Schedule a synchronous task to update the game state
 				Bukkit.getScheduler().runTask(plugin, () -> {
-					final Npc npc = Npc.builder().quest(quest).timestamp(System.currentTimeMillis()).build();
+					final Npc npc = Npc.builder()
+						.quest(quest)
+						.timestamp(System.currentTimeMillis())
+						.build();
 
 					logger.info("[generateQuest - SyncCallback] Storing quest & opening GUI for player "
 						+ player.getName());
@@ -792,22 +815,29 @@ public class RandomQuestPlugin implements SubPlugin {
 					// If TREASURE or FIND_NPC, spawn chest or NPC and give map
 					if (objective.getType() == TREASURE) {
 						spawnTreasureChest(quest.getDestination(), logger);
-						ItemStack mapItem = createMapItem(quest.getDestination(), "Treasure Hunt", logger);
+						ItemStack mapItem = createMapItem(
+							quest.getDestination(), "Treasure Hunt", logger
+						);
 						player.getInventory().addItem(mapItem);
-						logger.info("[generateQuest] Given Treasure Hunt map to player " + player.getName());
+						logger.info("[generateQuest] Given Treasure Hunt map to player "
+							+ player.getName());
 					} else if (objective.getType() == FIND_NPC) {
 						spawnHiddenVillager(quest.getDestination(), "Hidden NPC", logger);
-						ItemStack mapItem = createMapItem(quest.getDestination(), "Find NPC", logger);
+						ItemStack mapItem = createMapItem(
+							quest.getDestination(), "Find NPC", logger
+						);
 						player.getInventory().addItem(mapItem);
-						logger.info("[generateQuest] Given Find NPC map to player " + player.getName());
+						logger.info("[generateQuest] Given Find NPC map to player "
+							+ player.getName());
 					}
 
-					player.sendMessage("§a" + villagerUniqueNames.get(villager.getUniqueId()) + ": \"Here’s a quest for you! Open your inventory to see the details.\"");
+					player.sendMessage("§a" + villagerUniqueNames.get(villager.getUniqueId())
+						+ ": \"Here’s a quest for you! Open your inventory to see the details.\"");
 					showQuestDetails(player, quest);
 				});
 
 			} catch (Exception e) {
-				e.printStackTrace();
+				logger.log(Level.SEVERE, "[generateQuest] Failed to generate quest.", e);
 				Bukkit.getScheduler().runTask(plugin, ()
 					-> player.sendMessage("§cError generating quest from villager."));
 			}
@@ -834,7 +864,10 @@ public class RandomQuestPlugin implements SubPlugin {
 				}
 
 				final String finalLine = response;
-				final Npc npc = Npc.builder().nonsensePhrase(finalLine).timestamp(System.currentTimeMillis()).build();
+				final Npc npc = Npc.builder()
+					.nonsensePhrase(finalLine)
+					.timestamp(System.currentTimeMillis())
+					.build();
 				// Store the nonsense phrase with timestamp
 				questManager.setVillagerData(villager.getUniqueId(), npc, logger);
 
@@ -842,7 +875,7 @@ public class RandomQuestPlugin implements SubPlugin {
 					-> player.sendMessage("§e" + uniqueName + ": \"" + finalLine + "\"")
 				);
 			} catch (Exception e) {
-				e.printStackTrace();
+				logger.log(Level.SEVERE, "[generateNonsenseLine] Failed to generate villager line.", e);
 				Bukkit.getScheduler().runTask(plugin, ()
 					-> player.sendMessage("§cVillager tried to speak but had no words..."));
 			}
@@ -902,11 +935,12 @@ public class RandomQuestPlugin implements SubPlugin {
 	}
 
 	// ------------------- Custom Map Renderer -------------------
-	public class DestinationMarkerRenderer extends MapRenderer {
+	public static class DestinationMarkerRenderer extends MapRenderer {
 		private final Location destination;
-		private boolean hasRendered = false;
+		private boolean hasRendered;
 
 		public DestinationMarkerRenderer(Location destination) {
+			super();
 			this.destination = destination;
 		}
 
@@ -920,8 +954,8 @@ public class RandomQuestPlugin implements SubPlugin {
 			int dx = destination.getBlockX() - mapView.getCenterX();
 			int dz = destination.getBlockZ() - mapView.getCenterZ();
 			int scaleVal = 1 << mapView.getScale().getValue();
-			int markerX = 64 + (int) (dx / scaleVal);
-			int markerZ = 64 + (int) (dz / scaleVal);
+			int markerX = 64 + dx / scaleVal;
+			int markerZ = 64 + dz / scaleVal;
 
 			byte color = (byte) 116; // bright red
 			if (markerX >= 1 && markerX < 127 && markerZ >= 1 && markerZ < 127) {
@@ -960,8 +994,7 @@ public class RandomQuestPlugin implements SubPlugin {
 
 	// ------------------- Random World Location with Logarithmic Distribution -------------------
 	/**
-	 * Returns a random location in the world that is: 1) At least 500 blocks from spawn, 2) Up to 15000 blocks from spawn, 3)
-	 * Weighted so that closer radii are more likely (log distribution), 4) Ensures the chunk is loaded, thus generated.
+	 * Returns a random generated location in the world using a log-weighted distance from spawn.
 	 */
 	private Location getLogarithmicLocation(World world, Logger logger) {
 		logger.info("[getLogarithmicLocation] start for world " + world.getName());
@@ -996,7 +1029,8 @@ public class RandomQuestPlugin implements SubPlugin {
 		// 7) Load the chunk to ensure it's generated
 		Chunk chunk = world.getChunkAt(blockX >> 4, blockZ >> 4);
 		chunk.load(true); // force load
-		logger.info("[getLogarithmicLocation] Loaded chunk at X=" + (blockX >> 4) + ", Z=" + (blockZ >> 4));
+		logger.info("[getLogarithmicLocation] Loaded chunk at X="
+			+ (blockX >> 4) + ", Z=" + (blockZ >> 4));
 
 		// 8) Get the highest block (for a safe spawn)
 		int y = world.getHighestBlockYAt(blockX, blockZ);
@@ -1072,13 +1106,15 @@ public class RandomQuestPlugin implements SubPlugin {
 	 * @param player The player to open the GUI for.
 	 * @param quest The quest to display.
 	 */
+	@SuppressWarnings("PMD.NcssCount")
 	private void openQuestDialogue(Player player, Quest quest) {
 		Logger logger = plugin.getLogger();
 		logger.info("[openQuestDialogue] Opening quest dialogue for player " + player.getName());
 
 		// Update the pendingQuests map with the quest
 		pendingQuests.put(player.getUniqueId(), quest);
-		logger.info("[openQuestDialogue] Quest '" + quest.getShortTitle() + "' is pending for player " + player.getName());
+		logger.info("[openQuestDialogue] Quest '" + quest.getShortTitle()
+			+ "' is pending for player " + player.getName());
 
 		// Create a new inventory with the specified size and title
 		Inventory questInventory = Bukkit.createInventory(null, INVENTORY_SIZE, INVENTORY_TITLE);
@@ -1179,9 +1215,8 @@ public class RandomQuestPlugin implements SubPlugin {
 
 	// ------------------- Inventory Click Event -------------------
 	@EventHandler
+	@SuppressWarnings({"PMD.CognitiveComplexity", "checkstyle:CyclomaticComplexity"})
 	public void onInventoryClick(InventoryClickEvent event) {
-		Logger logger = plugin.getLogger();
-
 		// Check if the inventory is our quest dialogue
 		if (!event.getView().getTitle().equals(INVENTORY_TITLE)) {
 			return; // Not our GUI
@@ -1189,7 +1224,6 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		event.setCancelled(true); // Prevent item movement
 
-		Player player = (Player) event.getWhoClicked();
 		Inventory clickedInventory = event.getClickedInventory();
 		if (clickedInventory == null) {
 			return;
@@ -1200,6 +1234,8 @@ public class RandomQuestPlugin implements SubPlugin {
 			return;
 		}
 
+		Logger logger = plugin.getLogger();
+		Player player = (Player) event.getWhoClicked();
 		int slot = event.getRawSlot();
 		logger.info("[onInventoryClick] Player " + player.getName()
 			+ " clicked slot " + slot + " with item " + clickedItem.getType());
@@ -1212,7 +1248,8 @@ public class RandomQuestPlugin implements SubPlugin {
 				// Assign the quest to the player
 				questManager.assignQuest(player, pendingQuest, logger);
 				player.sendMessage("§aYou have accepted the quest: " + pendingQuest.getTitle());
-				logger.info("[onInventoryClick] Quest '" + pendingQuest.getTitle() + "' assigned to player " + player.getName());
+				logger.info("[onInventoryClick] Quest '" + pendingQuest.getTitle()
+					+ "' assigned to player " + player.getName());
 
 				// Play accept sound
 				player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
@@ -1236,7 +1273,8 @@ public class RandomQuestPlugin implements SubPlugin {
 				questManager.setVillagerData(pendingQuest.getVillagerUuid(), null, logger);
 				removeQuestIndicator(pendingQuest.getVillagerUuid(), logger);
 				player.sendMessage("§cYou have rejected the quest: " + pendingQuest.getTitle());
-				logger.info("[onInventoryClick] Quest '" + pendingQuest.getTitle() + "' rejected by player " + player.getName());
+				logger.info("[onInventoryClick] Quest '" + pendingQuest.getTitle()
+					+ "' rejected by player " + player.getName());
 
 				// Play reject sound
 				player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 1.0f, 1.0f);
@@ -1285,7 +1323,8 @@ public class RandomQuestPlugin implements SubPlugin {
 		QuestObjective objective = quest.getObjective();
 
 		if (objective.getType() != QuestObjective.Type.KILL) {
-			logger.info("[onEntityDeath] Active quest for player " + killer.getName() + " is not a kill-type quest.");
+			logger.info("[onEntityDeath] Active quest for player " + killer.getName()
+				+ " is not a kill-type quest.");
 			return; // Not a kill-type quest
 		}
 
@@ -1294,10 +1333,12 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		if (killedMob.equals(targetMob)) {
 			boolean isComplete = questManager.incrementProgress(killer, 1, logger);
-			logger.info("[onEntityDeath] Player " + killer.getName() + " killed " + killedMob + ". Progress: " + questProgress.getCurrent() + "/" + quest.getObjective().getAmount());
+			logger.info("[onEntityDeath] Player " + killer.getName() + " killed " + killedMob
+				+ ". Progress: " + questProgress.getCurrent() + "/" + quest.getObjective().getAmount());
 
 			if (isComplete) {
-				logger.info("[onEntityDeath] Player " + killer.getName() + " has completed the quest: " + quest.getTitle());
+				logger.info("[onEntityDeath] Player " + killer.getName()
+					+ " has completed the quest: " + quest.getTitle());
 				killer.sendMessage("§6Quest Update: You've completed the objective!");
 				rewardPlayer(killer, quest);
 				questManager.completeQuest(killer, logger);
@@ -1305,13 +1346,14 @@ public class RandomQuestPlugin implements SubPlugin {
 				removeQuestIndicator(quest.getVillagerUuid(), logger);
 				removeQuestBook(killer);
 			} else {
-				killer.sendMessage("§eQuest Update: " + questProgress.getCurrent() + "/" + quest.getObjective().getAmount() + " " + targetMob + "(s) killed.");
+				killer.sendMessage("§eQuest Update: " + questProgress.getCurrent()
+					+ "/" + quest.getObjective().getAmount() + " " + targetMob + "(s) killed.");
 			}
 		}
 	}
 
 	// ------------------- Event Listener for Item Pickup -------------------
-	@EventHandler(priority = org.bukkit.event.EventPriority.MONITOR, ignoreCancelled = true)
+	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
 	public void onPlayerPickupItem(PlayerPickupItemEvent event) {
 		Logger logger = plugin.getLogger();
 		Player player = event.getPlayer();
@@ -1328,7 +1370,8 @@ public class RandomQuestPlugin implements SubPlugin {
 		QuestObjective objective = quest.getObjective();
 
 		if (objective.getType() != QuestObjective.Type.COLLECT) {
-			logger.info("[onPlayerPickupItem] Active quest for player " + player.getName() + " is not a collect-type quest.");
+			logger.info("[onPlayerPickupItem] Active quest for player " + player.getName()
+				+ " is not a collect-type quest.");
 			return; // Not a collect-type quest
 		}
 
@@ -1338,10 +1381,13 @@ public class RandomQuestPlugin implements SubPlugin {
 		if (pickedItem.equals(targetItem)) {
 			int amount = item.getAmount();
 			boolean isComplete = questManager.incrementProgress(player, amount, logger);
-		logger.info("[onPlayerPickupItem] Player " + player.getName() + " picked up " + amount + " " + pickedItem + "(s). Progress: " + questProgress.getCurrent() + "/" + quest.getObjective().getAmount());
+			logger.info("[onPlayerPickupItem] Player " + player.getName() + " picked up "
+				+ amount + " " + pickedItem + "(s). Progress: "
+				+ questProgress.getCurrent() + "/" + quest.getObjective().getAmount());
 
 			if (isComplete) {
-				logger.info("[onPlayerPickupItem] Player " + player.getName() + " has completed the quest: " + quest.getTitle());
+				logger.info("[onPlayerPickupItem] Player " + player.getName()
+					+ " has completed the quest: " + quest.getTitle());
 				player.sendMessage("§6Quest Update: You've completed the objective!");
 				rewardPlayer(player, quest);
 				questManager.completeQuest(player, logger);
@@ -1349,7 +1395,8 @@ public class RandomQuestPlugin implements SubPlugin {
 				removeQuestIndicator(quest.getVillagerUuid(), logger);
 				removeQuestBook(player);
 			} else {
-				player.sendMessage("§eQuest Update: " + questProgress.getCurrent() + "/" + quest.getObjective().getAmount() + " " + targetItem + "(s) collected.");
+				player.sendMessage("§eQuest Update: " + questProgress.getCurrent()
+					+ "/" + quest.getObjective().getAmount() + " " + targetItem + "(s) collected.");
 			}
 		}
 	}
@@ -1388,11 +1435,12 @@ public class RandomQuestPlugin implements SubPlugin {
 			pages.add(ChatColor.GREEN + "Description: " + quest.getTitle());
 
 			if (EnumSet.of(TREASURE, FIND_NPC).contains(quest.getObjective().getType())) {
-				pages.add(ChatColor.BLUE + "Destination: " + ChatColor.WHITE + "Check your quest map for the location.");
+				pages.add(ChatColor.BLUE + "Destination: " + ChatColor.WHITE
+					+ "Check your quest map for the location.");
 			} else if (EnumSet.of(KILL, COLLECT).contains(quest.getObjective().getType())) {
 
-				String objectiveText = quest.getObjective().getType() + " " + quest.getObjective().getTarget()
-					+ " x" + quest.getObjective().getAmount();
+				String objectiveText = quest.getObjective().getType() + " "
+					+ quest.getObjective().getTarget() + " x" + quest.getObjective().getAmount();
 				pages.add(ChatColor.YELLOW + "Objective: " + ChatColor.WHITE + objectiveText);
 			}
 
@@ -1404,15 +1452,19 @@ public class RandomQuestPlugin implements SubPlugin {
 			book.setItemMeta(meta);
 
 			// Add the book to the player's inventory
-			HashMap<Integer, ItemStack> leftover = player.getInventory().addItem(book);
-			if (!leftover.isEmpty()) {
+			Map<Integer, ItemStack> leftover = player.getInventory().addItem(book);
+			if (leftover.isEmpty()) {
+				player.sendMessage("§aA quest book has been added to your inventory.");
+				logger.info("[addQuestBook] Quest book added to player "
+					+ player.getName() + "'s inventory.");
+			} else {
 				// If inventory is full, drop the book at player's location
 				player.getWorld().dropItemNaturally(player.getLocation(), book);
-				player.sendMessage("§cYour inventory is full! The quest book has been dropped at your location.");
-				logger.warning("[addQuestBook] Player " + player.getName() + " inventory full. Dropped quest book.");
-			} else {
-				player.sendMessage("§aA quest book has been added to your inventory.");
-				logger.info("[addQuestBook] Quest book added to player " + player.getName() + "'s inventory.");
+				player.sendMessage(
+					"§cYour inventory is full! The quest book has been dropped at your location."
+				);
+				logger.warning("[addQuestBook] Player " + player.getName()
+					+ " inventory full. Dropped quest book.");
 			}
 		}
 	}
@@ -1423,6 +1475,7 @@ public class RandomQuestPlugin implements SubPlugin {
 	 *
 	 * @param player The player from whose inventory the book should be removed.
 	 */
+	@SuppressWarnings("checkstyle:CyclomaticComplexity")
 	private void removeQuestBook(Player player) {
 		Logger logger = plugin.getLogger();
 		logger.info("[removeQuestBook] Attempting to remove quest book from player " + player.getName());
@@ -1437,21 +1490,24 @@ public class RandomQuestPlugin implements SubPlugin {
 		String questTitle = progress.getQuest().getShortTitle();
 
 		for (int i = 0; i < inv.getSize(); i++) {
-			ItemStack item = inv.getItem(i);
-			if (item != null && item.getType() == Material.WRITTEN_BOOK) {
-				BookMeta meta = (BookMeta) item.getItemMeta();
-				if (meta != null && meta.getTitle() != null) {
-					if (meta.getTitle().equals(questTitle)) {
-						inv.setItem(i, null);
-						logger.info("[removeQuestBook] Removed quest book titled '" + meta.getTitle() + "' from player " + player.getName());
-						player.sendMessage("§cYour quest book has been removed.");
-						return;
-					}
-				}
+			if (isQuestBook(inv.getItem(i), questTitle)) {
+				inv.setItem(i, null);
+				logger.info("[removeQuestBook] Removed quest book titled '" + questTitle
+					+ "' from player " + player.getName());
+				player.sendMessage("§cYour quest book has been removed.");
+				return;
 			}
 		}
 
 		logger.info("[removeQuestBook] No matching quest book found for player " + player.getName());
+	}
+
+	private boolean isQuestBook(ItemStack item, String questTitle) {
+		if (item == null || item.getType() != Material.WRITTEN_BOOK) {
+			return false;
+		}
+		BookMeta meta = (BookMeta) item.getItemMeta();
+		return meta != null && questTitle.equals(meta.getTitle());
 	}
 
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -1467,14 +1523,16 @@ public class RandomQuestPlugin implements SubPlugin {
 			if (entity instanceof Villager) {
 				Villager villager = (Villager) entity;
 				UUID villagerId = villager.getUniqueId();
-				if (!villagerUniqueNames.containsKey(villagerId)) {
-					logger.info("[onChunkLoad] Villager " + villagerId + " does not have a unique name. Generating now.");
-					generateUniqueNameForVillager(villager);
-				} else {
+				if (villagerUniqueNames.containsKey(villagerId)) {
 					String uniqueName = villagerUniqueNames.get(villagerId);
 					villager.setCustomName("§a" + uniqueName);
 					villager.setCustomNameVisible(true);
-					logger.info("[onChunkLoad] Assigned existing name '" + uniqueName + "' to villager " + villagerId);
+					logger.info("[onChunkLoad] Assigned existing name '"
+						+ uniqueName + "' to villager " + villagerId);
+				} else {
+					logger.info("[onChunkLoad] Villager " + villagerId
+						+ " does not have a unique name. Generating now.");
+					generateUniqueNameForVillager(villager);
 				}
 			}
 		}
@@ -1482,14 +1540,15 @@ public class RandomQuestPlugin implements SubPlugin {
 
 	// ------------------- Event Listener for Returning to Villager to Complete Quest -------------------
 	@EventHandler
+	@SuppressWarnings("checkstyle:CyclomaticComplexity")
 	public void onPlayerInteractVillagerCompletion(PlayerInteractEntityEvent event) {
-		Logger logger = plugin.getLogger();
 		Entity clicked = event.getRightClicked();
 		if (!(clicked instanceof Villager villager)) {
 			return;
 		}
 
 		Player player = event.getPlayer();
+		Logger logger = plugin.getLogger();
 
 		// Check if the player has an active quest assigned by this villager
 		final Npc npc = questManager.getVillagerData(villager.getUniqueId(), logger);
@@ -1519,37 +1578,13 @@ public class RandomQuestPlugin implements SubPlugin {
 			if (quest.getObjective().getType() == TREASURE) {
 				// Remove the treasure chest
 				quest.getDestination().getBlock().setType(Material.AIR);
-				logger.info("[onPlayerInteractVillagerCompletion] Removed treasure chest at " + quest.getDestination());
-			} else if (quest.getObjective().getType() == FIND_NPC) {
-				// Remove the hidden NPC
-				// This requires tracking the hidden NPC's UUID when spawned
-				// For simplicity, this part is omitted
-				// You can implement this by storing the hidden NPC's UUID in the Quest class
+				logger.info("[onPlayerInteractVillagerCompletion] Removed treasure chest at "
+					+ quest.getDestination());
 			}
 
 			// Play completion sound
 			player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
 		}
-	}
-
-	// ------------------- Helper Methods for Quest Book Management -------------------
-	/**
-	 * Searches the player's inventory for a written book with the specified title.
-	 *
-	 * @param player The player whose inventory is to be searched.
-	 * @param title The title of the book to find.
-	 * @return The ItemStack of the book if found, otherwise null.
-	 */
-	private ItemStack findBookByTitle(Player player, String title) {
-		for (ItemStack item : player.getInventory()) {
-			if (item != null && item.getType() == Material.WRITTEN_BOOK) {
-				BookMeta meta = (BookMeta) item.getItemMeta();
-				if (meta != null && meta.getTitle() != null && meta.getTitle().equals(title)) {
-					return item;
-				}
-			}
-		}
-		return null;
 	}
 
 	public void removeAllQuestIndicators(Chunk chunk, Logger logger) {

@@ -7,7 +7,11 @@ import org.bukkit.block.Block;
 import java.util.ArrayList;
 import java.util.List;
 
-public class SpawnLocator {
+public final class SpawnLocator {
+	private SpawnLocator() {
+	}
+
+	@SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
 	public static List<Location> getSuitableLevels(Location baseLocation) {
 		final List<Location> suitableLevels = new ArrayList<>();
 		final World world = baseLocation.getWorld();

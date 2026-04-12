@@ -18,6 +18,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 @Slf4j
 public class FlyingPigPlugin implements SubPlugin { // Implement Listener interface
+	private static final Vector UPWARD_VELOCITY = new Vector(0, 0.5, 0);
+
 	private final Random random = new Random();
 	private final JavaPlugin plugin;
 
@@ -84,27 +86,27 @@ public class FlyingPigPlugin implements SubPlugin { // Implement Listener interf
 		pig.customName(Component.text("Flying Pig"));
 		pig.setCustomNameVisible(true);
 		pig.setGravity(false);
-		pig.setVelocity(new Vector(0, 0.5, 0));
+		pig.setVelocity(UPWARD_VELOCITY);
+	}
+
+	private Vector createRandomHorizontalVelocity() {
+		double randomX = (random.nextDouble() - 0.5) * 0.2;
+		double randomZ = (random.nextDouble() - 0.5) * 0.2;
+		return new Vector(randomX, 0, randomZ);
 	}
 
 	// Keep flying pigs floating and wandering
-	private class KeepFlyingTask extends BukkitRunnable {
+	private final class KeepFlyingTask extends BukkitRunnable {
 		@Override
 		public void run() {
 			for (World world : Bukkit.getWorlds()) {
 				world.getEntitiesByClass(Pig.class).stream().filter(pig -> {
-					if (pig.customName() == null) {
-						return false;
-					}
-
-					return "Flying Pig".equals(pig.customName().toString());
+					return pig.customName() != null && "Flying Pig".equals(pig.customName().toString());
 				}).forEach(pig -> {
 					if (pig.getLocation().getY() < 80) {
-						pig.setVelocity(new Vector(0, 0.5, 0));
+						pig.setVelocity(UPWARD_VELOCITY);
 					} else {
-						double randomX = (random.nextDouble() - 0.5) * 0.2;
-						double randomZ = (random.nextDouble() - 0.5) * 0.2;
-						pig.setVelocity(new Vector(randomX, 0, randomZ));
+						pig.setVelocity(createRandomHorizontalVelocity());
 					}
 				});
 			}

@@ -16,7 +16,7 @@ public class Plugin extends JavaPlugin implements Listener {
 		plugins.add(new RandomQuestPlugin(this));
 
 		PluginManager pm = getServer().getPluginManager();
-		
+
 		plugins.forEach(p -> {
 			pm.registerEvents(p, this);
 			p.onEnable();
@@ -31,6 +31,4 @@ public class Plugin extends JavaPlugin implements Listener {
 			p.onDisable();
 		});
 	}
-	
-
 }

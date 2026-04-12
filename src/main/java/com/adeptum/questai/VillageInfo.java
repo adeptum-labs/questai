@@ -1,21 +1,21 @@
-
 package com.adeptum.questai;
 
+@SuppressWarnings("PMD.DataClass")
 public class VillageInfo {
-	private final boolean isVillage;
+	private final boolean village;
 	private final int bedCount;
 	private final int workstationCount;
 	private final int villagerCount;
 
-	public VillageInfo(boolean isVillage, int bedCount, int workstationCount, int villagerCount) {
-		this.isVillage = isVillage;
+	public VillageInfo(boolean village, int bedCount, int workstationCount, int villagerCount) {
+		this.village = village;
 		this.bedCount = bedCount;
 		this.workstationCount = workstationCount;
 		this.villagerCount = villagerCount;
 	}
 
 	public boolean isVillage() {
-		return isVillage;
+		return village;
 	}
 
 	public int getBedCount() {
