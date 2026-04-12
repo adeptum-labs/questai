@@ -20,8 +20,14 @@
 
 package com.adeptum.questai;
 
+import com.adeptum.questai.dialogue.ConversationManager;
+import com.adeptum.questai.service.QuestGenerationService;
+import dev.langchain4j.model.openai.OpenAiChatModel;
+import dev.langchain4j.model.openai.OpenAiChatModelName;
 import java.util.ArrayList;
 import java.util.List;
+import org.bukkit.Bukkit;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.PluginManager;
@@ -32,10 +38,35 @@ public class Plugin extends JavaPlugin implements Listener {
 
 	@Override
 	public void onEnable() {
-		plugins.add(new AutoVillagerPlugin(this));
-		plugins.add(new RandomQuestPlugin(this));
+		saveDefaultConfig();
+		final FileConfiguration config = getConfig();
 
-		PluginManager pm = getServer().getPluginManager();
+		final String apiKey = config.getString("openai.api-key");
+		if (apiKey == null || apiKey.isEmpty()
+			|| "YOUR_OPENAI_API_KEY_HERE".equals(apiKey)) {
+			getLogger().severe("OpenAI API key is not set in config.yml!");
+			Bukkit.getPluginManager().disablePlugin(this);
+			return;
+		}
+
+		final OpenAiChatModel chatModel = OpenAiChatModel.builder()
+			.apiKey(apiKey)
+			.modelName(OpenAiChatModelName.GPT_4_O_MINI)
+			.build();
+
+		final QuestGenerationService questService =
+			new QuestGenerationService(this, chatModel);
+		final ConversationManager conversationManager =
+			new ConversationManager(this, chatModel);
+		conversationManager.setQuestService(questService);
+
+		final PluginManager pm = getServer().getPluginManager();
+
+		plugins.add(new AutoVillagerPlugin(this));
+		plugins.add(new RandomQuestPlugin(this, conversationManager,
+			questService, chatModel));
+		plugins.add(new WanderingPeasantPlugin(this, conversationManager,
+			questService, chatModel));
 
 		plugins.forEach(p -> {
 			pm.registerEvents(p, this);
@@ -47,8 +78,6 @@ public class Plugin extends JavaPlugin implements Listener {
 	public void onDisable() {
 		HandlerList.unregisterAll((Listener) this);
 
-		plugins.forEach(p -> {
-			p.onDisable();
-		});
+		plugins.forEach(SubPlugin::onDisable);
 	}
 }
