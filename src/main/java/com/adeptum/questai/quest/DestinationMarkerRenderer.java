@@ -49,7 +49,7 @@ public final class DestinationMarkerRenderer extends MapRenderer {
 		final int markerZ = 64 + dz / scaleVal;
 
 		final byte color = (byte) 116; // bright red
-		if (markerX >= 1 && markerX < 127 && markerZ >= 1 && markerZ < 127) {
+		if (markerX >= 2 && markerX <= 125 && markerZ >= 2 && markerZ <= 125) {
 			mapCanvas.setPixel(markerX, markerZ, color);
 			mapCanvas.setPixel(markerX - 1, markerZ, color);
 			mapCanvas.setPixel(markerX + 1, markerZ, color);

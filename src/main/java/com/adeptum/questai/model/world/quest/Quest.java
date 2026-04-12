@@ -47,7 +47,7 @@ public class Quest {
 			case KILL -> "- Objective: Kill %d %s".formatted(objective.getAmount(), objective.getTarget());
 			case COLLECT -> "- Objective: Collect %d %s".formatted(objective.getAmount(), objective.getTarget());
 			case TREASURE -> "- Objective: Find a hidden chest in the world.";
-			case FIND_NPC -> "Objective: Locate an NPC.";
+			case FIND_NPC -> "- Objective: Locate an NPC.";
 		};
 		sb.append(objectiveLine).append('\n');
 
