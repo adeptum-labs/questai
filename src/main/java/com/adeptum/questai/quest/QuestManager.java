@@ -234,6 +234,10 @@ public class QuestManager {
 		return playerQuests.get(player.getUniqueId());
 	}
 
+	public boolean hasActiveQuest(Player player) {
+		return playerQuests.containsKey(player.getUniqueId());
+	}
+
 	/**
 	 * Increments the quest progress for a player.
 	 *

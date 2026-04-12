@@ -233,6 +233,18 @@ class QuestManagerTest {
 	}
 
 	@Test
+	void hasActiveQuestReturnsTrueWhenQuestAssigned() {
+		final Quest quest = createKillQuest(5);
+		assertFalse(questManager.hasActiveQuest(player));
+
+		questManager.assignQuest(player, quest);
+		assertTrue(questManager.hasActiveQuest(player));
+
+		questManager.completeQuest(player);
+		assertFalse(questManager.hasActiveQuest(player));
+	}
+
+	@Test
 	void cleanupAllQuestsClearsAllState() {
 		final Quest quest = createKillQuest(5);
 		questManager.assignQuest(player, quest);

@@ -34,6 +34,7 @@ public class Quest {
 	private int rewardAmount;
 	private Location destination;
 	private UUID villagerUuid;
+	private String narrative;
 
 	public String prompt() {
 		final StringBuilder sb = new StringBuilder(320);
