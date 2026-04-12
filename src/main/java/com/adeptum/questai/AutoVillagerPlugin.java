@@ -1,6 +1,7 @@
 
 package com.adeptum.questai;
 
+import com.adeptum.questai.model.VillageInfo;
 import java.util.Collection;
 import java.util.Set;
 import org.bukkit.Bukkit;
@@ -102,13 +103,13 @@ public class AutoVillagerPlugin implements SubPlugin {
 		// Retrieve village information
 		VillageInfo villageInfo = getVillageInfo(world, playerLoc);
 
-		if (!villageInfo.isVillage()) {
+		if (!villageInfo.village()) {
 			// Not within a village; no action needed
 			return;
 		}
 
-		int bedCount = villageInfo.getBedCount();
-		int currentVillagerCount = villageInfo.getVillagerCount();
+		int bedCount = villageInfo.bedCount();
+		int currentVillagerCount = villageInfo.villagerCount();
 
 		// Calculate the number of villagers to spawn to match the number of beds
 		int desiredVillagerCount = bedCount;
