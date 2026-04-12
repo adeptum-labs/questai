@@ -4,6 +4,8 @@
 
 # QuestAI
 
+[![License: LGPL v3](https://img.shields.io/badge/License-LGPL_v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
+
 QuestAI is a Paper Minecraft server plugin that turns villagers into generated quest givers. It scans nearby villages,
 keeps them populated, names villagers with AI-generated names, lets players accept generated quests through an inventory
 dialogue, tracks quest progress, and rewards players with mcMMO XP.
