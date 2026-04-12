@@ -21,7 +21,6 @@
 package com.adeptum.questai;
 
 import com.adeptum.questai.model.VillageInfo;
-import java.util.Collection;
 import java.util.Set;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -209,26 +208,18 @@ public class AutoVillagerPlugin implements SubPlugin {
 		int bedCount = 0;
 		int workstationCount = 0;
 
-		outerLoop:
 		for (int x = minX; x <= maxX; x++) {
 			for (int z = minZ; z <= maxZ; z++) {
 				for (int y = minY; y <= maxY; y++) {
-					Block block = world.getBlockAt(x, y, z);
-					Material type = block.getType();
+					final Block block = world.getBlockAt(x, y, z);
+					final Material type = block.getType();
 
-					// Check for beds
 					if (isBed(type)) {
 						bedCount++;
 					}
 
-					// Check for workstations
 					if (isWorkstation(type)) {
 						workstationCount++;
-					}
-
-					// If both criteria are met, no need to continue scanning
-					if (hasRequiredVillageBlocks(bedCount, workstationCount)) {
-						break outerLoop;
 					}
 				}
 			}
@@ -246,13 +237,11 @@ public class AutoVillagerPlugin implements SubPlugin {
 	}
 
 	private int countNearbyVillagers(World world, Location location) {
-		Collection<Villager> nearbyVillagers = world
+		return (int) world
 			.getNearbyEntities(location, SEARCH_RADIUS, SEARCH_RADIUS, SEARCH_RADIUS)
 			.stream()
 			.filter(e -> e.getType() == EntityType.VILLAGER)
-			.map(e -> (Villager) e)
-			.toList();
-		return nearbyVillagers.size();
+			.count();
 	}
 
 	/**
