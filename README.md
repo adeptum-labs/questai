@@ -1,5 +1,5 @@
 <p align="center">
-	<img src="docs/assets/questai-logo.svg" alt="QuestAI logo" width="640">
+	<img src="docs/assets/questai-logo.svg" alt="QuestAI logo">
 </p>
 
 # QuestAI
