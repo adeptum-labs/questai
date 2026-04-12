@@ -9,7 +9,8 @@ keeps them populated, names villagers with AI-generated names, lets players acce
 dialogue, tracks quest progress, and rewards players with mcMMO XP.
 
 The current implementation is intentionally small: one Bukkit entry point coordinates a few `SubPlugin` modules, while
-the quest system lives mostly inside `RandomQuestPlugin`.
+the quest system is split across `RandomQuestPlugin` (event handlers and AI generation) and the `quest` package
+(`QuestManager`, `QuestProgress`, `DestinationMarkerRenderer`).
 
 ## Features
 
@@ -29,15 +30,16 @@ flowchart TD
 	PluginYml[plugin.yml] --> Root[Plugin]
 	Root --> AutoVillager[AutoVillagerPlugin]
 	Root --> RandomQuest[RandomQuestPlugin]
-	RandomQuest --> QuestManager[QuestManager]
+	RandomQuest --> QM[quest.QuestManager]
 	RandomQuest --> OpenAI[OpenAiChatModel]
 	RandomQuest --> BukkitEvents[Bukkit event handlers]
 	RandomQuest --> McMMO[mcMMO ExperienceAPI]
-	QuestManager --> QuestProgress[QuestProgress]
-	QuestManager --> Npc[Npc cache]
-	QuestProgress --> Quest[Quest]
+	QM --> QP[quest.QuestProgress]
+	QM --> Npc[Npc cache]
+	QP --> Quest[Quest]
 	Quest --> Objective[QuestObjective]
-	AutoVillager --> VillageInfo[VillageInfo]
+	RandomQuest --> DMR[quest.DestinationMarkerRenderer]
+	AutoVillager --> VillageInfo[model.VillageInfo]
 	FlyingPig[FlyingPigPlugin] -. not currently registered .-> Root
 ```
 
@@ -47,8 +49,9 @@ flowchart TD
 | --- | --- | --- |
 | Plugin entry point | `Plugin`, `plugin.yml` | Starts and stops the subplugins. |
 | Village maintenance | `AutoVillagerPlugin`, `VillageInfo` | Detects nearby village blocks and spawns villagers up to bed count. |
-| Quest system | `RandomQuestPlugin`, `Quest`, `QuestObjective`, `Npc` | Generates dialogue and quests, opens the GUI, tracks progress, and grants rewards. |
-| World helpers | `SpawnLocator`, `EnumUtil` | Utility code for random enum values and spawn location scanning. |
+| Quest system | `RandomQuestPlugin`, `QuestManager`, `QuestProgress`, `Quest`, `QuestObjective`, `Npc` | Generates dialogue and quests, opens the GUI, tracks progress, and grants rewards. |
+| Map rendering | `DestinationMarkerRenderer` | Draws destination markers on quest maps for `TREASURE` and `FIND_NPC` quests. |
+| Utility | `EnumUtil` | Random enum value selection. |
 | Experimental content | `FlyingPigPlugin` | Floating pig behavior for new chunks; present but not enabled from `Plugin`. |
 
 ## Quest Flow
@@ -111,6 +114,14 @@ openai.api-key: "your-api-key"
 artifacts that should be shared. If a local `config.yml` exists when packaging, Maven can include it in the plugin jar
 because the POM lists it as a resource.
 
+## Testing
+
+```bash
+mvn test
+```
+
+Tests use JUnit 5 with Mockito to mock Bukkit server types. No live Minecraft server is needed.
+
 ## Build And Checks
 
 Requirements:
@@ -123,6 +134,7 @@ Useful commands:
 
 ```bash
 mvn clean compile
+mvn test
 mvn pmd:check checkstyle:check
 mvn package
 ```
