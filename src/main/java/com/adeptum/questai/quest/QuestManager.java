@@ -32,6 +32,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 import org.bukkit.Bukkit;
@@ -47,10 +48,10 @@ import org.bukkit.scheduler.BukkitTask;
  * Manages active quests, NPC data, boss bars, and scheduled progress tasks.
  */
 public class QuestManager {
-	private final Map<UUID, QuestProgress> playerQuests = new HashMap<>();
-	private final Map<UUID, Npc> npcs = new HashMap<>();
-	private final Map<UUID, UUID> villagerIndicators = new HashMap<>();
-	private final Map<UUID, BukkitTask> questTasks = new HashMap<>();
+	private final Map<UUID, QuestProgress> playerQuests = new ConcurrentHashMap<>();
+	private final Map<UUID, Npc> npcs = new ConcurrentHashMap<>();
+	private final Map<UUID, UUID> villagerIndicators = new ConcurrentHashMap<>();
+	private final Map<UUID, BukkitTask> questTasks = new ConcurrentHashMap<>();
 
 	private final JavaPlugin plugin;
 	private final Logger logger;
@@ -108,9 +109,9 @@ public class QuestManager {
 			Bukkit.getScheduler().runTask(plugin, () -> {
 				player.sendMessage("§cYour quest '"
 					+ quest.getShortTitle() + "' has expired.");
-				completeQuest(player);
-				removeBossBars(player, progress);
 				bookRemover.accept(player);
+				removeBossBars(player, progress);
+				completeQuest(player);
 			});
 			cancelQuestTask(player);
 			return;
@@ -120,10 +121,11 @@ public class QuestManager {
 			remainingTime / (double) sixHoursMillis, 0
 		);
 		Bukkit.getScheduler().runTask(plugin, () -> {
-			progress.getTimerBossBar().setProgress(timerProgress);
-			progress.getTimerBossBar().setTitle(
-				"Time Remaining: " + formatTime(remainingTime)
-			);
+			final BossBar bar = progress.getTimerBossBar();
+			if (bar != null) {
+				bar.setProgress(timerProgress);
+				bar.setTitle("Time Remaining: " + formatTime(remainingTime));
+			}
 		});
 
 		if (EnumSet.of(FIND_NPC, TREASURE).contains(quest.getObjective().getType())) {
@@ -143,20 +145,21 @@ public class QuestManager {
 			Math.max(1.0 - (distance / progress.getMaxDistance()), 0.0), 1.0
 		);
 		Bukkit.getScheduler().runTask(plugin, () -> {
-			progress.getObjectiveBossBar().setProgress(progressPercent);
-			progress.getObjectiveBossBar().setTitle(
-				"Distance to Destination: "
-					+ String.format("%.2f", distance) + " blocks"
-			);
+			final BossBar bar = progress.getObjectiveBossBar();
+			if (bar != null) {
+				bar.setProgress(progressPercent);
+				bar.setTitle("Distance to Destination: "
+					+ String.format("%.2f", distance) + " blocks");
+			}
 		});
 
 		if (distance <= 10) {
 			Bukkit.getScheduler().runTask(plugin, () -> {
 				player.sendMessage("§aYou have reached the destination for quest '"
 					+ quest.getShortTitle() + "'.");
-				completeQuest(player);
-				removeBossBars(player, progress);
 				bookRemover.accept(player);
+				removeBossBars(player, progress);
+				completeQuest(player);
 			});
 			cancelQuestTask(player);
 		}
@@ -171,19 +174,20 @@ public class QuestManager {
 			Math.max((double) current / required, 0.0), 1.0
 		);
 		Bukkit.getScheduler().runTask(plugin, () -> {
-			progress.getObjectiveBossBar().setProgress(progressPercent);
-			progress.getObjectiveBossBar().setTitle(
-				"Objective Progress: " + current + "/" + required
-			);
+			final BossBar bar = progress.getObjectiveBossBar();
+			if (bar != null) {
+				bar.setProgress(progressPercent);
+				bar.setTitle("Objective Progress: " + current + "/" + required);
+			}
 		});
 
 		if (current >= required) {
 			Bukkit.getScheduler().runTask(plugin, () -> {
 				player.sendMessage("§aYou have completed the objective for quest '"
 					+ quest.getShortTitle() + "'.");
-				completeQuest(player);
-				removeBossBars(player, progress);
 				bookRemover.accept(player);
+				removeBossBars(player, progress);
+				completeQuest(player);
 			});
 			cancelQuestTask(player);
 		}
@@ -215,11 +219,15 @@ public class QuestManager {
 		}
 	}
 
-	public void completeQuest(Player player) {
+	public boolean completeQuest(Player player) {
+		final QuestProgress removed = playerQuests.remove(player.getUniqueId());
+		if (removed == null) {
+			return false;
+		}
 		logger.info("[QuestManager] completeQuest() -> Removing quest for player: "
 			+ player.getName());
-		playerQuests.remove(player.getUniqueId());
 		cancelQuestTask(player);
+		return true;
 	}
 
 	public QuestProgress getQuestProgress(Player player) {
@@ -285,16 +293,24 @@ public class QuestManager {
 	 * Cleans up all active quests, BossBars, and scheduled tasks.
 	 */
 	public void cleanupAllQuests() {
-		for (Map.Entry<UUID, QuestProgress> entry : playerQuests.entrySet()) {
+		for (Map.Entry<UUID, QuestProgress> entry : new HashMap<>(playerQuests).entrySet()) {
 			final Player player = Bukkit.getPlayer(entry.getKey());
 			if (player != null) {
+				bookRemover.accept(player);
 				removeBossBars(player, entry.getValue());
 				cancelQuestTask(player);
-				bookRemover.accept(player);
 			}
 		}
 		playerQuests.clear();
 		questTasks.clear();
 		npcs.clear();
+
+		for (UUID standId : villagerIndicators.values()) {
+			final var entity = Bukkit.getEntity(standId);
+			if (entity != null) {
+				entity.remove();
+			}
+		}
+		villagerIndicators.clear();
 	}
 }

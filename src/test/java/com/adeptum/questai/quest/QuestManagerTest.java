@@ -186,13 +186,29 @@ class QuestManagerTest {
 	}
 
 	@Test
-	void completeQuestRemovesProgress() {
+	void completeQuestRemovesProgressAndReturnsTrue() {
 		final Quest quest = createKillQuest(5);
 		questManager.assignQuest(player, quest);
 
-		questManager.completeQuest(player);
+		final boolean result = questManager.completeQuest(player);
 
+		assertTrue(result);
 		assertNull(questManager.getQuestProgress(player));
+	}
+
+	@Test
+	void completeQuestReturnsFalseWhenNoActiveQuest() {
+		final boolean result = questManager.completeQuest(player);
+		assertFalse(result);
+	}
+
+	@Test
+	void completeQuestReturnsFalseOnSecondCall() {
+		final Quest quest = createKillQuest(5);
+		questManager.assignQuest(player, quest);
+
+		assertTrue(questManager.completeQuest(player));
+		assertFalse(questManager.completeQuest(player));
 	}
 
 	@Test
@@ -221,12 +237,19 @@ class QuestManagerTest {
 		final Quest quest = createKillQuest(5);
 		questManager.assignQuest(player, quest);
 
+		final UUID villagerId = UUID.randomUUID();
+		final UUID armorStandId = UUID.randomUUID();
+		questManager.setIndicator(villagerId, armorStandId);
+
 		bukkitMock.when(() -> Bukkit.getPlayer(player.getUniqueId()))
 			.thenReturn(player);
+		bukkitMock.when(() -> Bukkit.getEntity(armorStandId))
+			.thenReturn(null);
 
 		questManager.cleanupAllQuests();
 
 		assertNull(questManager.getQuestProgress(player));
+		assertNull(questManager.getIndicator(villagerId));
 		verify(objectiveBar).removePlayer(player);
 		verify(timerBar).removePlayer(player);
 		verify(bookRemover).accept(player);
