@@ -61,7 +61,6 @@ public class FlyingPigPlugin implements SubPlugin { // Implement Listener interf
 	@Override
 	public void onEnable() {
 		log.atInfo().log("Flying Pigs Plugin Enabled!");
-		Bukkit.getPluginManager().registerEvents(this, plugin);
 
 		// Schedule a task to keep flying pigs floating
 		new KeepFlyingTask().runTaskTimer(plugin, 20L, 20L); // Runs every second
@@ -121,7 +120,7 @@ public class FlyingPigPlugin implements SubPlugin { // Implement Listener interf
 		public void run() {
 			for (World world : Bukkit.getWorlds()) {
 				world.getEntitiesByClass(Pig.class).stream().filter(pig -> {
-					return pig.customName() != null && "Flying Pig".equals(pig.customName().toString());
+					return Component.text("Flying Pig").equals(pig.customName());
 				}).forEach(pig -> {
 					if (pig.getLocation().getY() < 80) {
 						pig.setVelocity(UPWARD_VELOCITY);

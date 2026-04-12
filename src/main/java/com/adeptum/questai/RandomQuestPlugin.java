@@ -59,7 +59,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.MapMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.map.MapView;
-import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
@@ -114,9 +113,6 @@ public class RandomQuestPlugin implements SubPlugin {
 	public void onEnable() {
 		final Logger logger = plugin.getLogger();
 		logger.info("[RandomQuestPlugin] onEnable() start");
-
-		final PluginManager pm = plugin.getServer().getPluginManager();
-		pm.registerEvents(this, plugin);
 
 		plugin.saveDefaultConfig();
 		final FileConfiguration config = plugin.getConfig();
@@ -300,7 +296,7 @@ public class RandomQuestPlugin implements SubPlugin {
 					"[generateUniqueNameForVillager] Failed to generate villager name.", e
 				);
 				Bukkit.getScheduler().runTask(plugin, ()
-					-> villager.setCustomName("§a")
+					-> villager.setCustomName("§aVillager")
 				);
 			}
 		});
@@ -399,22 +395,6 @@ public class RandomQuestPlugin implements SubPlugin {
 
 					questManager.setVillagerData(villager.getUniqueId(), npc);
 					openQuestDialogue(player, quest);
-
-					if (objective.getType() == TREASURE) {
-						spawnTreasureChest(quest.getDestination());
-						final ItemStack mapItem = createMapItem(
-							quest.getDestination(), "Treasure Hunt"
-						);
-						player.getInventory().addItem(mapItem);
-					} else if (objective.getType() == FIND_NPC) {
-						spawnHiddenVillager(
-							quest.getDestination(), "Hidden NPC"
-						);
-						final ItemStack mapItem = createMapItem(
-							quest.getDestination(), "Find NPC"
-						);
-						player.getInventory().addItem(mapItem);
-					}
 
 					player.sendMessage("§a"
 						+ villagerUniqueNames.get(villager.getUniqueId())
@@ -710,6 +690,20 @@ public class RandomQuestPlugin implements SubPlugin {
 
 			if (pendingQuest != null) {
 				questManager.assignQuest(player, pendingQuest);
+
+				final QuestObjective.Type type = pendingQuest.getObjective().getType();
+				if (type == TREASURE) {
+					spawnTreasureChest(pendingQuest.getDestination());
+					player.getInventory().addItem(
+						createMapItem(pendingQuest.getDestination(), "Treasure Hunt")
+					);
+				} else if (type == FIND_NPC) {
+					spawnHiddenVillager(pendingQuest.getDestination(), "Hidden NPC");
+					player.getInventory().addItem(
+						createMapItem(pendingQuest.getDestination(), "Find NPC")
+					);
+				}
+
 				player.sendMessage("§aYou have accepted the quest: "
 					+ pendingQuest.getTitle());
 
@@ -775,10 +769,10 @@ public class RandomQuestPlugin implements SubPlugin {
 			if (isComplete) {
 				killer.sendMessage("§6Quest Update: You've completed the objective!");
 				rewardPlayer(killer, quest);
+				removeQuestBook(killer);
 				questManager.completeQuest(killer);
 				questManager.setVillagerData(quest.getVillagerUuid(), null);
 				removeQuestIndicator(quest.getVillagerUuid());
-				removeQuestBook(killer);
 			} else {
 				killer.sendMessage("§eQuest Update: " + questProgress.getCurrent()
 					+ "/" + objective.getAmount() + " " + targetMob + "(s) killed.");
@@ -814,10 +808,10 @@ public class RandomQuestPlugin implements SubPlugin {
 			if (isComplete) {
 				player.sendMessage("§6Quest Update: You've completed the objective!");
 				rewardPlayer(player, quest);
+				removeQuestBook(player);
 				questManager.completeQuest(player);
 				questManager.setVillagerData(quest.getVillagerUuid(), null);
 				removeQuestIndicator(quest.getVillagerUuid());
-				removeQuestBook(player);
 			} else {
 				player.sendMessage("§eQuest Update: " + questProgress.getCurrent()
 					+ "/" + objective.getAmount()
@@ -948,12 +942,15 @@ public class RandomQuestPlugin implements SubPlugin {
 		if (EnumSet.of(TREASURE, FIND_NPC).contains(quest.getObjective().getType())
 			&& quest.getDestination().distance(player.getLocation()) <= 10) {
 
+			removeQuestBook(player);
+			if (!questManager.completeQuest(player)) {
+				return;
+			}
+
 			player.sendMessage("§aYou have completed the quest: " + quest.getTitle());
 			rewardPlayer(player, quest);
-			questManager.completeQuest(player);
 			questManager.setVillagerData(villager.getUniqueId(), null);
 			removeQuestIndicator(villager.getUniqueId());
-			removeQuestBook(player);
 
 			if (quest.getObjective().getType() == TREASURE) {
 				quest.getDestination().getBlock().setType(Material.AIR);
