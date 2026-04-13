@@ -56,9 +56,6 @@ public class ConversationManager {
 		this.plugin = plugin;
 		this.chatModel = chatModel;
 	}
-
-	// ------------------- Setters (break circular dependencies) -------------------
-
 	public void setQuestManager(final QuestManager questManager) {
 		this.questManager = questManager;
 	}
@@ -70,9 +67,6 @@ public class ConversationManager {
 	public void setQuestAcceptHandler(final BiConsumer<Player, Quest> handler) {
 		this.questAcceptHandler = handler;
 	}
-
-	// ------------------- Conversation lifecycle -------------------
-
 	public void startConversation(final Player player, final UUID npcUuid,
 		final String npcName, final String profession, final boolean questAvailable) {
 
@@ -143,9 +137,6 @@ public class ConversationManager {
 	public ConversationState getState(final Player player) {
 		return conversations.get(player.getUniqueId());
 	}
-
-	// ------------------- Phase handlers -------------------
-
 	private void handleGreeting(final Player player, final int slot,
 		final ConversationState state, final String npcName, final String profession) {
 
@@ -222,9 +213,6 @@ public class ConversationManager {
 			endConversation(player);
 		}
 	}
-
-	// ------------------- Async flows -------------------
-
 	private void startQuestOffer(final Player player, final ConversationState state,
 		final String npcName, final String profession) {
 
@@ -313,9 +301,6 @@ public class ConversationManager {
 			}
 		});
 	}
-
-	// ------------------- Helpers -------------------
-
 	private String callAi(final String prompt) {
 		final ChatRequest request = ChatRequest.builder()
 			.messages(UserMessage.from(prompt))

@@ -82,9 +82,6 @@ public class QuestManager {
 	public QuestLogBook getQuestLogBook() {
 		return questLogBook;
 	}
-
-	// ------------------- Quest lifecycle -------------------
-
 	/**
 	 * Assigns a quest to a player, initialises BossBars, and ensures the
 	 * player has a quest log book.
@@ -270,9 +267,6 @@ public class QuestManager {
 
 		return progress.getCurrent() >= objective.getAmount() ? progress : null;
 	}
-
-	// ------------------- Async progress updates -------------------
-
 	private void updateAllQuests(final Player player) {
 		final List<QuestProgress> quests = playerQuests.get(player.getUniqueId());
 		if (quests == null || quests.isEmpty()) {
@@ -396,9 +390,6 @@ public class QuestManager {
 			task.cancel();
 		}
 	}
-
-	// ------------------- Villager NPC Management -------------------
-
 	public Npc getVillagerData(final UUID villagerId) {
 		return npcs.get(villagerId);
 	}
@@ -422,9 +413,6 @@ public class QuestManager {
 	public void removeIndicator(final UUID villagerId) {
 		villagerIndicators.remove(villagerId);
 	}
-
-	// ------------------- Cleanup -------------------
-
 	/**
 	 * Cleans up all active quests, BossBars, and scheduled tasks for all
 	 * players. Called on plugin disable.

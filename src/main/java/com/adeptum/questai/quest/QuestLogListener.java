@@ -45,9 +45,6 @@ public class QuestLogListener implements Listener {
 	public QuestLogListener(final QuestManager questManager) {
 		this.questManager = questManager;
 	}
-
-	// ------------------- Right-click book → open GUI -------------------
-
 	@EventHandler(priority = EventPriority.HIGH)
 	public void onPlayerInteract(final PlayerInteractEvent event) {
 		if (event.getAction() != Action.RIGHT_CLICK_AIR
@@ -66,9 +63,6 @@ public class QuestLogListener implements Listener {
 		final List<QuestProgress> quests = questManager.getActiveQuests(player);
 		player.openInventory(QuestLogGui.create(quests));
 	}
-
-	// ------------------- Drop book → evaporate + cancel all -------------------
-
 	@EventHandler(priority = EventPriority.HIGH)
 	public void onDropQuestLogBook(final PlayerDropItemEvent event) {
 		if (!questManager.getQuestLogBook().isQuestLogBook(event.getItemDrop().getItemStack())) {
@@ -86,9 +80,6 @@ public class QuestLogListener implements Listener {
 				Sound.BLOCK_FIRE_EXTINGUISH, 0.8f, 1.2f);
 		}
 	}
-
-	// ------------------- Death → remove book from drops, cancel all -------------------
-
 	@EventHandler
 	public void onPlayerDeath(final PlayerDeathEvent event) {
 		final Player player = event.getEntity();
@@ -101,9 +92,6 @@ public class QuestLogListener implements Listener {
 		// Message will be seen on respawn via server log;
 		// avoid spamming the death screen.
 	}
-
-	// ------------------- Quest log GUI clicks -------------------
-
 	@EventHandler
 	public void onInventoryClick(final InventoryClickEvent event) {
 		if (!event.getView().getTitle().equals(QuestLogGui.TITLE)) {

@@ -102,9 +102,6 @@ public class WanderingPeasantPlugin implements SubPlugin {
 		peasantNames.clear();
 		plugin.getLogger().info("[WanderingPeasantPlugin] Disabled.");
 	}
-
-	// ------------------- Spawning -------------------
-
 	private void trySpawnPeasant(Player player) {
 		if (!player.isOnline()) {
 			return;
@@ -215,9 +212,6 @@ public class WanderingPeasantPlugin implements SubPlugin {
 		peasantIds.remove(traderId);
 		peasantNames.remove(traderId);
 	}
-
-	// ------------------- Event Handlers -------------------
-
 	@EventHandler(priority = EventPriority.HIGH)
 	public void onTraderInteract(PlayerInteractEntityEvent event) {
 		final Entity clicked = event.getRightClicked();

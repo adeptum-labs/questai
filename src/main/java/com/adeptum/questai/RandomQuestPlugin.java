@@ -108,9 +108,6 @@ public class RandomQuestPlugin implements SubPlugin {
 		this.questService = questService;
 		this.chatModel = chatModel;
 	}
-
-	// ------------------- Lifecycle -------------------
-
 	@Override
 	public void onEnable() {
 		final Logger logger = plugin.getLogger();
@@ -136,9 +133,6 @@ public class RandomQuestPlugin implements SubPlugin {
 	public QuestManager getQuestManager() {
 		return questManager;
 	}
-
-	// ------------------- Villager Interaction -------------------
-
 	@EventHandler
 	public void onVillagerClick(PlayerInteractEntityEvent event) {
 		final Entity clicked = event.getRightClicked();
@@ -172,9 +166,6 @@ public class RandomQuestPlugin implements SubPlugin {
 		conversationManager.startConversation(player, villager.getUniqueId(),
 			uniqueName, profession, questAvailable);
 	}
-
-	// ------------------- Dialogue Inventory Events -------------------
-
 	@EventHandler
 	public void onInventoryClick(InventoryClickEvent event) {
 		if (!event.getView().getTitle().equals(DialogueGui.DIALOGUE_TITLE)) {
@@ -216,9 +207,6 @@ public class RandomQuestPlugin implements SubPlugin {
 			});
 		}
 	}
-
-	// ------------------- Quest Acceptance Callback -------------------
-
 	private void onQuestAccepted(Player player, Quest quest) {
 		final QuestObjective.Type type = quest.getObjective().getType();
 
@@ -232,9 +220,6 @@ public class RandomQuestPlugin implements SubPlugin {
 				createMapItem(quest.getDestination(), "Find NPC"));
 		}
 	}
-
-	// ------------------- Quest Cleanup Callback -------------------
-
 	/**
 	 * Cleans up spawned entities and items associated with an abandoned or
 	 * expired quest: treasure chests, hidden NPCs, quest maps.
@@ -284,9 +269,6 @@ public class RandomQuestPlugin implements SubPlugin {
 			}
 		}
 	}
-
-	// ------------------- Villager Name Management -------------------
-
 	private void loadVillagerNames() {
 		final File configFile = new File(plugin.getDataFolder(), "config.yml");
 		final FileConfiguration cfg = YamlConfiguration.loadConfiguration(configFile);
@@ -393,18 +375,12 @@ public class RandomQuestPlugin implements SubPlugin {
 				"[saveVillagerUniqueNames] Failed to save config.", e);
 		}
 	}
-
-	// ------------------- Reward MCMMO XP -------------------
-
 	private void rewardPlayer(Player player, Quest quest) {
 		final String skill = quest.getRewardTarget();
 		final int xp = quest.getRewardAmount();
 		ExperienceAPI.addRawXP(player, skill, xp,
 			"§aYou earned " + xp + " MCMMO XP in " + skill + "!");
 	}
-
-	// ------------------- Quest Indicators -------------------
-
 	private void removeQuestIndicator(UUID villagerId) {
 		final UUID standId = questManager.getIndicator(villagerId);
 		if (standId != null) {
@@ -415,9 +391,6 @@ public class RandomQuestPlugin implements SubPlugin {
 		}
 		questManager.removeIndicator(villagerId);
 	}
-
-	// ------------------- Spawning -------------------
-
 	private void spawnTreasureChest(org.bukkit.Location loc) {
 		loc.getBlock().setType(Material.CHEST);
 		if (loc.getBlock().getState() instanceof org.bukkit.block.Chest cstate) {
@@ -454,9 +427,6 @@ public class RandomQuestPlugin implements SubPlugin {
 		mapItem.setItemMeta(meta);
 		return mapItem;
 	}
-
-	// ------------------- Kill Quest Tracking -------------------
-
 	@EventHandler
 	public void onEntityDeath(EntityDeathEvent event) {
 		final LivingEntity entity = event.getEntity();
@@ -489,9 +459,6 @@ public class RandomQuestPlugin implements SubPlugin {
 			}
 		}
 	}
-
-	// ------------------- Collect Quest Tracking -------------------
-
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
 	public void onPlayerPickupItem(PlayerPickupItemEvent event) {
 		final Player player = event.getPlayer();
@@ -519,9 +486,6 @@ public class RandomQuestPlugin implements SubPlugin {
 			}
 		}
 	}
-
-	// ------------------- Destination Quest Completion -------------------
-
 	@EventHandler
 	@SuppressWarnings("checkstyle:CyclomaticComplexity")
 	public void onPlayerInteractVillagerCompletion(PlayerInteractEntityEvent event) {
@@ -572,9 +536,6 @@ public class RandomQuestPlugin implements SubPlugin {
 		player.playSound(
 			player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
 	}
-
-	// ------------------- Chunk Load -------------------
-
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
 	public void onChunkLoad(ChunkLoadEvent event) {
 		final Chunk chunk = event.getChunk();

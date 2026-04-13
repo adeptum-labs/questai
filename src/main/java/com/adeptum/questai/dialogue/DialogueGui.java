@@ -49,9 +49,6 @@ public final class DialogueGui {
 
 	private DialogueGui() {
 	}
-
-	// ------------------- Base Layout -------------------
-
 	private static Inventory createBase(final String npcName, final String profession,
 		final String dialogueText) {
 
@@ -84,9 +81,6 @@ public final class DialogueGui {
 
 		return inv;
 	}
-
-	// ------------------- Factory Methods -------------------
-
 	public static Inventory createGreeting(final String npcName, final String profession,
 		final String greetingText) {
 
@@ -160,9 +154,6 @@ public final class DialogueGui {
 			button(Material.CLOCK, "\u00a77\u00a7lPlease wait..."));
 		return inv;
 	}
-
-	// ------------------- Helpers -------------------
-
 	private static ItemStack button(final Material material, final String displayName) {
 		final ItemStack item = new ItemStack(material);
 		final ItemMeta meta = item.getItemMeta();

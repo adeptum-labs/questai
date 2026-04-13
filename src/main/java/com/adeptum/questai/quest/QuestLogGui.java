@@ -82,9 +82,6 @@ public final class QuestLogGui {
 		}
 		return inv;
 	}
-
-	// ------------------- Item builders -------------------
-
 	private static ItemStack questItem(final QuestProgress progress) {
 		final Quest quest = progress.getQuest();
 		final QuestObjective obj = quest.getObjective();
@@ -134,9 +131,6 @@ public final class QuestLogGui {
 		item.setItemMeta(meta);
 		return item;
 	}
-
-	// ------------------- Empty state -------------------
-
 	private static Inventory createEmpty() {
 		final Inventory inv = Bukkit.createInventory(null, ROWS, TITLE);
 		fillBorder(inv);
@@ -150,9 +144,6 @@ public final class QuestLogGui {
 
 		return inv;
 	}
-
-	// ------------------- Helpers -------------------
-
 	private static void fillBorder(final Inventory inv) {
 		final ItemStack filler = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
 		final ItemMeta meta = filler.getItemMeta();
