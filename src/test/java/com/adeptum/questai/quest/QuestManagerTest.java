@@ -23,8 +23,8 @@ package com.adeptum.questai.quest;
 import com.adeptum.questai.model.world.Npc;
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
+import java.util.List;
 import java.util.UUID;
-import java.util.function.Consumer;
 import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -51,26 +51,15 @@ import static org.mockito.Mockito.*;
 @SuppressWarnings("PMD.ExcessiveImports")
 class QuestManagerTest {
 
-	@Mock
-	private JavaPlugin plugin;
-
-	@Mock
-	private Player player;
-
-	@Mock
-	private BossBar objectiveBar;
-
-	@Mock
-	private BossBar timerBar;
-
-	@Mock
-	private BukkitScheduler scheduler;
-
-	@Mock
-	private BukkitTask task;
-
-	@Mock
-	private Consumer<Player> bookRemover;
+	@Mock private JavaPlugin plugin;
+	@Mock private Player player;
+	@Mock private BossBar bossBar1;
+	@Mock private BossBar bossBar2;
+	@Mock private BossBar bossBar3;
+	@Mock private BossBar bossBar4;
+	@Mock private BukkitScheduler scheduler;
+	@Mock private BukkitTask task;
+	@Mock private QuestLogBook questLogBook;
 
 	private MockedStatic<Bukkit> bukkitMock;
 	private QuestManager questManager;
@@ -83,10 +72,12 @@ class QuestManagerTest {
 
 		final Logger logger = Logger.getLogger("test");
 		when(plugin.getLogger()).thenReturn(logger);
+		when(plugin.getName()).thenReturn("questai");
 
+		// Return alternating boss bars for multiple quests
 		bukkitMock.when(() -> Bukkit.createBossBar(
 			anyString(), any(BarColor.class), any(BarStyle.class)
-		)).thenReturn(objectiveBar, timerBar);
+		)).thenReturn(bossBar1, bossBar2, bossBar3, bossBar4);
 
 		bukkitMock.when(Bukkit::getScheduler).thenReturn(scheduler);
 		when(scheduler.runTaskTimerAsynchronously(
@@ -97,7 +88,7 @@ class QuestManagerTest {
 		when(player.getUniqueId()).thenReturn(playerId);
 		when(player.getName()).thenReturn("TestPlayer");
 
-		questManager = new QuestManager(plugin, bookRemover);
+		questManager = new QuestManager(plugin, questLogBook);
 	}
 
 	@AfterEach
@@ -106,110 +97,230 @@ class QuestManagerTest {
 		mocks.close();
 	}
 
+	// ------------------- assignQuest -------------------
+
 	@Test
 	void assignQuestCreatesProgressWithBossBars() {
-		final Quest quest = createKillQuest(5);
+		final Quest quest = createKillQuest(5, "ZOMBIE");
 
 		questManager.assignQuest(player, quest);
 
-		final QuestProgress progress = questManager.getQuestProgress(player);
-		assertNotNull(progress);
-		assertSame(quest, progress.getQuest());
-		assertEquals(0, progress.getCurrent());
-		assertNotNull(progress.getObjectiveBossBar());
-		assertNotNull(progress.getTimerBossBar());
-
-		verify(objectiveBar).addPlayer(player);
-		verify(timerBar).addPlayer(player);
+		final List<QuestProgress> quests = questManager.getActiveQuests(player);
+		assertEquals(1, quests.size());
+		assertSame(quest, quests.get(0).getQuest());
+		assertEquals(0, quests.get(0).getCurrent());
+		verify(bossBar1).addPlayer(player);
+		verify(bossBar2).addPlayer(player);
 	}
 
 	@Test
-	void assignQuestFindNpcQuestSetsMaxDistance() {
-		final Quest quest = createDestinationQuest(QuestObjective.Type.FIND_NPC);
+	void assignMultipleQuestsTracksAll() {
+		questManager.assignQuest(player, createKillQuest(5, "ZOMBIE"));
+		questManager.assignQuest(player, createKillQuest(3, "SKELETON"));
 
+		final List<QuestProgress> quests = questManager.getActiveQuests(player);
+		assertEquals(2, quests.size());
+		assertEquals("ZOMBIE", quests.get(0).getQuest().getObjective().getTarget());
+		assertEquals("SKELETON", quests.get(1).getQuest().getObjective().getTarget());
+	}
+
+	@Test
+	void assignQuestFindNpcSetsMaxDistance() {
+		final Quest quest = createDestinationQuest(QuestObjective.Type.FIND_NPC);
 		final Location playerLoc = mock(Location.class);
 		final Location destination = mock(Location.class);
-
 		when(player.getLocation()).thenReturn(playerLoc);
 		when(playerLoc.distance(destination)).thenReturn(500.0);
 		quest.setDestination(destination);
 
 		questManager.assignQuest(player, quest);
 
-		final QuestProgress progress = questManager.getQuestProgress(player);
-		assertEquals(500.0, progress.getMaxDistance());
+		assertEquals(500.0, questManager.getActiveQuests(player).get(0).getMaxDistance());
+	}
+
+	// ------------------- findQuest -------------------
+
+	@Test
+	void findQuestReturnsMatchingProgress() {
+		questManager.assignQuest(player, createKillQuest(5, "ZOMBIE"));
+		questManager.assignQuest(player, createKillQuest(3, "SKELETON"));
+
+		final QuestProgress found = questManager.findQuest(
+			player, QuestObjective.Type.KILL, "SKELETON");
+		assertNotNull(found);
+		assertEquals("SKELETON", found.getQuest().getObjective().getTarget());
 	}
 
 	@Test
-	void incrementProgressKillQuestIncrementsCorrectly() {
-		final Quest quest = createKillQuest(5);
+	void findQuestReturnsNullWhenNoMatch() {
+		questManager.assignQuest(player, createKillQuest(5, "ZOMBIE"));
+
+		assertNull(questManager.findQuest(
+			player, QuestObjective.Type.KILL, "CREEPER"));
+	}
+
+	// ------------------- incrementProgress -------------------
+
+	@Test
+	void incrementProgressReturnsNullWhenNotComplete() {
+		questManager.assignQuest(player, createKillQuest(5, "ZOMBIE"));
+
+		final QuestProgress result = questManager.incrementProgress(
+			player, QuestObjective.Type.KILL, "ZOMBIE", 1);
+
+		assertNull(result);
+		assertEquals(1, questManager.getActiveQuests(player).get(0).getCurrent());
+	}
+
+	@Test
+	void incrementProgressReturnsProgressWhenComplete() {
+		questManager.assignQuest(player, createKillQuest(3, "ZOMBIE"));
+
+		questManager.incrementProgress(
+			player, QuestObjective.Type.KILL, "ZOMBIE", 2);
+		final QuestProgress result = questManager.incrementProgress(
+			player, QuestObjective.Type.KILL, "ZOMBIE", 1);
+
+		assertNotNull(result);
+		assertEquals(3, result.getCurrent());
+	}
+
+	@Test
+	void incrementProgressReturnsNullWhenNoMatchingQuest() {
+		assertNull(questManager.incrementProgress(
+			player, QuestObjective.Type.KILL, "ZOMBIE", 1));
+	}
+
+	@Test
+	void incrementProgressOnlyAffectsMatchingQuest() {
+		questManager.assignQuest(player, createKillQuest(5, "ZOMBIE"));
+		questManager.assignQuest(player, createKillQuest(3, "SKELETON"));
+
+		questManager.incrementProgress(
+			player, QuestObjective.Type.KILL, "SKELETON", 2);
+
+		final List<QuestProgress> quests = questManager.getActiveQuests(player);
+		assertEquals(0, quests.get(0).getCurrent()); // ZOMBIE unchanged
+		assertEquals(2, quests.get(1).getCurrent()); // SKELETON incremented
+	}
+
+	// ------------------- completeQuest -------------------
+
+	@Test
+	void completeQuestRemovesSpecificQuest() {
+		final Quest zombie = createKillQuest(5, "ZOMBIE");
+		final Quest skeleton = createKillQuest(3, "SKELETON");
+		questManager.assignQuest(player, zombie);
+		questManager.assignQuest(player, skeleton);
+
+		assertTrue(questManager.completeQuest(player, zombie));
+
+		final List<QuestProgress> remaining = questManager.getActiveQuests(player);
+		assertEquals(1, remaining.size());
+		assertSame(skeleton, remaining.get(0).getQuest());
+	}
+
+	@Test
+	void completeLastQuestRemovesPlayerEntry() {
+		final Quest quest = createKillQuest(5, "ZOMBIE");
 		questManager.assignQuest(player, quest);
 
-		final boolean complete = questManager.incrementProgress(player, 1);
-
-		assertFalse(complete);
-		final QuestProgress progress = questManager.getQuestProgress(player);
-		assertEquals(1, progress.getCurrent());
-	}
-
-	@Test
-	void incrementProgressKillQuestReturnsTrueWhenComplete() {
-		final Quest quest = createKillQuest(3);
-		questManager.assignQuest(player, quest);
-
-		questManager.incrementProgress(player, 2);
-		final boolean complete = questManager.incrementProgress(player, 1);
-
-		assertTrue(complete);
-	}
-
-	@Test
-	void incrementProgressNoActiveQuestReturnsFalse() {
-		final boolean result = questManager.incrementProgress(player, 1);
-		assertFalse(result);
-	}
-
-	@Test
-	void incrementProgressTreasureQuestReturnsFalse() {
-		final Quest quest = createDestinationQuest(QuestObjective.Type.TREASURE);
-
-		final Location playerLoc = mock(Location.class);
-		final Location destination = mock(Location.class);
-		when(player.getLocation()).thenReturn(playerLoc);
-		when(playerLoc.distance(destination)).thenReturn(1000.0);
-		quest.setDestination(destination);
-
-		questManager.assignQuest(player, quest);
-
-		final boolean result = questManager.incrementProgress(player, 1);
-		assertFalse(result);
-	}
-
-	@Test
-	void completeQuestRemovesProgressAndReturnsTrue() {
-		final Quest quest = createKillQuest(5);
-		questManager.assignQuest(player, quest);
-
-		final boolean result = questManager.completeQuest(player);
-
-		assertTrue(result);
-		assertNull(questManager.getQuestProgress(player));
+		assertTrue(questManager.completeQuest(player, quest));
+		assertFalse(questManager.hasActiveQuest(player));
+		assertTrue(questManager.getActiveQuests(player).isEmpty());
 	}
 
 	@Test
 	void completeQuestReturnsFalseWhenNoActiveQuest() {
-		final boolean result = questManager.completeQuest(player);
-		assertFalse(result);
+		final Quest quest = createKillQuest(5, "ZOMBIE");
+		assertFalse(questManager.completeQuest(player, quest));
+	}
+
+	// ------------------- abandonQuest -------------------
+
+	@Test
+	void abandonQuestByIndexRemovesCorrectQuest() {
+		final Quest zombie = createKillQuest(5, "ZOMBIE");
+		final Quest skeleton = createKillQuest(3, "SKELETON");
+		questManager.assignQuest(player, zombie);
+		questManager.assignQuest(player, skeleton);
+
+		final Quest abandoned = questManager.abandonQuest(player, 0);
+		assertSame(zombie, abandoned);
+
+		final List<QuestProgress> remaining = questManager.getActiveQuests(player);
+		assertEquals(1, remaining.size());
+		assertSame(skeleton, remaining.get(0).getQuest());
 	}
 
 	@Test
-	void completeQuestReturnsFalseOnSecondCall() {
-		final Quest quest = createKillQuest(5);
-		questManager.assignQuest(player, quest);
+	void abandonLastQuestCleansUpCompletely() {
+		questManager.assignQuest(player, createKillQuest(5, "ZOMBIE"));
 
-		assertTrue(questManager.completeQuest(player));
-		assertFalse(questManager.completeQuest(player));
+		final Quest abandoned = questManager.abandonQuest(player, 0);
+		assertNotNull(abandoned);
+		assertFalse(questManager.hasActiveQuest(player));
+		verify(bossBar1).removePlayer(player);
+		verify(bossBar2).removePlayer(player);
 	}
+
+	@Test
+	void abandonQuestCallsCleanupCallback() {
+		@SuppressWarnings("unchecked")
+		final java.util.function.BiConsumer<Player, Quest> cleanup = mock(
+			java.util.function.BiConsumer.class);
+		questManager.setQuestCleanup(cleanup);
+
+		final Quest quest = createKillQuest(5, "ZOMBIE");
+		questManager.assignQuest(player, quest);
+		questManager.abandonQuest(player, 0);
+
+		verify(cleanup).accept(player, quest);
+	}
+
+	@Test
+	void abandonQuestReturnsNullForInvalidIndex() {
+		questManager.assignQuest(player, createKillQuest(5, "ZOMBIE"));
+
+		assertNull(questManager.abandonQuest(player, -1));
+		assertNull(questManager.abandonQuest(player, 5));
+	}
+
+	// ------------------- abandonAllQuests -------------------
+
+	@Test
+	void abandonAllQuestsReturnsAllQuests() {
+		final Quest zombie = createKillQuest(5, "ZOMBIE");
+		final Quest skeleton = createKillQuest(3, "SKELETON");
+		questManager.assignQuest(player, zombie);
+		questManager.assignQuest(player, skeleton);
+
+		final List<Quest> abandoned = questManager.abandonAllQuests(player);
+
+		assertEquals(2, abandoned.size());
+		assertFalse(questManager.hasActiveQuest(player));
+	}
+
+	@Test
+	void abandonAllQuestsReturnsEmptyWhenNoQuests() {
+		assertTrue(questManager.abandonAllQuests(player).isEmpty());
+	}
+
+	// ------------------- hasActiveQuest -------------------
+
+	@Test
+	void hasActiveQuestLifecycle() {
+		assertFalse(questManager.hasActiveQuest(player));
+
+		final Quest quest = createKillQuest(5, "ZOMBIE");
+		questManager.assignQuest(player, quest);
+		assertTrue(questManager.hasActiveQuest(player));
+
+		questManager.completeQuest(player, quest);
+		assertFalse(questManager.hasActiveQuest(player));
+	}
+
+	// ------------------- Villager NPC Management -------------------
 
 	@Test
 	void getVillagerDataReturnsStoredNpc() {
@@ -217,7 +328,6 @@ class QuestManagerTest {
 		final Npc npc = Npc.builder().timestamp(1000L).build();
 
 		questManager.setVillagerData(villagerId, npc);
-
 		assertSame(npc, questManager.getVillagerData(villagerId));
 	}
 
@@ -228,43 +338,7 @@ class QuestManagerTest {
 
 		questManager.setVillagerData(villagerId, npc);
 		questManager.setVillagerData(villagerId, null);
-
 		assertNull(questManager.getVillagerData(villagerId));
-	}
-
-	@Test
-	void hasActiveQuestReturnsTrueWhenQuestAssigned() {
-		final Quest quest = createKillQuest(5);
-		assertFalse(questManager.hasActiveQuest(player));
-
-		questManager.assignQuest(player, quest);
-		assertTrue(questManager.hasActiveQuest(player));
-
-		questManager.completeQuest(player);
-		assertFalse(questManager.hasActiveQuest(player));
-	}
-
-	@Test
-	void cleanupAllQuestsClearsAllState() {
-		final Quest quest = createKillQuest(5);
-		questManager.assignQuest(player, quest);
-
-		final UUID villagerId = UUID.randomUUID();
-		final UUID armorStandId = UUID.randomUUID();
-		questManager.setIndicator(villagerId, armorStandId);
-
-		bukkitMock.when(() -> Bukkit.getPlayer(player.getUniqueId()))
-			.thenReturn(player);
-		bukkitMock.when(() -> Bukkit.getEntity(armorStandId))
-			.thenReturn(null);
-
-		questManager.cleanupAllQuests();
-
-		assertNull(questManager.getQuestProgress(player));
-		assertNull(questManager.getIndicator(villagerId));
-		verify(objectiveBar).removePlayer(player);
-		verify(timerBar).removePlayer(player);
-		verify(bookRemover).accept(player);
 	}
 
 	@Test
@@ -279,10 +353,35 @@ class QuestManagerTest {
 		assertNull(questManager.getIndicator(villagerId));
 	}
 
-	private Quest createKillQuest(int amount) {
+	// ------------------- cleanupAllQuests -------------------
+
+	@Test
+	void cleanupAllQuestsClearsAllState() {
+		questManager.assignQuest(player, createKillQuest(5, "ZOMBIE"));
+
+		final UUID villagerId = UUID.randomUUID();
+		final UUID armorStandId = UUID.randomUUID();
+		questManager.setIndicator(villagerId, armorStandId);
+
+		bukkitMock.when(() -> Bukkit.getPlayer(player.getUniqueId()))
+			.thenReturn(player);
+		bukkitMock.when(() -> Bukkit.getEntity(armorStandId))
+			.thenReturn(null);
+
+		questManager.cleanupAllQuests();
+
+		assertFalse(questManager.hasActiveQuest(player));
+		assertNull(questManager.getIndicator(villagerId));
+		verify(bossBar1).removePlayer(player);
+		verify(bossBar2).removePlayer(player);
+	}
+
+	// ------------------- Helpers -------------------
+
+	private Quest createKillQuest(final int amount, final String target) {
 		final QuestObjective objective = new QuestObjective();
 		objective.setType(QuestObjective.Type.KILL);
-		objective.setTarget("ZOMBIE");
+		objective.setTarget(target);
 		objective.setAmount(amount);
 
 		final Quest quest = new Quest();
@@ -290,11 +389,11 @@ class QuestManagerTest {
 		quest.setRewardType("MCMMO");
 		quest.setRewardTarget("MINING");
 		quest.setRewardAmount(100);
-		quest.setShortTitle("Test Quest");
+		quest.setShortTitle("Kill " + target);
 		return quest;
 	}
 
-	private Quest createDestinationQuest(QuestObjective.Type type) {
+	private Quest createDestinationQuest(final QuestObjective.Type type) {
 		final QuestObjective objective = new QuestObjective();
 		objective.setType(type);
 		objective.setTarget("NONE");

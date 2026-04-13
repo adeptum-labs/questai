@@ -54,7 +54,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.Chunk;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -77,7 +76,6 @@ import org.bukkit.event.player.PlayerPickupItemEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.BookMeta;
 import org.bukkit.inventory.meta.MapMeta;
 import org.bukkit.map.MapView;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -120,7 +118,8 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		loadVillagerNames();
 
-		this.questManager = new QuestManager(plugin, this::removeQuestBook);
+		this.questManager = new QuestManager(plugin);
+		questManager.setQuestCleanup(this::cleanupQuestEntities);
 		conversationManager.setQuestManager(questManager);
 		conversationManager.setQuestAcceptHandler(this::onQuestAccepted);
 
@@ -206,12 +205,9 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		final Player player = (Player) event.getPlayer();
 		if (conversationManager.isInConversation(player)) {
-			// Remove state without re-closing (already closing)
-			conversationManager.getState(player); // keep reference if needed
-			// Just clean up the state, don't call endConversation (would recurse)
+			conversationManager.getState(player);
 			Bukkit.getScheduler().runTask(plugin, () -> {
 				if (conversationManager.isInConversation(player)) {
-					// Only end if still tracked — avoids interfering with GUI transitions
 					final var view = player.getOpenInventory();
 					if (!view.getTitle().equals(DialogueGui.DIALOGUE_TITLE)) {
 						conversationManager.endConversation(player);
@@ -235,8 +231,58 @@ public class RandomQuestPlugin implements SubPlugin {
 			player.getInventory().addItem(
 				createMapItem(quest.getDestination(), "Find NPC"));
 		}
+	}
 
-		addQuestBook(player, quest);
+	// ------------------- Quest Cleanup Callback -------------------
+
+	/**
+	 * Cleans up spawned entities and items associated with an abandoned or
+	 * expired quest: treasure chests, hidden NPCs, quest maps.
+	 */
+	private void cleanupQuestEntities(Player player, Quest quest) {
+		final QuestObjective.Type type = quest.getObjective().getType();
+		final org.bukkit.Location dest = quest.getDestination();
+
+		if (type == TREASURE && dest != null) {
+			dest.getBlock().setType(Material.AIR);
+		}
+
+		if (type == FIND_NPC && dest != null) {
+			dest.getWorld().getNearbyEntities(dest, 5, 5, 5).stream()
+				.filter(e -> e instanceof Villager)
+				.filter(e -> {
+					final String name = e.getCustomName();
+					return name != null && name.contains("Hidden NPC");
+				})
+				.forEach(Entity::remove);
+		}
+
+		// Remove quest maps from player inventory
+		if (EnumSet.of(TREASURE, FIND_NPC).contains(type)) {
+			removeQuestMaps(player, quest);
+		}
+
+		// Clear villager NPC data and indicator
+		if (quest.getVillagerUuid() != null) {
+			questManager.setVillagerData(quest.getVillagerUuid(), null);
+			removeQuestIndicator(quest.getVillagerUuid());
+		}
+	}
+
+	private void removeQuestMaps(Player player, Quest quest) {
+		final Inventory inv = player.getInventory();
+		for (int i = 0; i < inv.getSize(); i++) {
+			final ItemStack item = inv.getItem(i);
+			if (item != null && item.getType() == Material.FILLED_MAP) {
+				final var meta = item.getItemMeta();
+				if (meta != null) {
+					final var display = meta.displayName();
+					if (display != null && display.toString().contains("Quest Map")) {
+						inv.setItem(i, null);
+					}
+				}
+			}
+		}
 	}
 
 	// ------------------- Villager Name Management -------------------
@@ -409,77 +455,6 @@ public class RandomQuestPlugin implements SubPlugin {
 		return mapItem;
 	}
 
-	// ------------------- Quest Book -------------------
-
-	private void addQuestBook(Player player, Quest quest) {
-		final ItemStack book = new ItemStack(Material.WRITTEN_BOOK);
-		final BookMeta meta = (BookMeta) book.getItemMeta();
-		if (meta != null) {
-			meta.setTitle(quest.getShortTitle());
-			final String villagerName =
-				villagerUniqueNames.get(quest.getVillagerUuid());
-			meta.setAuthor(villagerName != null ? villagerName : "Unknown Quest Giver");
-
-			final List<String> pages = new ArrayList<>();
-			pages.add(ChatColor.GOLD + "Quest: " + quest.getShortTitle());
-			pages.add(ChatColor.GREEN + "Description: " + quest.getTitle());
-
-			if (EnumSet.of(TREASURE, FIND_NPC).contains(quest.getObjective().getType())) {
-				pages.add(ChatColor.BLUE + "Destination: " + ChatColor.WHITE
-					+ "Check your quest map for the location.");
-			} else if (EnumSet.of(KILL, COLLECT).contains(quest.getObjective().getType())) {
-				final String objectiveText = quest.getObjective().getType() + " "
-					+ quest.getObjective().getTarget()
-					+ " x" + quest.getObjective().getAmount();
-				pages.add(ChatColor.YELLOW + "Objective: "
-					+ ChatColor.WHITE + objectiveText);
-			}
-
-			final String rewardText = quest.getRewardType() + " "
-				+ quest.getRewardTarget() + " x" + quest.getRewardAmount();
-			pages.add(ChatColor.AQUA + "Reward: " + ChatColor.WHITE + rewardText);
-
-			meta.setPages(pages);
-			book.setItemMeta(meta);
-
-			final Map<Integer, ItemStack> leftover =
-				player.getInventory().addItem(book);
-			if (leftover.isEmpty()) {
-				player.sendMessage("§aA quest book has been added to your inventory.");
-			} else {
-				player.getWorld().dropItemNaturally(player.getLocation(), book);
-				player.sendMessage("§cYour inventory is full!"
-					+ " The quest book has been dropped at your location.");
-			}
-		}
-	}
-
-	@SuppressWarnings("checkstyle:CyclomaticComplexity")
-	private void removeQuestBook(Player player) {
-		final Inventory inv = player.getInventory();
-		final QuestProgress progress = questManager.getQuestProgress(player);
-		if (progress == null) {
-			return;
-		}
-
-		final String questTitle = progress.getQuest().getShortTitle();
-		for (int i = 0; i < inv.getSize(); i++) {
-			if (isQuestBook(inv.getItem(i), questTitle)) {
-				inv.setItem(i, null);
-				player.sendMessage("§cYour quest book has been removed.");
-				return;
-			}
-		}
-	}
-
-	private boolean isQuestBook(ItemStack item, String questTitle) {
-		if (item == null || item.getType() != Material.WRITTEN_BOOK) {
-			return false;
-		}
-		final BookMeta meta = (BookMeta) item.getItemMeta();
-		return meta != null && questTitle.equals(meta.getTitle());
-	}
-
 	// ------------------- Kill Quest Tracking -------------------
 
 	@EventHandler
@@ -490,32 +465,27 @@ public class RandomQuestPlugin implements SubPlugin {
 			return;
 		}
 
-		final QuestProgress questProgress = questManager.getQuestProgress(killer);
-		if (questProgress == null) {
-			return;
-		}
-
-		final Quest quest = questProgress.getQuest();
-		final QuestObjective objective = quest.getObjective();
-		if (objective.getType() != KILL) {
-			return;
-		}
-
-		final String targetMob = objective.getTarget().toUpperCase();
 		final String killedMob = entity.getType().name();
+		final QuestProgress completed = questManager.incrementProgress(
+			killer, KILL, killedMob, 1);
 
-		if (killedMob.equals(targetMob)) {
-			final boolean isComplete = questManager.incrementProgress(killer, 1);
-			if (isComplete) {
-				killer.sendMessage("§6Quest Update: You've completed the objective!");
-				rewardPlayer(killer, quest);
-				removeQuestBook(killer);
-				questManager.completeQuest(killer);
-				questManager.setVillagerData(quest.getVillagerUuid(), null);
-				removeQuestIndicator(quest.getVillagerUuid());
-			} else {
-				killer.sendMessage("§eQuest Update: " + questProgress.getCurrent()
-					+ "/" + objective.getAmount() + " " + targetMob + "(s) killed.");
+		if (completed != null) {
+			final Quest quest = completed.getQuest();
+			final QuestObjective obj = quest.getObjective();
+			killer.sendMessage("§6Quest Update: You've completed the objective!");
+			rewardPlayer(killer, quest);
+			questManager.removeBossBars(killer, completed);
+			questManager.completeQuest(killer, quest);
+			questManager.setVillagerData(quest.getVillagerUuid(), null);
+			removeQuestIndicator(quest.getVillagerUuid());
+		} else {
+			// Show progress message if there's a matching quest in progress
+			final QuestProgress progress =
+				questManager.findQuest(killer, KILL, killedMob);
+			if (progress != null) {
+				final QuestObjective obj = progress.getQuest().getObjective();
+				killer.sendMessage("§eQuest Update: " + progress.getCurrent()
+					+ "/" + obj.getAmount() + " " + killedMob + "(s) killed.");
 			}
 		}
 	}
@@ -526,35 +496,26 @@ public class RandomQuestPlugin implements SubPlugin {
 	public void onPlayerPickupItem(PlayerPickupItemEvent event) {
 		final Player player = event.getPlayer();
 		final ItemStack item = event.getItem().getItemStack();
-
-		final QuestProgress questProgress = questManager.getQuestProgress(player);
-		if (questProgress == null) {
-			return;
-		}
-
-		final Quest quest = questProgress.getQuest();
-		final QuestObjective objective = quest.getObjective();
-		if (objective.getType() != COLLECT) {
-			return;
-		}
-
-		final String targetItem = objective.getTarget().toUpperCase();
 		final String pickedItem = item.getType().name();
 
-		if (pickedItem.equals(targetItem)) {
-			final int amount = item.getAmount();
-			final boolean isComplete = questManager.incrementProgress(player, amount);
-			if (isComplete) {
-				player.sendMessage("§6Quest Update: You've completed the objective!");
-				rewardPlayer(player, quest);
-				removeQuestBook(player);
-				questManager.completeQuest(player);
-				questManager.setVillagerData(quest.getVillagerUuid(), null);
-				removeQuestIndicator(quest.getVillagerUuid());
-			} else {
-				player.sendMessage("§eQuest Update: " + questProgress.getCurrent()
-					+ "/" + objective.getAmount()
-					+ " " + targetItem + "(s) collected.");
+		final QuestProgress completed = questManager.incrementProgress(
+			player, COLLECT, pickedItem, item.getAmount());
+
+		if (completed != null) {
+			final Quest quest = completed.getQuest();
+			player.sendMessage("§6Quest Update: You've completed the objective!");
+			rewardPlayer(player, quest);
+			questManager.removeBossBars(player, completed);
+			questManager.completeQuest(player, quest);
+			questManager.setVillagerData(quest.getVillagerUuid(), null);
+			removeQuestIndicator(quest.getVillagerUuid());
+		} else {
+			final QuestProgress progress =
+				questManager.findQuest(player, COLLECT, pickedItem);
+			if (progress != null) {
+				final QuestObjective obj = progress.getQuest().getObjective();
+				player.sendMessage("§eQuest Update: " + progress.getCurrent()
+					+ "/" + obj.getAmount() + " " + pickedItem + "(s) collected.");
 			}
 		}
 	}
@@ -576,31 +537,40 @@ public class RandomQuestPlugin implements SubPlugin {
 		}
 
 		final Quest quest = npc.getQuest();
-		final QuestProgress progress = questManager.getQuestProgress(player);
-		if (progress == null) {
+		if (!EnumSet.of(TREASURE, FIND_NPC).contains(quest.getObjective().getType())) {
+			return;
+		}
+		if (quest.getDestination().distance(player.getLocation()) > 10) {
 			return;
 		}
 
-		if (EnumSet.of(TREASURE, FIND_NPC).contains(quest.getObjective().getType())
-			&& quest.getDestination().distance(player.getLocation()) <= 10) {
+		// Find matching quest in the player's active list
+		final List<QuestProgress> activeQuests = questManager.getActiveQuests(player);
+		final QuestProgress matching = activeQuests.stream()
+			.filter(p -> p.getQuest().getVillagerUuid() != null
+				&& p.getQuest().getVillagerUuid().equals(quest.getVillagerUuid()))
+			.findFirst().orElse(null);
 
-			removeQuestBook(player);
-			if (!questManager.completeQuest(player)) {
-				return;
-			}
-
-			player.sendMessage("§aYou have completed the quest: " + quest.getTitle());
-			rewardPlayer(player, quest);
-			questManager.setVillagerData(villager.getUniqueId(), null);
-			removeQuestIndicator(villager.getUniqueId());
-
-			if (quest.getObjective().getType() == TREASURE) {
-				quest.getDestination().getBlock().setType(Material.AIR);
-			}
-
-			player.playSound(
-				player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+		if (matching == null) {
+			return;
 		}
+
+		questManager.removeBossBars(player, matching);
+		if (!questManager.completeQuest(player, matching.getQuest())) {
+			return;
+		}
+
+		player.sendMessage("§aYou have completed the quest: " + quest.getTitle());
+		rewardPlayer(player, quest);
+		questManager.setVillagerData(villager.getUniqueId(), null);
+		removeQuestIndicator(villager.getUniqueId());
+
+		if (quest.getObjective().getType() == TREASURE) {
+			quest.getDestination().getBlock().setType(Material.AIR);
+		}
+
+		player.playSound(
+			player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
 	}
 
 	// ------------------- Chunk Load -------------------

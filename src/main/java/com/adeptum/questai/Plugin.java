@@ -21,6 +21,7 @@
 package com.adeptum.questai;
 
 import com.adeptum.questai.dialogue.ConversationManager;
+import com.adeptum.questai.quest.QuestLogListener;
 import com.adeptum.questai.service.QuestGenerationService;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import java.util.ArrayList;
@@ -61,9 +62,10 @@ public class Plugin extends JavaPlugin implements Listener {
 
 		final PluginManager pm = getServer().getPluginManager();
 
+		final RandomQuestPlugin randomQuestPlugin =
+			new RandomQuestPlugin(this, conversationManager, questService, chatModel);
 		plugins.add(new AutoVillagerPlugin(this));
-		plugins.add(new RandomQuestPlugin(this, conversationManager,
-			questService, chatModel));
+		plugins.add(randomQuestPlugin);
 		plugins.add(new WanderingPeasantPlugin(this, conversationManager,
 			questService, chatModel));
 
@@ -71,6 +73,9 @@ public class Plugin extends JavaPlugin implements Listener {
 			pm.registerEvents(p, this);
 			p.onEnable();
 		});
+
+		pm.registerEvents(
+			new QuestLogListener(randomQuestPlugin.getQuestManager()), this);
 	}
 
 	@Override
