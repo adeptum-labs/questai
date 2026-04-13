@@ -147,13 +147,13 @@ public class RandomQuestPlugin implements SubPlugin {
 			return;
 		}
 
-		event.setCancelled(true);
-		final Player player = event.getPlayer();
-
 		final String uniqueName = villagerUniqueNames.get(villager.getUniqueId());
 		if (uniqueName == null) {
 			return;
 		}
+
+		event.setCancelled(true);
+		final Player player = event.getPlayer();
 
 		final String profession = villager.getProfession().name();
 
