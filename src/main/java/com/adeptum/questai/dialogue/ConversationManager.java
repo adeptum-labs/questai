@@ -35,6 +35,7 @@ import java.util.logging.Level;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Villager;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -68,7 +69,8 @@ public class ConversationManager {
 		this.questAcceptHandler = handler;
 	}
 	public void startConversation(final Player player, final UUID npcUuid,
-		final String npcName, final String profession, final boolean questAvailable) {
+		final String npcName, final String profession,
+		final boolean questAvailable, final boolean tradeable) {
 
 		if (isInConversation(player)) {
 			endConversation(player);
@@ -80,6 +82,7 @@ public class ConversationManager {
 			.npcName(npcName)
 			.npcProfession(profession)
 			.questAvailable(questAvailable)
+			.tradeable(tradeable)
 			.build();
 
 		conversations.put(player.getUniqueId(), state);
@@ -146,7 +149,8 @@ public class ConversationManager {
 
 		state.setPhase(ConversationPhase.OPTIONS);
 		player.openInventory(
-			DialogueGui.createOptions(npcName, state.getLastAiResponse()));
+			DialogueGui.createOptions(npcName, state.getLastAiResponse(),
+				state.isTradeable()));
 	}
 
 	private void handleOptions(final Player player, final int slot,
@@ -154,6 +158,8 @@ public class ConversationManager {
 
 		if (slot == DialogueGui.OPTION_1_SLOT) {
 			startCasualChat(player, state, npcName, profession);
+		} else if (slot == DialogueGui.OPTION_2_SLOT && state.isTradeable()) {
+			openVillagerTrade(player, state.getNpcUuid());
 		} else if (slot == DialogueGui.OPTION_3_SLOT) {
 			endConversation(player);
 		}
@@ -307,6 +313,14 @@ public class ConversationManager {
 			.build();
 		final String text = chatModel.chat(request).aiMessage().text().trim();
 		return text.isEmpty() ? "..." : text;
+	}
+
+	private void openVillagerTrade(final Player player, final UUID npcUuid) {
+		endConversation(player);
+		final var entity = Bukkit.getEntity(npcUuid);
+		if (entity instanceof Villager villager) {
+			player.openMerchant(villager, true);
+		}
 	}
 
 	private void openGuiSync(final Player player, final Inventory inventory) {

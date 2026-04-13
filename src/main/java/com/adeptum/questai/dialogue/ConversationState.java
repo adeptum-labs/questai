@@ -36,4 +36,5 @@ public class ConversationState {
 	private Quest pendingQuest;
 	private String lastAiResponse;
 	private boolean questAvailable;
+	private boolean tradeable;
 }

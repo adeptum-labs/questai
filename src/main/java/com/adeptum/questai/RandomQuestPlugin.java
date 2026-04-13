@@ -148,7 +148,9 @@ public class RandomQuestPlugin implements SubPlugin {
 		event.setCancelled(true);
 		final Player player = event.getPlayer();
 
-		final String profession = villager.getProfession().name();
+		final Villager.Profession profession = villager.getProfession();
+		final boolean tradeable = profession != Villager.Profession.NONE
+			&& profession != Villager.Profession.NITWIT;
 
 		final Npc npc = questManager.getVillagerData(villager.getUniqueId());
 		final long currentTime = System.currentTimeMillis();
@@ -164,7 +166,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		}
 
 		conversationManager.startConversation(player, villager.getUniqueId(),
-			uniqueName, profession, questAvailable);
+			uniqueName, profession.name(), questAvailable, tradeable);
 	}
 	@EventHandler
 	public void onInventoryClick(InventoryClickEvent event) {

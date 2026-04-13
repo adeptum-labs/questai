@@ -89,9 +89,15 @@ public final class DialogueGui {
 		return inv;
 	}
 
-	public static Inventory createOptions(final String npcName, final String dialogueText) {
+	public static Inventory createOptions(final String npcName, final String dialogueText,
+		final boolean tradeable) {
+
 		final Inventory inv = createBase(npcName, "", dialogueText);
 		inv.setItem(OPTION_1_SLOT, button(Material.YELLOW_DYE, "\u00a7e\u00a7lChat"));
+		if (tradeable) {
+			inv.setItem(OPTION_2_SLOT,
+				button(Material.EMERALD, "\u00a7a\u00a7lTrade"));
+		}
 		inv.setItem(OPTION_3_SLOT, button(Material.RED_DYE, "\u00a7c\u00a7lGoodbye"));
 		return inv;
 	}
