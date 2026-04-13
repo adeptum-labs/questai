@@ -57,6 +57,7 @@ public class ConversationManager {
 		this.plugin = plugin;
 		this.chatModel = chatModel;
 	}
+
 	public void setQuestManager(final QuestManager questManager) {
 		this.questManager = questManager;
 	}
@@ -68,6 +69,7 @@ public class ConversationManager {
 	public void setQuestAcceptHandler(final BiConsumer<Player, Quest> handler) {
 		this.questAcceptHandler = handler;
 	}
+
 	public void startConversation(final Player player, final UUID npcUuid,
 		final String npcName, final String profession,
 		final boolean questAvailable, final boolean tradeable) {
@@ -140,17 +142,18 @@ public class ConversationManager {
 	public ConversationState getState(final Player player) {
 		return conversations.get(player.getUniqueId());
 	}
+
 	private void handleGreeting(final Player player, final int slot,
 		final ConversationState state, final String npcName, final String profession) {
 
-		if (slot != DialogueGui.OPTION_2_SLOT) {
+		if (slot != DialogueGui.CENTER_SLOT) {
 			return;
 		}
 
 		state.setPhase(ConversationPhase.OPTIONS);
 		player.openInventory(
 			DialogueGui.createOptions(npcName, state.getLastAiResponse(),
-				state.isTradeable()));
+				state.isQuestAvailable(), state.isTradeable()));
 	}
 
 	private void handleOptions(final Player player, final int slot,
@@ -158,9 +161,11 @@ public class ConversationManager {
 
 		if (slot == DialogueGui.OPTION_1_SLOT) {
 			startCasualChat(player, state, npcName, profession);
-		} else if (slot == DialogueGui.OPTION_2_SLOT && state.isTradeable()) {
+		} else if (slot == DialogueGui.OPTION_2_SLOT && state.isQuestAvailable()) {
+			startQuestOffer(player, state, npcName, profession);
+		} else if (slot == DialogueGui.OPTION_3_SLOT && state.isTradeable()) {
 			openVillagerTrade(player, state.getNpcUuid());
-		} else if (slot == DialogueGui.OPTION_3_SLOT) {
+		} else if (slot == DialogueGui.OPTION_4_SLOT) {
 			endConversation(player);
 		}
 	}
@@ -168,7 +173,7 @@ public class ConversationManager {
 	private void handleQuestOffer(final Player player, final int slot,
 		final ConversationState state, final String npcName) {
 
-		if (slot != DialogueGui.OPTION_2_SLOT) {
+		if (slot != DialogueGui.CENTER_SLOT) {
 			return;
 		}
 
@@ -194,14 +199,15 @@ public class ConversationManager {
 				questAcceptHandler.accept(player, quest);
 			}
 
-			player.sendMessage("§aYou have accepted the quest: " + quest.getTitle());
+			player.sendMessage("\u00a7aYou have accepted the quest: " + quest.getTitle());
 			player.playSound(player.getLocation(),
 				Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
 			endConversation(player);
 
-		} else if (slot == DialogueGui.OPTION_3_SLOT) {
+		} else if (slot == DialogueGui.OPTION_4_SLOT) {
 			questManager.setVillagerData(state.getNpcUuid(), null);
-			player.sendMessage("§cYou have rejected the quest: " + quest.getShortTitle());
+			player.sendMessage("\u00a7cYou have rejected the quest: "
+				+ quest.getShortTitle());
 			player.playSound(player.getLocation(),
 				Sound.BLOCK_NOTE_BLOCK_BASS, 1.0f, 1.0f);
 			endConversation(player);
@@ -212,13 +218,14 @@ public class ConversationManager {
 		final ConversationState state, final String npcName, final String profession) {
 
 		if (slot == DialogueGui.OPTION_1_SLOT) {
-			startQuestOffer(player, state, npcName, profession);
-		} else if (slot == DialogueGui.OPTION_2_SLOT) {
 			startCasualChat(player, state, npcName, profession);
-		} else if (slot == DialogueGui.OPTION_3_SLOT) {
+		} else if (slot == DialogueGui.OPTION_2_SLOT && state.isQuestAvailable()) {
+			startQuestOffer(player, state, npcName, profession);
+		} else if (slot == DialogueGui.OPTION_4_SLOT) {
 			endConversation(player);
 		}
 	}
+
 	private void startQuestOffer(final Player player, final ConversationState state,
 		final String npcName, final String profession) {
 
@@ -235,7 +242,6 @@ public class ConversationManager {
 			player.getWorld());
 
 		questService.generateQuestDescription(quest, () -> {
-			// Quest now has shortTitle and title set; generate narrative
 			final String narrativePrompt =
 				DialoguePrompts.questNarrative(npcName, profession, quest);
 
@@ -250,7 +256,8 @@ public class ConversationManager {
 					});
 				} catch (final Exception e) {
 					plugin.getLogger().log(Level.SEVERE,
-						"AI narrative call failed for quest " + quest.getShortTitle(), e);
+						"AI narrative call failed for quest "
+							+ quest.getShortTitle(), e);
 					Bukkit.getScheduler().runTask(plugin, () -> {
 						final String fallback = "I have a task for you, traveler.";
 						state.setLastAiResponse(fallback);
@@ -269,7 +276,8 @@ public class ConversationManager {
 				state.setLastAiResponse("I have a task for you, traveler.");
 				state.setPendingQuest(quest);
 				openGuiSync(player,
-					DialogueGui.createQuestOffer(npcName, state.getLastAiResponse()));
+					DialogueGui.createQuestOffer(npcName,
+						state.getLastAiResponse()));
 			});
 		});
 	}
@@ -291,22 +299,26 @@ public class ConversationManager {
 				Bukkit.getScheduler().runTask(plugin, () -> {
 					state.setLastAiResponse(response);
 					openGuiSync(player,
-						DialogueGui.createChatResponse(npcName, response, canOfferHelp));
+						DialogueGui.createChatResponse(npcName, response,
+							canOfferHelp));
 				});
 			} catch (final Exception e) {
 				plugin.getLogger().log(Level.SEVERE,
 					"AI casual chat call failed for " + npcName, e);
 				Bukkit.getScheduler().runTask(plugin, () -> {
 					final String fallback = canOfferHelp
-						? "Things have been difficult lately... I could really use some help."
+						? "Things have been difficult lately..."
+							+ " I could really use some help."
 						: "Nice weather today, isn't it?";
 					state.setLastAiResponse(fallback);
 					openGuiSync(player,
-						DialogueGui.createChatResponse(npcName, fallback, canOfferHelp));
+						DialogueGui.createChatResponse(npcName, fallback,
+							canOfferHelp));
 				});
 			}
 		});
 	}
+
 	private String callAi(final String prompt) {
 		final ChatRequest request = ChatRequest.builder()
 			.messages(UserMessage.from(prompt))

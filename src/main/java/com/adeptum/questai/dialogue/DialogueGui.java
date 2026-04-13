@@ -34,27 +34,38 @@ import java.util.List;
 
 /**
  * Factory for 27-slot chest inventory GUIs used in the NPC conversation system.
+ *
+ * <p>Option buttons use four evenly-spaced slots in the bottom row:
+ * <pre>
+ *   Row 2: [F][O1][F][O2][F][O3][F][O4][F]
+ *           18  19  20  21  22  23  24  25  26
+ * </pre>
+ * Single-action screens (Continue, Please wait) use the centre slot (22).
  */
 public final class DialogueGui {
 
 	public static final String DIALOGUE_TITLE = "\u00a76NPC Dialogue";
 	private static final int ROWS = 27;
-	public static final int OPTION_1_SLOT = 20;
-	public static final int OPTION_2_SLOT = 22;
-	public static final int OPTION_3_SLOT = 24;
+
+	public static final int OPTION_1_SLOT = 19;
+	public static final int OPTION_2_SLOT = 21;
+	public static final int OPTION_3_SLOT = 23;
+	public static final int OPTION_4_SLOT = 25;
+	public static final int CENTER_SLOT = 22;
 
 	private static final int[] FILLER_SLOTS = {
-		1, 2, 3, 4, 5, 6, 7, 8, 9, 17, 18, 19, 21, 23, 25, 26
+		1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17,
+		18, 19, 20, 21, 22, 23, 24, 25, 26
 	};
 
 	private DialogueGui() {
 	}
+
 	private static Inventory createBase(final String npcName, final String profession,
 		final String dialogueText) {
 
 		final Inventory inv = Bukkit.createInventory(null, ROWS, DIALOGUE_TITLE);
 
-		// Slot 0: NPC head
 		final ItemStack head = new ItemStack(Material.PLAYER_HEAD);
 		final ItemMeta headMeta = head.getItemMeta();
 		headMeta.displayName(Component.text("\u00a76" + npcName));
@@ -62,7 +73,6 @@ public final class DialogueGui {
 		head.setItemMeta(headMeta);
 		inv.setItem(0, head);
 
-		// Filler panes
 		final ItemStack filler = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
 		final ItemMeta fillerMeta = filler.getItemMeta();
 		fillerMeta.displayName(Component.text(" "));
@@ -71,7 +81,6 @@ public final class DialogueGui {
 			inv.setItem(slot, filler.clone());
 		}
 
-		// Slot 10: Dialogue text on paper
 		final ItemStack paper = new ItemStack(Material.PAPER);
 		final ItemMeta paperMeta = paper.getItemMeta();
 		paperMeta.displayName(Component.text("\u00a7f" + npcName + " says:"));
@@ -81,24 +90,33 @@ public final class DialogueGui {
 
 		return inv;
 	}
+
 	public static Inventory createGreeting(final String npcName, final String profession,
 		final String greetingText) {
 
 		final Inventory inv = createBase(npcName, profession, greetingText);
-		inv.setItem(OPTION_2_SLOT, button(Material.GREEN_DYE, "\u00a7a\u00a7lContinue \u2192"));
+		inv.setItem(CENTER_SLOT,
+			button(Material.GREEN_DYE, "\u00a7a\u00a7lContinue \u2192"));
 		return inv;
 	}
 
 	public static Inventory createOptions(final String npcName, final String dialogueText,
-		final boolean tradeable) {
+		final boolean questAvailable, final boolean tradeable) {
 
 		final Inventory inv = createBase(npcName, "", dialogueText);
-		inv.setItem(OPTION_1_SLOT, button(Material.YELLOW_DYE, "\u00a7e\u00a7lChat"));
-		if (tradeable) {
+		inv.setItem(OPTION_1_SLOT,
+			button(Material.YELLOW_DYE, "\u00a7e\u00a7lWhat's new around here?"));
+		if (questAvailable) {
 			inv.setItem(OPTION_2_SLOT,
-				button(Material.EMERALD, "\u00a7a\u00a7lTrade"));
+				button(Material.GREEN_DYE,
+					"\u00a7a\u00a7lDo you need help with anything?"));
 		}
-		inv.setItem(OPTION_3_SLOT, button(Material.RED_DYE, "\u00a7c\u00a7lGoodbye"));
+		if (tradeable) {
+			inv.setItem(OPTION_3_SLOT,
+				button(Material.EMERALD, "\u00a7a\u00a7lLet's trade"));
+		}
+		inv.setItem(OPTION_4_SLOT,
+			button(Material.RED_DYE, "\u00a7c\u00a7lI should get going"));
 		return inv;
 	}
 
@@ -112,11 +130,14 @@ public final class DialogueGui {
 		final String narrativeText, final Quest quest) {
 
 		final Inventory inv = createBase(npcName, profession, narrativeText);
-		inv.setItem(OPTION_2_SLOT, button(Material.GREEN_DYE, "\u00a7a\u00a7lContinue \u2192"));
+		inv.setItem(CENTER_SLOT,
+			button(Material.GREEN_DYE, "\u00a7a\u00a7lContinue \u2192"));
 		return inv;
 	}
 
-	public static Inventory createQuestAcceptReject(final String npcName, final Quest quest) {
+	public static Inventory createQuestAcceptReject(final String npcName,
+		final Quest quest) {
+
 		final QuestObjective obj = quest.getObjective();
 
 		final String objectiveLine = switch (obj.getType()) {
@@ -133,7 +154,7 @@ public final class DialogueGui {
 		final Inventory inv = createBase(npcName, "", dialogueText);
 		inv.setItem(OPTION_1_SLOT,
 			button(Material.GREEN_WOOL, "\u00a7a\u00a7lAccept Quest"));
-		inv.setItem(OPTION_3_SLOT,
+		inv.setItem(OPTION_4_SLOT,
 			button(Material.RED_WOOL, "\u00a7c\u00a7lReject Quest"));
 		return inv;
 	}
@@ -142,24 +163,25 @@ public final class DialogueGui {
 		final boolean canOfferHelp) {
 
 		final Inventory inv = createBase(npcName, "", chatText);
-
+		inv.setItem(OPTION_1_SLOT,
+			button(Material.YELLOW_DYE, "\u00a7e\u00a7lTell me more"));
 		if (canOfferHelp) {
-			inv.setItem(OPTION_1_SLOT,
-				button(Material.GREEN_DYE, "\u00a7a\u00a7lOffer to help"));
+			inv.setItem(OPTION_2_SLOT,
+				button(Material.GREEN_DYE,
+					"\u00a7a\u00a7lIs there anything I can do?"));
 		}
-
-		inv.setItem(OPTION_2_SLOT,
-			button(Material.YELLOW_DYE, "\u00a7e\u00a7lContinue chatting"));
-		inv.setItem(OPTION_3_SLOT, button(Material.RED_DYE, "\u00a7c\u00a7lGoodbye"));
+		inv.setItem(OPTION_4_SLOT,
+			button(Material.RED_DYE, "\u00a7c\u00a7lTake care"));
 		return inv;
 	}
 
 	public static Inventory createThinking(final String npcName, final String profession) {
 		final Inventory inv = createBase(npcName, profession, "...");
-		inv.setItem(OPTION_2_SLOT,
+		inv.setItem(CENTER_SLOT,
 			button(Material.CLOCK, "\u00a77\u00a7lPlease wait..."));
 		return inv;
 	}
+
 	private static ItemStack button(final Material material, final String displayName) {
 		final ItemStack item = new ItemStack(material);
 		final ItemMeta meta = item.getItemMeta();
