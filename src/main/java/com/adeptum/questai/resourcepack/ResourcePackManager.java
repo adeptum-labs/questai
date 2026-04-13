@@ -69,6 +69,18 @@ public class ResourcePackManager {
 		packBytes = buildPack(plugin.getLogger());
 		packHash = sha1(packBytes);
 
+		// Save a copy for debugging / manual hosting
+		try {
+			final var packFile = new java.io.File(
+				plugin.getDataFolder(), "questai-pack.zip");
+			java.nio.file.Files.write(packFile.toPath(), packBytes);
+			plugin.getLogger().info("[ResourcePack] Saved pack to "
+				+ packFile.getAbsolutePath());
+		} catch (final IOException e) {
+			plugin.getLogger().log(Level.WARNING,
+				"[ResourcePack] Could not save pack to disk", e);
+		}
+
 		try {
 			server = HttpServer.create(new InetSocketAddress(port), 0);
 			server.createContext("/questai-pack.zip", exchange -> {
@@ -134,75 +146,85 @@ public class ResourcePackManager {
 	private byte[] buildPack(final Logger logger) {
 		final Map<String, byte[]> files = new LinkedHashMap<>();
 
-		// pack.mcmeta
-		files.put("pack.mcmeta", json("""
-			{"pack":{"pack_format":%d,"description":"QuestAI dialogue UI"}}
-			""".formatted(PACK_FORMAT)));
+		files.put("pack.mcmeta", utf8(
+			"{\"pack\":{\"pack_format\":" + PACK_FORMAT
+				+ ",\"description\":\"QuestAI dialogue UI\"}}"));
 
-		// Vanilla model overrides
-		addModelOverride(files, "yellow_dye", CMD, "questai:item/btn_chat");
-		addModelOverride(files, "green_dye",
+		// Vanilla model overrides — texture path must match the real vanilla
+		// texture location (block/ for blocks, item/ for items).
+		vanillaOverride(files, "yellow_dye", "item/yellow_dye",
+			CMD, "questai:item/btn_chat");
+		vanillaOverride(files, "green_dye", "item/green_dye",
 			CMD, "questai:item/btn_help",
 			CMD + 1, "questai:item/btn_continue");
-		addModelOverride(files, "red_dye", CMD, "questai:item/btn_goodbye");
-		addModelOverride(files, "emerald", CMD, "questai:item/btn_trade");
-		addModelOverride(files, "green_wool", CMD, "questai:item/btn_accept");
-		addModelOverride(files, "red_wool", CMD, "questai:item/btn_reject");
-		addModelOverride(files, "clock", CMD, "questai:item/btn_wait");
-		addModelOverride(files, "gray_stained_glass_pane",
+		vanillaOverride(files, "red_dye", "item/red_dye",
+			CMD, "questai:item/btn_goodbye");
+		vanillaOverride(files, "emerald", "item/emerald",
+			CMD, "questai:item/btn_trade");
+		vanillaOverride(files, "green_wool", "block/green_wool",
+			CMD, "questai:item/btn_accept");
+		vanillaOverride(files, "red_wool", "block/red_wool",
+			CMD, "questai:item/btn_reject");
+		vanillaOverride(files, "clock", "item/clock_00",
+			CMD, "questai:item/btn_wait");
+		vanillaOverride(files, "gray_stained_glass_pane",
+			"block/gray_stained_glass_pane_top",
 			CMD, "questai:item/filler_pane");
-		addModelOverride(files, "paper", CMD, "questai:item/dialogue_paper");
+		vanillaOverride(files, "paper", "item/paper",
+			CMD, "questai:item/dialogue_paper");
 
 		// Custom models + textures
-		addCustomItem(files, "btn_chat", TextureGenerator.chatButton());
-		addCustomItem(files, "btn_help", TextureGenerator.helpButton());
-		addCustomItem(files, "btn_continue", TextureGenerator.continueButton());
-		addCustomItem(files, "btn_goodbye", TextureGenerator.goodbyeButton());
-		addCustomItem(files, "btn_trade", TextureGenerator.tradeButton());
-		addCustomItem(files, "btn_accept", TextureGenerator.acceptButton());
-		addCustomItem(files, "btn_reject", TextureGenerator.rejectButton());
-		addCustomItem(files, "btn_wait", TextureGenerator.waitButton());
-		addCustomItem(files, "filler_pane", TextureGenerator.fillerPane());
-		addCustomItem(files, "dialogue_paper", TextureGenerator.dialoguePaper());
+		customItem(files, "btn_chat", TextureGenerator.chatButton());
+		customItem(files, "btn_help", TextureGenerator.helpButton());
+		customItem(files, "btn_continue", TextureGenerator.continueButton());
+		customItem(files, "btn_goodbye", TextureGenerator.goodbyeButton());
+		customItem(files, "btn_trade", TextureGenerator.tradeButton());
+		customItem(files, "btn_accept", TextureGenerator.acceptButton());
+		customItem(files, "btn_reject", TextureGenerator.rejectButton());
+		customItem(files, "btn_wait", TextureGenerator.waitButton());
+		customItem(files, "filler_pane", TextureGenerator.fillerPane());
+		customItem(files, "dialogue_paper", TextureGenerator.dialoguePaper());
 
 		logger.info("[ResourcePack] Built pack with " + files.size() + " entries.");
 		return zip(files);
 	}
 
-	private void addModelOverride(final Map<String, byte[]> files,
-		final String vanillaItem, final Object... cmdModelPairs) {
+	private void vanillaOverride(final Map<String, byte[]> files,
+		final String itemName, final String vanillaTexture,
+		final Object... cmdModelPairs) {
 
-		final StringBuilder overrides = new StringBuilder("[");
+		final StringBuilder sb = new StringBuilder();
+		sb.append("{\"parent\":\"minecraft:item/generated\",");
+		sb.append("\"textures\":{\"layer0\":\"minecraft:")
+			.append(vanillaTexture).append("\"},");
+		sb.append("\"overrides\":[");
 		for (int i = 0; i < cmdModelPairs.length; i += 2) {
 			if (i > 0) {
-				overrides.append(",");
+				sb.append(",");
 			}
-			overrides.append("""
-				{"predicate":{"custom_model_data":%d},"model":"%s"}"""
-				.formatted(cmdModelPairs[i], cmdModelPairs[i + 1]));
+			sb.append("{\"predicate\":{\"custom_model_data\":")
+				.append(cmdModelPairs[i])
+				.append("},\"model\":\"")
+				.append(cmdModelPairs[i + 1])
+				.append("\"}");
 		}
-		overrides.append("]");
+		sb.append("]}");
 
-		final String modelJson = """
-			{"parent":"minecraft:item/generated",\
-			"textures":{"layer0":"minecraft:item/%s"},\
-			"overrides":%s}""".formatted(vanillaItem, overrides);
-
-		files.put("assets/minecraft/models/item/" + vanillaItem + ".json",
-			json(modelJson));
+		files.put("assets/minecraft/models/item/" + itemName + ".json",
+			utf8(sb.toString()));
 	}
 
-	private void addCustomItem(final Map<String, byte[]> files,
+	private void customItem(final Map<String, byte[]> files,
 		final String name, final byte[] texture) {
 
-		files.put("assets/questai/models/item/" + name + ".json", json("""
-			{"parent":"minecraft:item/generated",\
-			"textures":{"layer0":"questai:item/%s"}}""".formatted(name)));
+		final String model = "{\"parent\":\"minecraft:item/generated\","
+			+ "\"textures\":{\"layer0\":\"questai:item/" + name + "\"}}";
+		files.put("assets/questai/models/item/" + name + ".json", utf8(model));
 		files.put("assets/questai/textures/item/" + name + ".png", texture);
 	}
 
-	private static byte[] json(final String s) {
-		return s.strip().getBytes(StandardCharsets.UTF_8);
+	private static byte[] utf8(final String s) {
+		return s.getBytes(StandardCharsets.UTF_8);
 	}
 
 	private static byte[] zip(final Map<String, byte[]> files) {
