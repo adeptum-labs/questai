@@ -23,7 +23,6 @@ package com.adeptum.questai;
 import com.adeptum.questai.dialogue.ConversationManager;
 import com.adeptum.questai.service.QuestGenerationService;
 import dev.langchain4j.model.openai.OpenAiChatModel;
-import dev.langchain4j.model.openai.OpenAiChatModelName;
 import java.util.ArrayList;
 import java.util.List;
 import org.bukkit.Bukkit;
@@ -51,7 +50,7 @@ public class Plugin extends JavaPlugin implements Listener {
 
 		final OpenAiChatModel chatModel = OpenAiChatModel.builder()
 			.apiKey(apiKey)
-			.modelName(OpenAiChatModelName.GPT_4_O_MINI)
+			.modelName("gpt-5.4-nano")
 			.build();
 
 		final QuestGenerationService questService =
