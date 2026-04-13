@@ -22,19 +22,24 @@ package com.adeptum.questai;
 
 import com.adeptum.questai.dialogue.ConversationManager;
 import com.adeptum.questai.quest.QuestLogListener;
+import com.adeptum.questai.resourcepack.ResourcePackManager;
 import com.adeptum.questai.service.QuestGenerationService;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import java.util.ArrayList;
 import java.util.List;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class Plugin extends JavaPlugin implements Listener {
 	private final List<SubPlugin> plugins = new ArrayList<>();
+	private ResourcePackManager resourcePackManager;
 
 	@Override
 	public void onEnable() {
@@ -76,12 +81,32 @@ public class Plugin extends JavaPlugin implements Listener {
 
 		pm.registerEvents(
 			new QuestLogListener(randomQuestPlugin.getQuestManager()), this);
+
+		resourcePackManager = new ResourcePackManager();
+		resourcePackManager.initialize(this);
+		pm.registerEvents(this, this);
+
+		// Send resource pack to already online players (plugin reload)
+		for (final Player player : Bukkit.getOnlinePlayers()) {
+			resourcePackManager.sendToPlayer(player);
+		}
+	}
+
+	@EventHandler
+	public void onPlayerJoin(final PlayerJoinEvent event) {
+		if (resourcePackManager != null) {
+			// Slight delay so the client is ready to receive the pack
+			Bukkit.getScheduler().runTaskLater(this,
+				() -> resourcePackManager.sendToPlayer(event.getPlayer()), 20L);
+		}
 	}
 
 	@Override
 	public void onDisable() {
 		HandlerList.unregisterAll((Listener) this);
-
 		plugins.forEach(SubPlugin::onDisable);
+		if (resourcePackManager != null) {
+			resourcePackManager.shutdown();
+		}
 	}
 }

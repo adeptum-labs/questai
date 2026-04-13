@@ -20,6 +20,8 @@
 
 package com.adeptum.questai.dialogue;
 
+import static com.adeptum.questai.resourcepack.ResourcePackManager.CMD;
+
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
 import net.kyori.adventure.text.Component;
@@ -73,22 +75,24 @@ public final class DialogueGui {
 		head.setItemMeta(headMeta);
 		inv.setItem(0, head);
 
-		final ItemStack filler = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
-		final ItemMeta fillerMeta = filler.getItemMeta();
-		fillerMeta.displayName(Component.text(" "));
-		filler.setItemMeta(fillerMeta);
+		final ItemStack filler = item(Material.GRAY_STAINED_GLASS_PANE, " ", CMD);
 		for (final int slot : FILLER_SLOTS) {
 			inv.setItem(slot, filler.clone());
 		}
 
-		final ItemStack paper = new ItemStack(Material.PAPER);
-		final ItemMeta paperMeta = paper.getItemMeta();
-		paperMeta.displayName(Component.text("\u00a7f" + npcName + " says:"));
-		paperMeta.setLore(wordWrap(dialogueText, 40));
-		paper.setItemMeta(paperMeta);
-		inv.setItem(10, paper);
+		inv.setItem(10, dialogueItem(npcName, dialogueText));
 
 		return inv;
+	}
+
+	private static ItemStack dialogueItem(final String npcName, final String text) {
+		final ItemStack paper = new ItemStack(Material.PAPER);
+		final ItemMeta meta = paper.getItemMeta();
+		meta.displayName(Component.text("\u00a7f" + npcName + " says:"));
+		meta.setLore(wordWrap(text, 40));
+		meta.setCustomModelData(CMD);
+		paper.setItemMeta(meta);
+		return paper;
 	}
 
 	public static Inventory createGreeting(final String npcName, final String profession,
@@ -96,7 +100,7 @@ public final class DialogueGui {
 
 		final Inventory inv = createBase(npcName, profession, greetingText);
 		inv.setItem(CENTER_SLOT,
-			button(Material.GREEN_DYE, "\u00a7a\u00a7lContinue \u2192"));
+			button(Material.GREEN_DYE, "\u00a7a\u00a7lContinue \u2192", CMD + 1));
 		return inv;
 	}
 
@@ -105,18 +109,19 @@ public final class DialogueGui {
 
 		final Inventory inv = createBase(npcName, "", dialogueText);
 		inv.setItem(OPTION_1_SLOT,
-			button(Material.YELLOW_DYE, "\u00a7e\u00a7lWhat's new around here?"));
+			button(Material.YELLOW_DYE,
+				"\u00a7e\u00a7lWhat's new around here?", CMD));
 		if (questAvailable) {
 			inv.setItem(OPTION_2_SLOT,
 				button(Material.GREEN_DYE,
-					"\u00a7a\u00a7lDo you need help with anything?"));
+					"\u00a7a\u00a7lDo you need help with anything?", CMD));
 		}
 		if (tradeable) {
 			inv.setItem(OPTION_3_SLOT,
-				button(Material.EMERALD, "\u00a7a\u00a7lLet's trade"));
+				button(Material.EMERALD, "\u00a7a\u00a7lLet's trade", CMD));
 		}
 		inv.setItem(OPTION_4_SLOT,
-			button(Material.RED_DYE, "\u00a7c\u00a7lI should get going"));
+			button(Material.RED_DYE, "\u00a7c\u00a7lI should get going", CMD));
 		return inv;
 	}
 
@@ -131,7 +136,7 @@ public final class DialogueGui {
 
 		final Inventory inv = createBase(npcName, profession, narrativeText);
 		inv.setItem(CENTER_SLOT,
-			button(Material.GREEN_DYE, "\u00a7a\u00a7lContinue \u2192"));
+			button(Material.GREEN_DYE, "\u00a7a\u00a7lContinue \u2192", CMD + 1));
 		return inv;
 	}
 
@@ -153,9 +158,9 @@ public final class DialogueGui {
 
 		final Inventory inv = createBase(npcName, "", dialogueText);
 		inv.setItem(OPTION_1_SLOT,
-			button(Material.GREEN_WOOL, "\u00a7a\u00a7lAccept Quest"));
+			button(Material.GREEN_WOOL, "\u00a7a\u00a7lAccept Quest", CMD));
 		inv.setItem(OPTION_4_SLOT,
-			button(Material.RED_WOOL, "\u00a7c\u00a7lReject Quest"));
+			button(Material.RED_WOOL, "\u00a7c\u00a7lReject Quest", CMD));
 		return inv;
 	}
 
@@ -164,30 +169,44 @@ public final class DialogueGui {
 
 		final Inventory inv = createBase(npcName, "", chatText);
 		inv.setItem(OPTION_1_SLOT,
-			button(Material.YELLOW_DYE, "\u00a7e\u00a7lTell me more"));
+			button(Material.YELLOW_DYE, "\u00a7e\u00a7lTell me more", CMD));
 		if (canOfferHelp) {
 			inv.setItem(OPTION_2_SLOT,
 				button(Material.GREEN_DYE,
-					"\u00a7a\u00a7lIs there anything I can do?"));
+					"\u00a7a\u00a7lIs there anything I can do?", CMD));
 		}
 		inv.setItem(OPTION_4_SLOT,
-			button(Material.RED_DYE, "\u00a7c\u00a7lTake care"));
+			button(Material.RED_DYE, "\u00a7c\u00a7lTake care", CMD));
 		return inv;
 	}
 
 	public static Inventory createThinking(final String npcName, final String profession) {
 		final Inventory inv = createBase(npcName, profession, "...");
 		inv.setItem(CENTER_SLOT,
-			button(Material.CLOCK, "\u00a77\u00a7lPlease wait..."));
+			button(Material.CLOCK, "\u00a77\u00a7lPlease wait...", CMD));
 		return inv;
 	}
 
-	private static ItemStack button(final Material material, final String displayName) {
-		final ItemStack item = new ItemStack(material);
-		final ItemMeta meta = item.getItemMeta();
+	private static ItemStack button(final Material material, final String displayName,
+		final int customModelData) {
+
+		final ItemStack stack = new ItemStack(material);
+		final ItemMeta meta = stack.getItemMeta();
 		meta.displayName(Component.text(displayName));
-		item.setItemMeta(meta);
-		return item;
+		meta.setCustomModelData(customModelData);
+		stack.setItemMeta(meta);
+		return stack;
+	}
+
+	private static ItemStack item(final Material material, final String displayName,
+		final int customModelData) {
+
+		final ItemStack stack = new ItemStack(material);
+		final ItemMeta meta = stack.getItemMeta();
+		meta.displayName(Component.text(displayName));
+		meta.setCustomModelData(customModelData);
+		stack.setItemMeta(meta);
+		return stack;
 	}
 
 	private static List<String> wordWrap(final String text, final int maxLength) {
