@@ -6,24 +6,21 @@
 
 [![License: LGPL v3](https://img.shields.io/badge/License-LGPL_v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
 
-QuestAI is a Paper Minecraft server plugin that turns villagers into generated quest givers. It scans nearby villages,
-keeps them populated, names villagers with AI-generated names, lets players accept generated quests through an inventory
-dialogue, tracks quest progress, and rewards players with mcMMO XP.
-
-The current implementation is intentionally small: one Bukkit entry point coordinates a few `SubPlugin` modules, while
-the quest system is split across `RandomQuestPlugin` (event handlers and AI generation) and the `quest` package
-(`QuestManager`, `QuestProgress`, `DestinationMarkerRenderer`).
+QuestAI is a Paper Minecraft server plugin that turns villagers and wandering peasants into AI-driven quest givers.
+It scans nearby villages, keeps them populated, names every villager with AI-generated names, lets players discover
+quests through natural conversation, tracks multiple quest progress simultaneously, and rewards players with mcMMO XP.
 
 ## Features
 
 - Repopulates villages around online players when there are fewer villagers than detected beds.
-- Assigns generated names to villagers and persists the villager UUID-to-name mapping in `config.yml`.
-- Generates short quest titles and descriptions through LangChain4j's OpenAI chat model.
-- Supports `KILL`, `COLLECT`, `TREASURE`, and `FIND_NPC` quest objectives.
-- Offers quests through a single-row inventory UI with accept and reject buttons.
-- Tracks active quest progress with boss bars and event handlers.
+- Assigns AI-generated names to villagers and persists the UUID-to-name mapping in `config.yml`.
+- Conversational dialogue system with AI-driven NPC greetings, casual chat, and quest narratives.
+- Quest discovery through organic NPC conversation — NPCs hint they need help rather than showing explicit quest buttons.
+- Supports multiple concurrent quests per player with `KILL`, `COLLECT`, `TREASURE`, and `FIND_NPC` objectives.
+- Interactive quest log book — right-click to view all active quests, drop to abandon all quests.
+- Wandering peasant NPCs that roam the world and offer quests to players they encounter.
+- Tracks quest progress with boss bars and event handlers.
 - Rewards completed quests through the mcMMO `ExperienceAPI`.
-- Includes optional experimental flying pig behavior, currently not wired into the root plugin.
 
 ## Architecture
 
@@ -32,61 +29,81 @@ flowchart TD
 	PluginYml[plugin.yml] --> Root[Plugin]
 	Root --> AutoVillager[AutoVillagerPlugin]
 	Root --> RandomQuest[RandomQuestPlugin]
+	Root --> WanderingPeasant[WanderingPeasantPlugin]
+	Root --> QuestLogListener[QuestLogListener]
 	RandomQuest --> QM[quest.QuestManager]
-	RandomQuest --> OpenAI[OpenAiChatModel]
-	RandomQuest --> BukkitEvents[Bukkit event handlers]
-	RandomQuest --> McMMO[mcMMO ExperienceAPI]
+	RandomQuest --> ConvMgr[dialogue.ConversationManager]
+	WanderingPeasant --> ConvMgr
+	ConvMgr --> DialogueGui[dialogue.DialogueGui]
+	ConvMgr --> DialoguePrompts[dialogue.DialoguePrompts]
+	ConvMgr --> OpenAI[OpenAiChatModel]
 	QM --> QP[quest.QuestProgress]
+	QM --> QLB[quest.QuestLogBook]
 	QM --> Npc[Npc cache]
 	QP --> Quest[Quest]
 	Quest --> Objective[QuestObjective]
+	QuestLogListener --> QM
+	QuestLogListener --> QLG[quest.QuestLogGui]
+	RandomQuest --> McMMO[mcMMO ExperienceAPI]
 	RandomQuest --> DMR[quest.DestinationMarkerRenderer]
 	AutoVillager --> VillageInfo[model.VillageInfo]
-	FlyingPig[FlyingPigPlugin] -. not currently registered .-> Root
 ```
 
 ### Runtime Modules
 
 | Area | Main files | Responsibility |
 | --- | --- | --- |
-| Plugin entry point | `Plugin`, `plugin.yml` | Starts and stops the subplugins. |
+| Plugin entry point | `Plugin`, `plugin.yml` | Starts and stops the subplugins, registers the quest log listener. |
 | Village maintenance | `AutoVillagerPlugin`, `VillageInfo` | Detects nearby village blocks and spawns villagers up to bed count. |
-| Quest system | `RandomQuestPlugin`, `QuestManager`, `QuestProgress`, `Quest`, `QuestObjective`, `Npc` | Generates dialogue and quests, opens the GUI, tracks progress, and grants rewards. |
+| Dialogue system | `ConversationManager`, `ConversationState`, `ConversationPhase`, `DialogueGui`, `DialoguePrompts` | Manages NPC conversation flow, AI-driven dialogue, and inventory GUI screens. |
+| Quest system | `RandomQuestPlugin`, `QuestManager`, `QuestProgress`, `Quest`, `QuestObjective`, `Npc` | Generates quests, tracks progress, handles completion, and grants rewards. |
+| Quest log | `QuestLogBook`, `QuestLogGui`, `QuestLogListener` | Interactive quest log book item and GUI for viewing and abandoning quests. |
+| Wandering peasants | `WanderingPeasantPlugin` | Spawns roaming quest NPCs using Wandering Trader entities. |
 | Map rendering | `DestinationMarkerRenderer` | Draws destination markers on quest maps for `TREASURE` and `FIND_NPC` quests. |
+| Quest generation | `QuestGenerationService` | Builds quests with random objectives and generates AI descriptions. |
 | Utility | `EnumUtil` | Random enum value selection. |
-| Experimental content | `FlyingPigPlugin` | Floating pig behavior for new chunks; present but not enabled from `Plugin`. |
 
 ## Quest Flow
 
 ```mermaid
 sequenceDiagram
 	actor Player
-	participant Villager
-	participant RandomQuestPlugin
+	participant NPC as Villager / Wandering Peasant
+	participant ConvMgr as ConversationManager
 	participant OpenAI as OpenAI chat model
 	participant QuestManager
 	participant Bukkit
 	participant McMMO
 
-	Player->>Villager: Right-click
-	Villager->>RandomQuestPlugin: PlayerInteractEntityEvent
-	RandomQuestPlugin->>QuestManager: Check cached NPC data
-	alt cached quest exists
-		RandomQuestPlugin->>Player: Open quest dialogue
-	else no cached data
-		RandomQuestPlugin->>OpenAI: Generate quest or villager line
-		OpenAI-->>RandomQuestPlugin: Title and description
-		RandomQuestPlugin->>QuestManager: Store NPC quest data
-		RandomQuestPlugin->>Player: Open quest dialogue
-	end
-	Player->>RandomQuestPlugin: Accept quest in inventory UI
-	RandomQuestPlugin->>QuestManager: Assign QuestProgress
+	Player->>NPC: Right-click
+	NPC->>ConvMgr: Start conversation
+	ConvMgr->>OpenAI: Generate greeting
+	OpenAI-->>ConvMgr: Greeting text
+	ConvMgr->>Player: Show greeting GUI
+	Player->>ConvMgr: Chat with NPC
+	ConvMgr->>OpenAI: Generate casual chat (with quest hint if available)
+	OpenAI-->>ConvMgr: Chat text hinting at trouble
+	ConvMgr->>Player: Show chat with "Offer to help" button
+	Player->>ConvMgr: Offer to help
+	ConvMgr->>OpenAI: Generate quest narrative
+	OpenAI-->>ConvMgr: Quest story
+	ConvMgr->>Player: Show quest offer and accept/reject
+	Player->>ConvMgr: Accept quest
+	ConvMgr->>QuestManager: Assign quest + give quest log book
 	QuestManager->>Bukkit: Create boss bars and progress task
 	Player->>Bukkit: Kill, collect, or reach destination
-	Bukkit->>RandomQuestPlugin: Progress event
-	RandomQuestPlugin->>QuestManager: Increment or complete quest
-	RandomQuestPlugin->>McMMO: Award raw XP
+	Bukkit->>QuestManager: Increment or complete quest
+	QuestManager->>McMMO: Award raw XP
 ```
+
+## Quest Log
+
+Players receive a **Quest Log** book when they accept their first quest. The book serves as
+an interactive quest tracker:
+
+- **Right-click** the book to open a GUI showing all active quests with progress, time remaining, and objectives.
+- **Click an abandon button** below any quest to cancel it (spawned entities and items are cleaned up).
+- **Drop the book** to abandon all active quests — the book evaporates and all quest-related entities are removed.
 
 ## Village Scan Flow
 
@@ -146,4 +163,3 @@ The project uses:
 - `pmd.xml` for PMD rules.
 - `checkstyle.xml` for Checkstyle rules.
 - `checkstyle-suppress.xml` for narrow Checkstyle XPath suppressions.
-
