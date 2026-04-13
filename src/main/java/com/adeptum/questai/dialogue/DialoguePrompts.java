@@ -65,6 +65,18 @@ public final class DialoguePrompts {
 				.formatted(npcName, profession);
 	}
 
+	public static String casualChatWithQuestHint(final String npcName,
+		final String profession) {
+
+		return ("You are %s, a %s in a Minecraft village. The player wants to chat. "
+			+ "Share something interesting about your life, but subtly hint that you "
+			+ "could use some help with a problem or task. Do NOT describe the task "
+			+ "in detail — just hint that something is troubling you or that you need "
+			+ "assistance. 1-2 sentences. Stay in character. "
+			+ "Output ONLY the dialogue text, no quotes.")
+				.formatted(npcName, profession);
+	}
+
 	public static String farewell(final String npcName) {
 		return ("You are %s. Say a brief goodbye to the player (1 sentence). "
 			+ "Stay in character. Output ONLY the text, no quotes.")

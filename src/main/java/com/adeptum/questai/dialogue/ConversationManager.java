@@ -154,18 +154,14 @@ public class ConversationManager {
 		}
 
 		state.setPhase(ConversationPhase.OPTIONS);
-		final boolean canAskQuest =
-			state.isQuestAvailable() && questManager.getQuestProgress(player) == null;
 		player.openInventory(
-			DialogueGui.createOptions(npcName, state.getLastAiResponse(), canAskQuest));
+			DialogueGui.createOptions(npcName, state.getLastAiResponse()));
 	}
 
 	private void handleOptions(final Player player, final int slot,
 		final ConversationState state, final String npcName, final String profession) {
 
 		if (slot == DialogueGui.OPTION_1_SLOT) {
-			startQuestOffer(player, state, npcName, profession);
-		} else if (slot == DialogueGui.OPTION_2_SLOT) {
 			startCasualChat(player, state, npcName, profession);
 		} else if (slot == DialogueGui.OPTION_3_SLOT) {
 			endConversation(player);
@@ -219,9 +215,9 @@ public class ConversationManager {
 		final ConversationState state, final String npcName, final String profession) {
 
 		if (slot == DialogueGui.OPTION_1_SLOT) {
-			startCasualChat(player, state, npcName, profession);
-		} else if (slot == DialogueGui.OPTION_2_SLOT) {
 			startQuestOffer(player, state, npcName, profession);
+		} else if (slot == DialogueGui.OPTION_2_SLOT) {
+			startCasualChat(player, state, npcName, profession);
 		} else if (slot == DialogueGui.OPTION_3_SLOT) {
 			endConversation(player);
 		}
@@ -232,9 +228,7 @@ public class ConversationManager {
 	private void startQuestOffer(final Player player, final ConversationState state,
 		final String npcName, final String profession) {
 
-		final boolean canAskQuest =
-			state.isQuestAvailable() && questManager.getQuestProgress(player) == null;
-		if (!canAskQuest) {
+		if (!state.isQuestAvailable()) {
 			return;
 		}
 
@@ -292,25 +286,29 @@ public class ConversationManager {
 		state.setPhase(ConversationPhase.CHAT_RESPONSE);
 		player.openInventory(DialogueGui.createThinking(npcName, profession));
 
-		final boolean canAskQuest =
-			state.isQuestAvailable() && questManager.getQuestProgress(player) == null;
-		final String prompt = DialoguePrompts.casualChat(npcName, profession);
+		final boolean canOfferHelp = state.isQuestAvailable();
+		final String prompt = canOfferHelp
+			? DialoguePrompts.casualChatWithQuestHint(npcName, profession)
+			: DialoguePrompts.casualChat(npcName, profession);
+
 		Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
 			try {
 				final String response = callAi(prompt);
 				Bukkit.getScheduler().runTask(plugin, () -> {
 					state.setLastAiResponse(response);
 					openGuiSync(player,
-						DialogueGui.createChatResponse(npcName, response, canAskQuest));
+						DialogueGui.createChatResponse(npcName, response, canOfferHelp));
 				});
 			} catch (final Exception e) {
 				plugin.getLogger().log(Level.SEVERE,
 					"AI casual chat call failed for " + npcName, e);
 				Bukkit.getScheduler().runTask(plugin, () -> {
-					final String fallback = "Nice weather today, isn't it?";
+					final String fallback = canOfferHelp
+						? "Things have been difficult lately... I could really use some help."
+						: "Nice weather today, isn't it?";
 					state.setLastAiResponse(fallback);
 					openGuiSync(player,
-						DialogueGui.createChatResponse(npcName, fallback, canAskQuest));
+						DialogueGui.createChatResponse(npcName, fallback, canOfferHelp));
 				});
 			}
 		});

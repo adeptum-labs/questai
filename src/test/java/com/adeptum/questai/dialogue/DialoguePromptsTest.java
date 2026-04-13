@@ -65,6 +65,16 @@ class DialoguePromptsTest {
 	}
 
 	@Test
+	void casualChatWithQuestHintContainsHelpInstruction() {
+		final String prompt =
+			DialoguePrompts.casualChatWithQuestHint("Mira Bloom", "LIBRARIAN");
+
+		assertTrue(prompt.contains("Mira Bloom"));
+		assertTrue(prompt.contains("LIBRARIAN"));
+		assertTrue(prompt.contains("help"));
+	}
+
+	@Test
 	void farewellContainsNpcName() {
 		final String prompt = DialoguePrompts.farewell("Goran Dusk");
 

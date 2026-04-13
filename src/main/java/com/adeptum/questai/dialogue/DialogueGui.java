@@ -95,20 +95,9 @@ public final class DialogueGui {
 		return inv;
 	}
 
-	public static Inventory createOptions(final String npcName, final String dialogueText,
-		final boolean canAskQuest) {
-
+	public static Inventory createOptions(final String npcName, final String dialogueText) {
 		final Inventory inv = createBase(npcName, "", dialogueText);
-
-		if (canAskQuest) {
-			inv.setItem(OPTION_1_SLOT,
-				button(Material.GREEN_DYE, "\u00a7a\u00a7lAsk about a quest"));
-		} else {
-			inv.setItem(OPTION_1_SLOT,
-				button(Material.GRAY_DYE, "\u00a77\u00a7lYou already have a quest"));
-		}
-
-		inv.setItem(OPTION_2_SLOT, button(Material.YELLOW_DYE, "\u00a7e\u00a7lChat"));
+		inv.setItem(OPTION_1_SLOT, button(Material.YELLOW_DYE, "\u00a7e\u00a7lChat"));
 		inv.setItem(OPTION_3_SLOT, button(Material.RED_DYE, "\u00a7c\u00a7lGoodbye"));
 		return inv;
 	}
@@ -149,27 +138,18 @@ public final class DialogueGui {
 		return inv;
 	}
 
-	public static Inventory createChatResponse(final String npcName, final String profession,
-		final String chatText) {
-
-		return createChatResponse(npcName, chatText, true);
-	}
-
 	public static Inventory createChatResponse(final String npcName, final String chatText,
-		final boolean canAskQuest) {
+		final boolean canOfferHelp) {
 
 		final Inventory inv = createBase(npcName, "", chatText);
-		inv.setItem(OPTION_1_SLOT,
-			button(Material.YELLOW_DYE, "\u00a7e\u00a7lContinue chatting"));
 
-		if (canAskQuest) {
-			inv.setItem(OPTION_2_SLOT,
-				button(Material.GREEN_DYE, "\u00a7a\u00a7lAsk about a quest"));
-		} else {
-			inv.setItem(OPTION_2_SLOT,
-				button(Material.GRAY_DYE, "\u00a77\u00a7lYou already have a quest"));
+		if (canOfferHelp) {
+			inv.setItem(OPTION_1_SLOT,
+				button(Material.GREEN_DYE, "\u00a7a\u00a7lOffer to help"));
 		}
 
+		inv.setItem(OPTION_2_SLOT,
+			button(Material.YELLOW_DYE, "\u00a7e\u00a7lContinue chatting"));
 		inv.setItem(OPTION_3_SLOT, button(Material.RED_DYE, "\u00a7c\u00a7lGoodbye"));
 		return inv;
 	}
