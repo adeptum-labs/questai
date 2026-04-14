@@ -72,6 +72,7 @@ import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerPickupItemEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.Inventory;
@@ -133,6 +134,34 @@ public class RandomQuestPlugin implements SubPlugin {
 	public QuestManager getQuestManager() {
 		return questManager;
 	}
+
+	@EventHandler
+	public void onPlayerJoin(final PlayerJoinEvent event) {
+		final Player player = event.getPlayer();
+		final List<QuestProgress> quests = questManager.getActiveQuests(player);
+		if (quests.isEmpty()) {
+			return;
+		}
+
+		final List<QuestProgress> completed = quests.stream()
+			.filter(p -> {
+				final QuestObjective obj = p.getQuest().getObjective();
+				return (obj.getType() == KILL || obj.getType() == COLLECT)
+					&& p.getCurrent() >= obj.getAmount();
+			})
+			.toList();
+
+		for (final QuestProgress progress : completed) {
+			final Quest quest = progress.getQuest();
+			questManager.removeBossBars(player, progress);
+			questManager.completeQuest(player, quest);
+			questManager.setVillagerData(quest.getVillagerUuid(), null);
+			removeQuestIndicator(quest.getVillagerUuid());
+			player.sendMessage("\u00a7aCompleted quest: " + quest.getShortTitle());
+			rewardPlayer(player, quest);
+		}
+	}
+
 	@EventHandler
 	public void onVillagerClick(PlayerInteractEntityEvent event) {
 		final Entity clicked = event.getRightClicked();

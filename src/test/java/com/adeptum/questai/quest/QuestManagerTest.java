@@ -363,6 +363,54 @@ class QuestManagerTest {
 		return quest;
 	}
 
+	/**
+	 * Simulates the zombie-quest scenario: progress exceeds the target
+	 * but the quest was never completed (e.g. because rewardPlayer threw).
+	 * Verifies that the quest is still in the active list and can be
+	 * detected and completed on player join.
+	 */
+	@Test
+	void overTargetQuestRemainsActiveUntilExplicitlyCompleted() {
+		final Quest quest = createKillQuest(3, "ZOMBIE");
+		questManager.assignQuest(player, quest);
+
+		// Increment well past the target (simulates repeated pickup events)
+		questManager.incrementProgress(player, QuestObjective.Type.KILL, "ZOMBIE", 10);
+
+		// Quest is still tracked despite being over target
+		assertTrue(questManager.hasActiveQuest(player));
+		final List<QuestProgress> active = questManager.getActiveQuests(player);
+		assertEquals(1, active.size());
+
+		final QuestProgress progress = active.get(0);
+		assertTrue(progress.getCurrent() >= quest.getObjective().getAmount(),
+			"Progress should be at or above the target");
+
+		// Explicit completion removes it (this is what the join handler does)
+		assertTrue(questManager.completeQuest(player, quest));
+		assertFalse(questManager.hasActiveQuest(player));
+	}
+
+	@Test
+	void overTargetQuestCanBeFilteredFromActiveList() {
+		questManager.assignQuest(player, createKillQuest(3, "ZOMBIE"));
+		questManager.assignQuest(player, createKillQuest(5, "SKELETON"));
+
+		// Only the zombie quest exceeds its target
+		questManager.incrementProgress(player, QuestObjective.Type.KILL, "ZOMBIE", 5);
+
+		final List<QuestProgress> completed = questManager.getActiveQuests(player)
+			.stream()
+			.filter(p -> {
+				final QuestObjective obj = p.getQuest().getObjective();
+				return p.getCurrent() >= obj.getAmount();
+			})
+			.toList();
+
+		assertEquals(1, completed.size());
+		assertEquals("ZOMBIE", completed.get(0).getQuest().getObjective().getTarget());
+	}
+
 	private Quest createDestinationQuest(final QuestObjective.Type type) {
 		final QuestObjective objective = new QuestObjective();
 		objective.setType(type);
