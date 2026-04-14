@@ -380,8 +380,8 @@ public class RandomQuestPlugin implements SubPlugin {
 	private void rewardPlayer(Player player, Quest quest) {
 		final String skill = quest.getRewardTarget();
 		final int xp = quest.getRewardAmount();
-		ExperienceAPI.addRawXP(player, skill, xp,
-			"§aYou earned " + xp + " MCMMO XP in " + skill + "!");
+		ExperienceAPI.addXP(player, skill, xp, "COMMAND");
+		player.sendMessage("§aYou earned " + xp + " MCMMO XP in " + skill + "!");
 	}
 	private void removeQuestIndicator(UUID villagerId) {
 		final UUID standId = questManager.getIndicator(villagerId);
@@ -443,13 +443,12 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		if (completed != null) {
 			final Quest quest = completed.getQuest();
-			final QuestObjective obj = quest.getObjective();
-			killer.sendMessage("§6Quest Update: You've completed the objective!");
-			rewardPlayer(killer, quest);
 			questManager.removeBossBars(killer, completed);
 			questManager.completeQuest(killer, quest);
 			questManager.setVillagerData(quest.getVillagerUuid(), null);
 			removeQuestIndicator(quest.getVillagerUuid());
+			killer.sendMessage("§6Quest Update: You've completed the objective!");
+			rewardPlayer(killer, quest);
 		} else {
 			// Show progress message if there's a matching quest in progress
 			final QuestProgress progress =
@@ -472,12 +471,12 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		if (completed != null) {
 			final Quest quest = completed.getQuest();
-			player.sendMessage("§6Quest Update: You've completed the objective!");
-			rewardPlayer(player, quest);
 			questManager.removeBossBars(player, completed);
 			questManager.completeQuest(player, quest);
 			questManager.setVillagerData(quest.getVillagerUuid(), null);
 			removeQuestIndicator(quest.getVillagerUuid());
+			player.sendMessage("§6Quest Update: You've completed the objective!");
+			rewardPlayer(player, quest);
 		} else {
 			final QuestProgress progress =
 				questManager.findQuest(player, COLLECT, pickedItem);
