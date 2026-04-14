@@ -54,7 +54,7 @@ flowchart TD
 | Area | Main files | Responsibility |
 | --- | --- | --- |
 | Plugin entry point | `Plugin`, `plugin.yml` | Starts and stops the subplugins, registers the quest log listener. |
-| Village maintenance | `AutoVillagerPlugin`, `VillageInfo` | Detects nearby village blocks and spawns villagers up to bed count. |
+| Village maintenance | `AutoVillagerPlugin`, `VillageInfo` | Detects nearby village blocks and spawns villagers based on door count. |
 | Dialogue system | `ConversationManager`, `ConversationState`, `ConversationPhase`, `DialogueGui`, `DialoguePrompts` | Manages NPC conversation flow, AI-driven dialogue, and inventory GUI screens. |
 | Quest system | `RandomQuestPlugin`, `QuestManager`, `QuestProgress`, `Quest`, `QuestObjective`, `Npc` | Generates quests, tracks progress, handles completion, and grants rewards. |
 | Quest log | `QuestLogBook`, `QuestLogGui`, `QuestLogListener` | Interactive quest log book item and GUI for viewing and abandoning quests. |
@@ -110,13 +110,10 @@ an interactive quest tracker:
 ```mermaid
 flowchart LR
 	PlayerTick[Scheduled player scan] --> Location[Player location]
-	Location --> Blocks[Count beds and workstations]
+	Location --> Blocks[Count doors and workstations]
 	Blocks --> EnoughBlocks{Village blocks found?}
 	EnoughBlocks -- no --> Stop[Do nothing]
-	EnoughBlocks -- yes --> Villagers[Count nearby villagers]
-	Villagers --> Village{Enough villagers to count as village?}
-	Village -- no --> Stop
-	Village -- yes --> Spawn{Villagers below bed count?}
+	EnoughBlocks -- yes --> Spawn{Villagers below door-based target?}
 	Spawn -- no --> Stop
 	Spawn -- yes --> Create[Spawn persistent villagers near player]
 ```

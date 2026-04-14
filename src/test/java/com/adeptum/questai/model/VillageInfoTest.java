@@ -31,7 +31,7 @@ class VillageInfoTest {
 		final VillageInfo info = new VillageInfo(true, 5, 3, 7);
 
 		assertTrue(info.village());
-		assertEquals(5, info.bedCount());
+		assertEquals(5, info.doorCount());
 		assertEquals(3, info.workstationCount());
 		assertEquals(7, info.villagerCount());
 	}

@@ -28,9 +28,11 @@ import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.World;
 import org.bukkit.block.Block;
-import org.bukkit.entity.Villager;
-import org.bukkit.entity.Player;
+import org.bukkit.block.data.Bisected;
+import org.bukkit.block.data.type.Door;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Player;
+import org.bukkit.entity.Villager;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
 
@@ -42,13 +44,14 @@ import net.kyori.adventure.text.Component;
  * Enhanced AutoVillagerPlugin that spawns villagers only within actual villages.
  */
 public class AutoVillagerPlugin implements SubPlugin {
-	private static final int MIN_BEDS = 3;
+	private static final int MIN_DOORS = 4;
 	private static final int MIN_WORKSTATIONS = 3;
-	private static final int MIN_EXISTING_VILLAGERS = 3;
-	private static final int MAX_VILLAGERS = 20;
-	private static final int SEARCH_RADIUS = 16;
+	private static final int MIN_SPAWN_VILLAGERS = 3;
+	private static final int MAX_VILLAGERS = 8;
+	private static final int SEARCH_RADIUS = 32;
 	private static final int VERTICAL_SEARCH_RADIUS = 8;
 	private static final int SPAWN_RADIUS = 5;
+	private static final int MAX_DEPTH_BELOW_SURFACE = 10;
 	private static final long RECHECK_INTERVAL = 6000;
 	private static final String[] MOODS = {
 		"Kindly", "Surly", "Mysterious", "Eccentric",
@@ -114,7 +117,7 @@ public class AutoVillagerPlugin implements SubPlugin {
 
 		Location playerLoc = player.getLocation();
 		World world = playerLoc.getWorld();
-		if (world == null) {
+		if (world == null || !isNearSurface(world, playerLoc)) {
 			return;
 		}
 
@@ -126,22 +129,20 @@ public class AutoVillagerPlugin implements SubPlugin {
 			return;
 		}
 
-		int bedCount = villageInfo.bedCount();
+		int doorCount = villageInfo.doorCount();
 		int currentVillagerCount = villageInfo.villagerCount();
 
-		// Calculate the number of villagers to spawn to match the number of beds
-		int desiredVillagerCount = bedCount;
+		// Calculate the number of villagers to spawn based on door count
+		int desiredVillagerCount = Math.max(MIN_SPAWN_VILLAGERS, doorCount / 2);
 		int toSpawn = desiredVillagerCount - currentVillagerCount;
 
 		// Ensure we don't spawn more than the maximum allowed villagers
 		if (toSpawn > 0) {
-			// Limit the spawn count to not exceed the maximum spawn limit
 			toSpawn = Math.min(toSpawn, MAX_VILLAGERS - currentVillagerCount);
 
-			// Spawn the required number of villagers
 			spawnVillagers(world, playerLoc, toSpawn);
 			logger.info("Spawned " + toSpawn + " villagers near " + player.getName()
-				+ " to match bed count (" + bedCount + ").");
+				+ " to match door count (" + doorCount + ").");
 		}
 	}
 
@@ -174,8 +175,8 @@ public class AutoVillagerPlugin implements SubPlugin {
 	}
 
 	/**
-	 * Determines whether a specific location is within a genuine village by checking for the presence of multiple beds,
-	 * workstations, and existing villagers within a defined search radius.
+	 * Determines whether a specific location is within a genuine village by checking for the presence of multiple doors
+	 * and workstations within a defined search radius.
 	 *
 	 * @param world The world to search in.
 	 * @param location The central location to check for village presence.
@@ -183,57 +184,74 @@ public class AutoVillagerPlugin implements SubPlugin {
 	 */
 	private VillageInfo getVillageInfo(World world, Location location) {
 		final VillageBlocks villageBlocks = countVillageBlocks(world, location);
-		int villagerCount = 0;
-		boolean village = false;
+		final boolean village = hasRequiredVillageBlocks(villageBlocks);
+		final int villagerCount = village ? countNearbyVillagers(world, location) : 0;
 
-		if (hasRequiredVillageBlocks(villageBlocks)) {
-			villagerCount = countNearbyVillagers(world, location);
-			village = villagerCount >= MIN_EXISTING_VILLAGERS;
-		}
-
-		return new VillageInfo(village, villageBlocks.bedCount(), villageBlocks.workstationCount(), villagerCount);
+		return new VillageInfo(village, villageBlocks.doorCount(), villageBlocks.workstationCount(), villagerCount);
 	}
 
 	@SuppressWarnings({"PMD.CognitiveComplexity", "checkstyle:CyclomaticComplexity"})
 	private VillageBlocks countVillageBlocks(World world, Location location) {
-		int centerX = location.getBlockX();
-		int centerY = location.getBlockY();
-		int centerZ = location.getBlockZ();
-		int minX = centerX - SEARCH_RADIUS;
-		int maxX = centerX + SEARCH_RADIUS;
-		int minZ = centerZ - SEARCH_RADIUS;
-		int maxZ = centerZ + SEARCH_RADIUS;
-		int minY = Math.max(centerY - VERTICAL_SEARCH_RADIUS, world.getMinHeight());
-		int maxY = Math.min(centerY + VERTICAL_SEARCH_RADIUS, world.getMaxHeight());
-		int bedCount = 0;
+		final int centerX = location.getBlockX();
+		final int centerY = location.getBlockY();
+		final int centerZ = location.getBlockZ();
+		final int minX = centerX - SEARCH_RADIUS;
+		final int maxX = centerX + SEARCH_RADIUS;
+		final int minZ = centerZ - SEARCH_RADIUS;
+		final int maxZ = centerZ + SEARCH_RADIUS;
+		final int minY = Math.max(centerY - VERTICAL_SEARCH_RADIUS, world.getMinHeight());
+		final int maxY = Math.min(centerY + VERTICAL_SEARCH_RADIUS, world.getMaxHeight());
+		int doorCount = 0;
 		int workstationCount = 0;
 
-		for (int x = minX; x <= maxX; x++) {
-			for (int z = minZ; z <= maxZ; z++) {
-				for (int y = minY; y <= maxY; y++) {
-					final Block block = world.getBlockAt(x, y, z);
-					final Material type = block.getType();
+		// Iterate chunk-by-chunk for cache locality, skipping unloaded chunks
+		final int minChunkX = minX >> 4;
+		final int maxChunkX = maxX >> 4;
+		final int minChunkZ = minZ >> 4;
+		final int maxChunkZ = maxZ >> 4;
 
-					if (isBed(type)) {
-						bedCount++;
-					}
+		for (int cx = minChunkX; cx <= maxChunkX; cx++) {
+			for (int cz = minChunkZ; cz <= maxChunkZ; cz++) {
+				if (!world.isChunkLoaded(cx, cz)) {
+					continue;
+				}
 
-					if (isWorkstation(type)) {
-						workstationCount++;
+				final int startX = Math.max(minX, cx << 4);
+				final int endX = Math.min(maxX, (cx << 4) + 15);
+				final int startZ = Math.max(minZ, cz << 4);
+				final int endZ = Math.min(maxZ, (cz << 4) + 15);
+
+				for (int x = startX; x <= endX; x++) {
+					for (int z = startZ; z <= endZ; z++) {
+						for (int y = minY; y <= maxY; y++) {
+							final Block block = world.getBlockAt(x, y, z);
+							final Material type = block.getType();
+
+							if (isDoor(type) && block.getBlockData() instanceof Door door
+								&& door.getHalf() == Bisected.Half.BOTTOM) {
+								doorCount++;
+							}
+
+							if (isWorkstation(type)) {
+								workstationCount++;
+							}
+						}
 					}
 				}
 			}
 		}
 
-		return new VillageBlocks(bedCount, workstationCount);
+		return new VillageBlocks(doorCount, workstationCount);
 	}
 
 	private boolean hasRequiredVillageBlocks(VillageBlocks villageBlocks) {
-		return hasRequiredVillageBlocks(villageBlocks.bedCount(), villageBlocks.workstationCount());
+		return villageBlocks.doorCount() >= MIN_DOORS
+			&& villageBlocks.workstationCount() >= MIN_WORKSTATIONS;
 	}
 
-	private boolean hasRequiredVillageBlocks(int bedCount, int workstationCount) {
-		return bedCount >= MIN_BEDS && workstationCount >= MIN_WORKSTATIONS;
+	private boolean isNearSurface(World world, Location location) {
+		final int surfaceY = world.getHighestBlockYAt(location);
+		return location.getBlockY() >= surfaceY - MAX_DEPTH_BELOW_SURFACE;
 	}
 
 	private int countNearbyVillagers(World world, Location location) {
@@ -245,13 +263,13 @@ public class AutoVillagerPlugin implements SubPlugin {
 	}
 
 	/**
-	 * Determines if the given material is any type of bed.
+	 * Determines if the given material is a wooden door.
 	 *
 	 * @param type The material to check.
-	 * @return True if the material is a bed, false otherwise.
+	 * @return True if the material is a wooden door, false otherwise.
 	 */
-	private boolean isBed(Material type) {
-		return Tag.BEDS.isTagged(type);
+	private boolean isDoor(Material type) {
+		return Tag.WOODEN_DOORS.isTagged(type);
 	}
 
 	/**
@@ -264,6 +282,6 @@ public class AutoVillagerPlugin implements SubPlugin {
 		return VILLAGE_WORKSTATION_MATERIALS.contains(type);
 	}
 
-	private record VillageBlocks(int bedCount, int workstationCount) {
+	private record VillageBlocks(int doorCount, int workstationCount) {
 	}
 }

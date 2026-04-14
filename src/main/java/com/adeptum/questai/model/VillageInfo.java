@@ -20,6 +20,6 @@
 
 package com.adeptum.questai.model;
 
-public record VillageInfo(boolean village, int bedCount,
+public record VillageInfo(boolean village, int doorCount,
 	int workstationCount, int villagerCount) {
 }
