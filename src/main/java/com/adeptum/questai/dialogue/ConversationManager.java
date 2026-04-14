@@ -79,7 +79,7 @@ public class ConversationManager {
 		}
 
 		final ConversationState state = ConversationState.builder()
-			.phase(ConversationPhase.GREETING)
+			.phase(ConversationPhase.THINKING)
 			.npcUuid(npcUuid)
 			.npcName(npcName)
 			.npcProfession(profession)
@@ -95,6 +95,7 @@ public class ConversationManager {
 			try {
 				final String response = callAi(prompt);
 				Bukkit.getScheduler().runTask(plugin, () -> {
+					state.setPhase(ConversationPhase.GREETING);
 					state.setLastAiResponse(response);
 					openGuiSync(player,
 						DialogueGui.createGreeting(npcName, profession, response));
@@ -103,6 +104,7 @@ public class ConversationManager {
 				plugin.getLogger().log(Level.SEVERE,
 					"AI greeting call failed for " + npcName, e);
 				Bukkit.getScheduler().runTask(plugin, () -> {
+					state.setPhase(ConversationPhase.GREETING);
 					final String fallback = "Hello there, traveler.";
 					state.setLastAiResponse(fallback);
 					openGuiSync(player,
@@ -233,7 +235,7 @@ public class ConversationManager {
 			return;
 		}
 
-		state.setPhase(ConversationPhase.QUEST_OFFER);
+		state.setPhase(ConversationPhase.THINKING);
 		player.openInventory(DialogueGui.createThinking(npcName, profession));
 
 		final Quest quest = questService.buildQuest(
@@ -249,6 +251,7 @@ public class ConversationManager {
 				try {
 					final String narrative = callAi(narrativePrompt);
 					Bukkit.getScheduler().runTask(plugin, () -> {
+						state.setPhase(ConversationPhase.QUEST_OFFER);
 						state.setLastAiResponse(narrative);
 						state.setPendingQuest(quest);
 						openGuiSync(player,
@@ -259,6 +262,7 @@ public class ConversationManager {
 						"AI narrative call failed for quest "
 							+ quest.getShortTitle(), e);
 					Bukkit.getScheduler().runTask(plugin, () -> {
+						state.setPhase(ConversationPhase.QUEST_OFFER);
 						final String fallback = "I have a task for you, traveler.";
 						state.setLastAiResponse(fallback);
 						state.setPendingQuest(quest);
@@ -271,6 +275,7 @@ public class ConversationManager {
 			plugin.getLogger().log(Level.SEVERE,
 				"Quest description generation failed", error);
 			Bukkit.getScheduler().runTask(plugin, () -> {
+				state.setPhase(ConversationPhase.QUEST_OFFER);
 				quest.setShortTitle("Mysterious Quest");
 				quest.setTitle("A mysterious quest awaits...");
 				state.setLastAiResponse("I have a task for you, traveler.");
@@ -285,7 +290,7 @@ public class ConversationManager {
 	private void startCasualChat(final Player player, final ConversationState state,
 		final String npcName, final String profession) {
 
-		state.setPhase(ConversationPhase.CHAT_RESPONSE);
+		state.setPhase(ConversationPhase.THINKING);
 		player.openInventory(DialogueGui.createThinking(npcName, profession));
 
 		final boolean canOfferHelp = state.isQuestAvailable();
@@ -297,6 +302,7 @@ public class ConversationManager {
 			try {
 				final String response = callAi(prompt);
 				Bukkit.getScheduler().runTask(plugin, () -> {
+					state.setPhase(ConversationPhase.CHAT_RESPONSE);
 					state.setLastAiResponse(response);
 					openGuiSync(player,
 						DialogueGui.createChatResponse(npcName, response,
@@ -306,6 +312,7 @@ public class ConversationManager {
 				plugin.getLogger().log(Level.SEVERE,
 					"AI casual chat call failed for " + npcName, e);
 				Bukkit.getScheduler().runTask(plugin, () -> {
+					state.setPhase(ConversationPhase.CHAT_RESPONSE);
 					final String fallback = canOfferHelp
 						? "Things have been difficult lately..."
 							+ " I could really use some help."
