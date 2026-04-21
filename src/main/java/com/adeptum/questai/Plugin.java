@@ -73,6 +73,7 @@ public class Plugin extends JavaPlugin implements Listener {
 		plugins.add(randomQuestPlugin);
 		plugins.add(new WanderingPeasantPlugin(this, conversationManager,
 			questService, chatModel));
+		plugins.add(new FlyingPigPlugin(this));
 
 		plugins.forEach(p -> {
 			pm.registerEvents(p, this);
