@@ -155,6 +155,105 @@ final class TextureGenerator {
 			TextureGenerator::drawHourglass);
 	}
 
+	/**
+	 * 80x16 unfurled scroll banner rendered through the client's default font.
+	 * Injected via a private-use-area codepoint at the start of the dialogue
+	 * title so it overlays the chest inventory's title bar instead of the
+	 * default "NPC Dialogue" plain text.
+	 */
+	static byte[] dialogueBanner() {
+		final int w = 80;
+		final int h = 16;
+		final BufferedImage img = create(w, h);
+		drawScrollRolls(img, w, h);
+		drawParchment(img, w);
+		drawQuillAndInk(img);
+		drawInkLines(img, w);
+		drawWaxSeal(img, w);
+		return encode(img);
+	}
+
+	private static void drawScrollRolls(final BufferedImage img,
+		final int w, final int h) {
+
+		// Left wooden roll — x=0..5
+		fillRect(img, 1, 2, 5, h - 4, WOOD_MID);
+		drawRect(img, 1, 2, 5, h - 4, WOOD_DARK);
+		fillRect(img, 2, 3, 3, 1, WOOD_LIGHT);
+		fillRect(img, 2, h - 4, 3, 1, WOOD_GRAIN);
+		// Roll caps (top + bottom flares)
+		fillRect(img, 0, 3, 1, h - 6, WOOD_DARK);
+		fillRect(img, 1, 1, 5, 1, WOOD_DARK);
+		fillRect(img, 1, h - 2, 5, 1, WOOD_DARK);
+		// Right wooden roll — x=(w-6)..(w-1)
+		fillRect(img, w - 6, 2, 5, h - 4, WOOD_MID);
+		drawRect(img, w - 6, 2, 5, h - 4, WOOD_DARK);
+		fillRect(img, w - 5, 3, 3, 1, WOOD_LIGHT);
+		fillRect(img, w - 5, h - 4, 3, 1, WOOD_GRAIN);
+		fillRect(img, w - 1, 3, 1, h - 6, WOOD_DARK);
+		fillRect(img, w - 6, 1, 5, 1, WOOD_DARK);
+		fillRect(img, w - 6, h - 2, 5, 1, WOOD_DARK);
+	}
+
+	private static void drawParchment(final BufferedImage img, final int w) {
+		// Unfurled parchment between the two rolls
+		fillRect(img, 6, 3, w - 12, 10, PARCHMENT);
+		// Aged top/bottom edges
+		fillRect(img, 6, 3, w - 12, 1, PARCHMENT_EDGE);
+		fillRect(img, 6, 12, w - 12, 1, PARCHMENT_EDGE);
+		// Subtle shadow under each roll so the parchment reads as tucked in
+		fillRect(img, 6, 4, 1, 8, PARCHMENT_DARK);
+		fillRect(img, w - 7, 4, 1, 8, PARCHMENT_DARK);
+	}
+
+	private static void drawQuillAndInk(final BufferedImage img) {
+		// Quill feather on the left side of the parchment
+		final Color featherLight = new Color(0xE8D878);
+		final Color featherMid = new Color(0xB89840);
+		final Color featherDark = new Color(0x705820);
+		// Shaft
+		fillRect(img, 10, 5, 1, 7, featherDark);
+		// Feather body
+		fillRect(img, 8, 5, 2, 2, featherLight);
+		fillRect(img, 9, 7, 2, 1, featherMid);
+		fillRect(img, 8, 8, 2, 1, featherLight);
+		fillRect(img, 9, 9, 2, 1, featherMid);
+		fillRect(img, 8, 10, 2, 1, featherLight);
+		// Nib + ink dot
+		setPixel(img, 10, 12, new Color(0x202020));
+		setPixel(img, 11, 11, new Color(0x202020));
+	}
+
+	private static void drawInkLines(final BufferedImage img, final int w) {
+		// Horizontal ink strokes suggesting handwritten text
+		final int textStart = 14;
+		final int textEnd = w - 14;
+		fillRect(img, textStart, 6, textEnd - textStart - 6, 1, PARCHMENT_DARK);
+		fillRect(img, textStart, 9, textEnd - textStart, 1, PARCHMENT_DARK);
+		fillRect(img, textStart, 11, textEnd - textStart - 10, 1, PARCHMENT_DARK);
+	}
+
+	private static void drawWaxSeal(final BufferedImage img, final int w) {
+		// Round red wax seal on the right edge of the parchment
+		final Color sealDark = new Color(0x6B1818);
+		final Color sealMid = new Color(0x8B2020);
+		final Color sealLight = new Color(0xC83838);
+		final int cx = w - 10;
+		fillRect(img, cx - 2, 6, 4, 4, sealMid);
+		fillRect(img, cx - 1, 5, 2, 6, sealMid);
+		fillRect(img, cx - 3, 7, 1, 2, sealMid);
+		fillRect(img, cx + 2, 7, 1, 2, sealMid);
+		setPixel(img, cx - 1, 6, sealLight);
+		setPixel(img, cx, 5, sealLight);
+		setPixel(img, cx + 1, 9, sealDark);
+		setPixel(img, cx, 10, sealDark);
+		// Pressed "star" in the seal
+		setPixel(img, cx, 7, sealDark);
+		setPixel(img, cx, 8, sealDark);
+		setPixel(img, cx - 1, 8, sealDark);
+		setPixel(img, cx + 1, 8, sealDark);
+	}
+
 	private static byte[] makeButton(final Color bg, final Color border,
 		final Color highlight, final IconDrawer icon) {
 
@@ -289,18 +388,24 @@ final class TextureGenerator {
 	// Drawing primitives
 
 	private static BufferedImage create() {
-		return new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
+		return create(16, 16);
+	}
+
+	private static BufferedImage create(final int w, final int h) {
+		return new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
 	}
 
 	private static void fillRect(final BufferedImage img,
 		final int x, final int y, final int w, final int h, final Color c) {
 
 		final int rgb = c.getRGB();
+		final int imgW = img.getWidth();
+		final int imgH = img.getHeight();
 		for (int dy = 0; dy < h; dy++) {
 			for (int dx = 0; dx < w; dx++) {
 				final int px = x + dx;
 				final int py = y + dy;
-				if (px >= 0 && px < 16 && py >= 0 && py < 16) {
+				if (px >= 0 && px < imgW && py >= 0 && py < imgH) {
 					img.setRGB(px, py, rgb);
 				}
 			}
@@ -319,7 +424,7 @@ final class TextureGenerator {
 	private static void setPixel(final BufferedImage img,
 		final int x, final int y, final Color c) {
 
-		if (x >= 0 && x < 16 && y >= 0 && y < 16) {
+		if (x >= 0 && x < img.getWidth() && y >= 0 && y < img.getHeight()) {
 			img.setRGB(x, y, c.getRGB());
 		}
 	}

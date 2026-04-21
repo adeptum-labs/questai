@@ -199,7 +199,7 @@ public class RandomQuestPlugin implements SubPlugin {
 	}
 	@EventHandler
 	public void onInventoryClick(InventoryClickEvent event) {
-		if (!event.getView().getTitle().equals(DialogueGui.DIALOGUE_TITLE)) {
+		if (!DialogueGui.isDialogueInventory(event.getView())) {
 			return;
 		}
 
@@ -221,7 +221,7 @@ public class RandomQuestPlugin implements SubPlugin {
 
 	@EventHandler
 	public void onInventoryClose(InventoryCloseEvent event) {
-		if (!event.getView().getTitle().equals(DialogueGui.DIALOGUE_TITLE)) {
+		if (!DialogueGui.isDialogueInventory(event.getView())) {
 			return;
 		}
 
@@ -231,7 +231,7 @@ public class RandomQuestPlugin implements SubPlugin {
 			Bukkit.getScheduler().runTask(plugin, () -> {
 				if (conversationManager.isInConversation(player)) {
 					final var view = player.getOpenInventory();
-					if (!view.getTitle().equals(DialogueGui.DIALOGUE_TITLE)) {
+					if (!DialogueGui.isDialogueInventory(view)) {
 						conversationManager.endConversation(player);
 					}
 				}

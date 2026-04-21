@@ -21,13 +21,18 @@
 package com.adeptum.questai.dialogue;
 
 import static com.adeptum.questai.resourcepack.ResourcePackManager.CMD;
+import static com.adeptum.questai.resourcepack.ResourcePackManager.DIALOGUE_BANNER_GLYPH;
 
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
+import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
@@ -46,7 +51,10 @@ import java.util.List;
  */
 public final class DialogueGui {
 
-	public static final String DIALOGUE_TITLE = "\u00a76NPC Dialogue";
+	/** Plain-text marker substring used to identify dialogue inventories. */
+	public static final String DIALOGUE_TITLE_MARKER = "NPC Dialogue";
+
+	private static final Key DIALOGUE_FONT = Key.key("questai", "dialogue");
 	private static final int ROWS = 27;
 
 	public static final int OPTION_1_SLOT = 19;
@@ -63,10 +71,26 @@ public final class DialogueGui {
 	private DialogueGui() {
 	}
 
+	/**
+	 * Returns true for inventories whose title contains the dialogue marker —
+	 * matches legacy and Component-titled views alike.
+	 */
+	public static boolean isDialogueInventory(final InventoryView view) {
+		final String plain = PlainTextComponentSerializer.plainText()
+			.serialize(view.title());
+		return plain.contains(DIALOGUE_TITLE_MARKER);
+	}
+
+	private static Component buildTitle() {
+		return Component.text(DIALOGUE_BANNER_GLYPH).font(DIALOGUE_FONT)
+			.append(Component.text("  " + DIALOGUE_TITLE_MARKER,
+				NamedTextColor.GOLD));
+	}
+
 	private static Inventory createBase(final String npcName, final String profession,
 		final String dialogueText) {
 
-		final Inventory inv = Bukkit.createInventory(null, ROWS, DIALOGUE_TITLE);
+		final Inventory inv = Bukkit.createInventory(null, ROWS, buildTitle());
 
 		final ItemStack head = new ItemStack(Material.PLAYER_HEAD);
 		final ItemMeta headMeta = head.getItemMeta();

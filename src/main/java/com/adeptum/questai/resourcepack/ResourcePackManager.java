@@ -27,9 +27,13 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.ZipEntry;
@@ -47,6 +51,13 @@ public class ResourcePackManager {
 	/** CustomModelData value applied to all QuestAI GUI items. */
 	public static final int CMD = 100001;
 
+	/**
+	 * Private-use-area codepoint rendered via the custom font provider as a
+	 * themed banner glyph. Prepended to the dialogue inventory title so the
+	 * title bar stops looking like the vanilla chest UI.
+	 */
+	public static final String DIALOGUE_BANNER_GLYPH = "\uE000";
+
 	private static final int PACK_FORMAT = 34; // MC 1.21
 
 	private byte[] packBytes;
@@ -54,6 +65,8 @@ public class ResourcePackManager {
 	private HttpServer server;
 	private int port;
 	private String configuredHostname;
+	private final Set<UUID> loggedRecipients =
+		Collections.synchronizedSet(new HashSet<>());
 
 	public void initialize(final JavaPlugin plugin) {
 		final var config = plugin.getConfig();
@@ -98,6 +111,15 @@ public class ResourcePackManager {
 			plugin.getLogger().log(Level.SEVERE,
 				"[ResourcePack] Failed to start HTTP server on port " + port, e);
 		}
+
+		if (configuredHostname == null || configuredHostname.isBlank()) {
+			plugin.getLogger().warning("[ResourcePack] resourcepack.hostname is"
+				+ " empty. Auto-detection works for direct LAN/localhost but"
+				+ " will usually fail for players connecting from the internet"
+				+ " or through a proxy. Set resourcepack.hostname in config.yml"
+				+ " to the public IP or DNS name where port " + port
+				+ " is reachable.");
+		}
 	}
 
 	/**
@@ -112,6 +134,10 @@ public class ResourcePackManager {
 
 		final String host = resolveHostname(player);
 		final String url = "http://" + host + ":" + port + "/questai-pack.zip";
+		if (loggedRecipients.add(player.getUniqueId())) {
+			player.getServer().getLogger().info("[ResourcePack] Sending pack to "
+				+ player.getName() + " at " + url);
+		}
 		player.setResourcePack(url, packHash,
 			Component.text(
 				"\u00a76QuestAI requires a resource pack for the best experience."),
@@ -185,8 +211,28 @@ public class ResourcePackManager {
 		customItem(files, "filler_pane", TextureGenerator.fillerPane());
 		customItem(files, "dialogue_paper", TextureGenerator.dialoguePaper());
 
+		// Custom font: maps the banner glyph to a scroll emblem shown at the
+		// start of the dialogue inventory title, overriding vanilla rendering.
+		registerDialogueFont(files);
+
 		logger.info("[ResourcePack] Built pack with " + files.size() + " entries.");
 		return zip(files);
+	}
+
+	private void registerDialogueFont(final Map<String, byte[]> files) {
+		files.put("assets/questai/textures/font/dialogue_banner.png",
+			TextureGenerator.dialogueBanner());
+
+		// Custom namespace keeps vanilla text rendering untouched; only the
+		// banner glyph rendered with font(questai:dialogue) uses the bitmap.
+		final String provider = "{\"providers\":[{"
+			+ "\"type\":\"bitmap\","
+			+ "\"file\":\"questai:font/dialogue_banner.png\","
+			+ "\"ascent\":9,"
+			+ "\"height\":10,"
+			+ "\"chars\":[\"" + DIALOGUE_BANNER_GLYPH + "\"]"
+			+ "}]}";
+		files.put("assets/questai/font/dialogue.json", utf8(provider));
 	}
 
 	private void vanillaOverride(final Map<String, byte[]> files,
