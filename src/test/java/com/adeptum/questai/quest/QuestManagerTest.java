@@ -348,6 +348,27 @@ class QuestManagerTest {
 		verify(bossBar1).removePlayer(player);
 		verify(bossBar2).removePlayer(player);
 	}
+
+	@Test
+	void cleanupAllQuestsFiresCleanupCallback() {
+		@SuppressWarnings("unchecked")
+		final java.util.function.BiConsumer<Player, Quest> cleanup = mock(
+			java.util.function.BiConsumer.class);
+		questManager.setQuestCleanup(cleanup);
+
+		final Quest zombie = createKillQuest(5, "ZOMBIE");
+		final Quest skeleton = createKillQuest(3, "SKELETON");
+		questManager.assignQuest(player, zombie);
+		questManager.assignQuest(player, skeleton);
+
+		bukkitMock.when(() -> Bukkit.getPlayer(player.getUniqueId()))
+			.thenReturn(player);
+
+		questManager.cleanupAllQuests();
+
+		verify(cleanup).accept(player, zombie);
+		verify(cleanup).accept(player, skeleton);
+	}
 	private Quest createKillQuest(final int amount, final String target) {
 		final QuestObjective objective = new QuestObjective();
 		objective.setType(QuestObjective.Type.KILL);

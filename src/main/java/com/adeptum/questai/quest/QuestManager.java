@@ -415,7 +415,8 @@ public class QuestManager {
 	}
 	/**
 	 * Cleans up all active quests, BossBars, and scheduled tasks for all
-	 * players. Called on plugin disable.
+	 * players. Called on plugin disable. Fires the questCleanup callback
+	 * for every active quest so spawned blocks and entities are removed.
 	 */
 	public void cleanupAllQuests() {
 		for (final var entry : new HashMap<>(playerQuests).entrySet()) {
@@ -423,6 +424,9 @@ public class QuestManager {
 			if (player != null) {
 				for (final QuestProgress progress : entry.getValue()) {
 					removeBossBars(player, progress);
+					if (questCleanup != null) {
+						questCleanup.accept(player, progress.getQuest());
+					}
 				}
 				cancelQuestTask(player);
 				questLogBook.remove(player);

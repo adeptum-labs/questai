@@ -31,6 +31,7 @@ import com.adeptum.questai.model.world.Npc;
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
 import com.adeptum.questai.quest.DestinationMarkerRenderer;
+import com.adeptum.questai.quest.PlacedEntityStore;
 import com.adeptum.questai.quest.QuestManager;
 import com.adeptum.questai.quest.QuestProgress;
 import com.adeptum.questai.service.QuestGenerationService;
@@ -74,6 +75,7 @@ import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerPickupItemEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -95,6 +97,7 @@ public class RandomQuestPlugin implements SubPlugin {
 	private final OpenAiChatModel chatModel;
 
 	private QuestManager questManager;
+	private PlacedEntityStore placedEntityStore;
 
 	private final Map<UUID, String> villagerUniqueNames =
 		Collections.synchronizedMap(new HashMap<>());
@@ -115,6 +118,13 @@ public class RandomQuestPlugin implements SubPlugin {
 		logger.info("[RandomQuestPlugin] onEnable() start");
 
 		loadVillagerNames();
+
+		this.placedEntityStore = new PlacedEntityStore(plugin);
+		final int swept = placedEntityStore.sweepOrphans();
+		if (swept > 0) {
+			logger.info("[RandomQuestPlugin] Swept " + swept
+				+ " orphaned quest block(s)/entity(ies) from previous session.");
+		}
 
 		this.questManager = new QuestManager(plugin);
 		questManager.setQuestCleanup(this::cleanupQuestEntities);
@@ -160,6 +170,16 @@ public class RandomQuestPlugin implements SubPlugin {
 			player.sendMessage("\u00a7aCompleted quest: " + quest.getShortTitle());
 			rewardPlayer(player, quest);
 		}
+	}
+
+	/**
+	 * Abandons all active quests when the player disconnects so that any
+	 * placed treasure chests or hidden NPCs are cleaned up rather than
+	 * leaking into the world until the 6-hour timeout fires.
+	 */
+	@EventHandler
+	public void onPlayerQuit(final PlayerQuitEvent event) {
+		questManager.abandonAllQuests(event.getPlayer());
 	}
 
 	@EventHandler
@@ -261,6 +281,7 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		if (type == TREASURE && dest != null) {
 			dest.getBlock().setType(Material.AIR);
+			placedEntityStore.forget(PlacedEntityStore.Kind.CHEST, dest);
 		}
 
 		if (type == FIND_NPC && dest != null) {
@@ -271,6 +292,7 @@ public class RandomQuestPlugin implements SubPlugin {
 					return name != null && name.contains("Hidden NPC");
 				})
 				.forEach(Entity::remove);
+			placedEntityStore.forget(PlacedEntityStore.Kind.HIDDEN_NPC, dest);
 		}
 
 		// Remove quest maps from player inventory
@@ -429,6 +451,7 @@ public class RandomQuestPlugin implements SubPlugin {
 			inv.addItem(new ItemStack(Material.DIAMOND, 3));
 			inv.addItem(new ItemStack(Material.GOLDEN_APPLE, 1));
 		}
+		placedEntityStore.record(PlacedEntityStore.Kind.CHEST, loc);
 	}
 
 	private void spawnHiddenVillager(org.bukkit.Location loc, String questTitle) {
@@ -438,6 +461,7 @@ public class RandomQuestPlugin implements SubPlugin {
 			v.setCustomNameVisible(true);
 			v.setProfession(Villager.Profession.NITWIT);
 		});
+		placedEntityStore.record(PlacedEntityStore.Kind.HIDDEN_NPC, loc);
 	}
 
 	private ItemStack createMapItem(org.bukkit.Location dest, String title) {
@@ -561,6 +585,8 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		if (quest.getObjective().getType() == TREASURE) {
 			quest.getDestination().getBlock().setType(Material.AIR);
+			placedEntityStore.forget(PlacedEntityStore.Kind.CHEST,
+				quest.getDestination());
 		}
 
 		player.playSound(
