@@ -448,10 +448,44 @@ public class RandomQuestPlugin implements SubPlugin {
 		loc.getBlock().setType(Material.CHEST);
 		if (loc.getBlock().getState() instanceof org.bukkit.block.Chest cstate) {
 			final Inventory inv = cstate.getInventory();
-			inv.addItem(new ItemStack(Material.DIAMOND, 3));
-			inv.addItem(new ItemStack(Material.GOLDEN_APPLE, 1));
+			fillTreasureLoot(inv);
 		}
 		placedEntityStore.record(PlacedEntityStore.Kind.CHEST, loc);
+	}
+
+	private void fillTreasureLoot(final Inventory inv) {
+		final var rng = ThreadLocalRandom.current();
+		final ItemStack[] common = {
+			new ItemStack(Material.IRON_INGOT, 4 + rng.nextInt(5)),
+			new ItemStack(Material.BREAD, 4 + rng.nextInt(4)),
+			new ItemStack(Material.ARROW, 8 + rng.nextInt(9)),
+			new ItemStack(Material.GOLDEN_CARROT, 2 + rng.nextInt(3)),
+			new ItemStack(Material.EMERALD, 1 + rng.nextInt(3)),
+		};
+		final ItemStack[] uncommon = {
+			new ItemStack(Material.DIAMOND, 1 + rng.nextInt(3)),
+			new ItemStack(Material.GOLDEN_APPLE, 1),
+			new ItemStack(Material.ENCHANTED_BOOK, 1),
+			new ItemStack(Material.EXPERIENCE_BOTTLE, 2 + rng.nextInt(4)),
+			new ItemStack(Material.NAME_TAG, 1),
+		};
+		final ItemStack[] rare = {
+			new ItemStack(Material.NETHERITE_SCRAP, 1),
+			new ItemStack(Material.ENCHANTED_GOLDEN_APPLE, 1),
+			new ItemStack(Material.TOTEM_OF_UNDYING, 1),
+			new ItemStack(Material.NETHER_STAR, 1),
+		};
+
+		// Always give 2-3 common drops, 1-2 uncommon, and a 15% rare
+		for (int i = 0; i < 2 + rng.nextInt(2); i++) {
+			inv.addItem(common[rng.nextInt(common.length)].clone());
+		}
+		for (int i = 0; i < 1 + rng.nextInt(2); i++) {
+			inv.addItem(uncommon[rng.nextInt(uncommon.length)].clone());
+		}
+		if (rng.nextDouble() < 0.15) {
+			inv.addItem(rare[rng.nextInt(rare.length)].clone());
+		}
 	}
 
 	private void spawnHiddenVillager(org.bukkit.Location loc, String questTitle) {
