@@ -22,13 +22,14 @@ package com.adeptum.questai.quest;
 
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
+import com.adeptum.questai.utility.GuiItems;
 import java.util.List;
-import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 /**
  * Factory for the quest log chest inventory GUI.
@@ -66,13 +67,38 @@ public final class QuestLogGui {
 		return index >= 0 && index < MAX_DISPLAY ? index : -1;
 	}
 
+	/**
+	 * Returns true for inventories created by this factory, identified by
+	 * their marker holder rather than by parsing the view title.
+	 */
+	public static boolean isQuestLogInventory(final InventoryView view) {
+		return view.getTopInventory().getHolder() instanceof QuestLogHolder;
+	}
+
+	/** Marker holder identifying quest log inventories. */
+	private static final class QuestLogHolder implements InventoryHolder {
+		private Inventory inventory;
+
+		@Override
+		public Inventory getInventory() {
+			return inventory;
+		}
+	}
+
+	private static Inventory createBase() {
+		final QuestLogHolder holder = new QuestLogHolder();
+		final Inventory inv = Bukkit.createInventory(holder, ROWS, TITLE);
+		holder.inventory = inv;
+		fillBorder(inv);
+		return inv;
+	}
+
 	public static Inventory create(final List<QuestProgress> quests) {
 		if (quests == null || quests.isEmpty()) {
 			return createEmpty();
 		}
 
-		final Inventory inv = Bukkit.createInventory(null, ROWS, TITLE);
-		fillBorder(inv);
+		final Inventory inv = createBase();
 
 		final int count = Math.min(quests.size(), MAX_DISPLAY);
 		for (int i = 0; i < count; i++) {
@@ -86,24 +112,20 @@ public final class QuestLogGui {
 		final Quest quest = progress.getQuest();
 		final QuestObjective obj = quest.getObjective();
 
-		final ItemStack item = new ItemStack(materialForType(obj.getType()));
-		final ItemMeta meta = item.getItemMeta();
-		meta.displayName(Component.text("\u00a76" + quest.getShortTitle()));
-
 		final String progressLine = obj.getType().isCountable()
 			? progress.getCurrent() + "/" + obj.getAmount()
 			: "Follow your quest map";
 
-		meta.setLore(List.of(
-			"\u00a77Objective: \u00a7f" + obj.describe(),
-			"\u00a77Progress: \u00a7f" + progressLine,
-			"\u00a77Reward: \u00a7a" + quest.getRewardAmount()
-				+ " MCMMO XP in " + quest.getRewardTarget(),
-			"",
-			"\u00a77" + formatTimeRemaining(progress)
-		));
-		item.setItemMeta(meta);
-		return item;
+		return GuiItems.item(materialForType(obj.getType()),
+			"\u00a76" + quest.getShortTitle(),
+			List.of(
+				"\u00a77Objective: \u00a7f" + obj.describe(),
+				"\u00a77Progress: \u00a7f" + progressLine,
+				"\u00a77Reward: \u00a7a" + quest.getRewardAmount()
+					+ " MCMMO XP in " + quest.getRewardTarget(),
+				"",
+				"\u00a77" + formatTimeRemaining(progress)
+			));
 	}
 
 	private static Material materialForType(final QuestObjective.Type type) {
@@ -116,31 +138,17 @@ public final class QuestLogGui {
 	}
 
 	private static ItemStack abandonButton() {
-		final ItemStack item = new ItemStack(Material.BARRIER);
-		final ItemMeta meta = item.getItemMeta();
-		meta.displayName(Component.text("\u00a7c\u00a7lAbandon Quest"));
-		meta.setLore(List.of("\u00a77Click to abandon this quest"));
-		item.setItemMeta(meta);
-		return item;
+		return GuiItems.item(Material.BARRIER, "\u00a7c\u00a7lAbandon Quest",
+			List.of("\u00a77Click to abandon this quest"));
 	}
 	private static Inventory createEmpty() {
-		final Inventory inv = Bukkit.createInventory(null, ROWS, TITLE);
-		fillBorder(inv);
-
-		final ItemStack noQuest = new ItemStack(Material.PAPER);
-		final ItemMeta meta = noQuest.getItemMeta();
-		meta.displayName(Component.text("\u00a77No active quests"));
-		meta.setLore(List.of("\u00a77Talk to villagers to discover quests!"));
-		noQuest.setItemMeta(meta);
-		inv.setItem(13, noQuest);
-
+		final Inventory inv = createBase();
+		inv.setItem(13, GuiItems.item(Material.PAPER, "\u00a77No active quests",
+			List.of("\u00a77Talk to villagers to discover quests!")));
 		return inv;
 	}
 	private static void fillBorder(final Inventory inv) {
-		final ItemStack filler = new ItemStack(Material.GRAY_STAINED_GLASS_PANE);
-		final ItemMeta meta = filler.getItemMeta();
-		meta.displayName(Component.text(" "));
-		filler.setItemMeta(meta);
+		final ItemStack filler = GuiItems.item(Material.GRAY_STAINED_GLASS_PANE, " ");
 		for (final int slot : BORDER_SLOTS) {
 			inv.setItem(slot, filler.clone());
 		}

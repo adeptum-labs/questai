@@ -24,16 +24,16 @@ import static com.adeptum.questai.resourcepack.ResourcePackManager.CMD;
 import static com.adeptum.questai.resourcepack.ResourcePackManager.DIALOGUE_BANNER_GLYPH;
 
 import com.adeptum.questai.model.world.quest.Quest;
+import com.adeptum.questai.utility.GuiItems;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -71,13 +71,21 @@ public final class DialogueGui {
 	}
 
 	/**
-	 * Returns true for inventories whose title contains the dialogue marker —
-	 * matches legacy and Component-titled views alike.
+	 * Returns true for inventories created by this factory, identified by
+	 * their marker holder rather than by parsing the view title.
 	 */
 	public static boolean isDialogueInventory(final InventoryView view) {
-		final String plain = PlainTextComponentSerializer.plainText()
-			.serialize(view.title());
-		return plain.contains(DIALOGUE_TITLE_MARKER);
+		return view.getTopInventory().getHolder() instanceof DialogueHolder;
+	}
+
+	/** Marker holder identifying dialogue inventories. */
+	private static final class DialogueHolder implements InventoryHolder {
+		private Inventory inventory;
+
+		@Override
+		public Inventory getInventory() {
+			return inventory;
+		}
 	}
 
 	private static Component buildTitle() {
@@ -89,33 +97,22 @@ public final class DialogueGui {
 	private static Inventory createBase(final String npcName, final String profession,
 		final String dialogueText) {
 
-		final Inventory inv = Bukkit.createInventory(null, ROWS, buildTitle());
+		final DialogueHolder holder = new DialogueHolder();
+		final Inventory inv = Bukkit.createInventory(holder, ROWS, buildTitle());
+		holder.inventory = inv;
 
-		final ItemStack head = new ItemStack(Material.PLAYER_HEAD);
-		final ItemMeta headMeta = head.getItemMeta();
-		headMeta.displayName(Component.text("\u00a76" + npcName));
-		headMeta.setLore(List.of("\u00a77" + profession));
-		head.setItemMeta(headMeta);
-		inv.setItem(0, head);
+		inv.setItem(0, GuiItems.item(Material.PLAYER_HEAD,
+			"\u00a76" + npcName, List.of("\u00a77" + profession)));
 
 		final ItemStack filler = button(Material.GRAY_STAINED_GLASS_PANE, " ", CMD);
 		for (final int slot : FILLER_SLOTS) {
 			inv.setItem(slot, filler.clone());
 		}
 
-		inv.setItem(10, dialogueItem(npcName, dialogueText));
+		inv.setItem(10, GuiItems.item(Material.PAPER,
+			"\u00a7f" + npcName + " says:", wordWrap(dialogueText, 40), CMD));
 
 		return inv;
-	}
-
-	private static ItemStack dialogueItem(final String npcName, final String text) {
-		final ItemStack paper = new ItemStack(Material.PAPER);
-		final ItemMeta meta = paper.getItemMeta();
-		meta.displayName(Component.text("\u00a7f" + npcName + " says:"));
-		meta.setLore(wordWrap(text, 40));
-		meta.setCustomModelData(CMD);
-		paper.setItemMeta(meta);
-		return paper;
 	}
 
 	public static Inventory createGreeting(final String npcName, final String profession,
@@ -199,12 +196,7 @@ public final class DialogueGui {
 	private static ItemStack button(final Material material, final String displayName,
 		final int customModelData) {
 
-		final ItemStack stack = new ItemStack(material);
-		final ItemMeta meta = stack.getItemMeta();
-		meta.displayName(Component.text(displayName));
-		meta.setCustomModelData(customModelData);
-		stack.setItemMeta(meta);
-		return stack;
+		return GuiItems.item(material, displayName, null, customModelData);
 	}
 
 	private static List<String> wordWrap(final String text, final int maxLength) {

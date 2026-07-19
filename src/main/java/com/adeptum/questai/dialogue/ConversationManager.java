@@ -337,7 +337,11 @@ public class ConversationManager {
 		}
 	}
 
+	/**
+	 * Opens a GUI inventory. Callers already run on the main thread inside
+	 * a scheduled task, so the inventory can be opened directly.
+	 */
 	private void openGuiSync(final Player player, final Inventory inventory) {
-		Bukkit.getScheduler().runTask(plugin, () -> player.openInventory(inventory));
+		player.openInventory(inventory);
 	}
 }

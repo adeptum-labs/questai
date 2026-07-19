@@ -94,7 +94,7 @@ public class QuestLogListener implements Listener {
 	}
 	@EventHandler
 	public void onInventoryClick(final InventoryClickEvent event) {
-		if (!event.getView().getTitle().equals(QuestLogGui.TITLE)) {
+		if (!QuestLogGui.isQuestLogInventory(event.getView())) {
 			return;
 		}
 
