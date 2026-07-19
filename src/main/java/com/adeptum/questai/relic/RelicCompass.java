@@ -62,7 +62,7 @@ public final class RelicCompass {
 	}
 
 	/** Eight-way compass direction; north is negative z, east positive x. */
-	/* default */ static String cardinal(final double dx, final double dz) {
+	public static String cardinal(final double dx, final double dz) {
 		final double angle = Math.toDegrees(Math.atan2(dx, -dz));
 		final int index = (int) Math.floor((angle + 360 + 22.5) % 360 / 45);
 		return DIRECTIONS[index];
