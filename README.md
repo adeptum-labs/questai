@@ -167,7 +167,7 @@ sequenceDiagram
 	Player->>Bukkit: Kill, collect, deliver, or reach destination
 	Bukkit->>QuestManager: Increment or complete quest
 	QuestManager->>McMMO: Award XP (relic and festival bonuses)
-	QuestManager->>Profiles: Record the deed; gossip spreads it
+	QuestManager->>Profiles: Record the deed, gossip spreads it
 ```
 
 ## Quest Log
