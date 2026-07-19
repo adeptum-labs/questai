@@ -31,6 +31,7 @@ import com.adeptum.questai.model.world.quest.QuestObjective;
 import com.adeptum.questai.quest.DeliveryPackage;
 import com.adeptum.questai.quest.DestinationMarkerRenderer;
 import com.adeptum.questai.relic.QuestRelic;
+import com.adeptum.questai.relic.RelicEffects;
 import com.adeptum.questai.relic.RelicItems;
 import com.adeptum.questai.relic.RelicRoll;
 import com.adeptum.questai.quest.PlacedEntityStore;
@@ -85,7 +86,6 @@ import org.bukkit.scheduler.BukkitTask;
 @SuppressWarnings("PMD.ExcessiveImports")
 public class RandomQuestPlugin implements SubPlugin {
 
-	private static final double QUEST_CHANCE = 0.3;
 	private static final long GOSSIP_INTERVAL_TICKS = 12_000L;
 
 	private final JavaPlugin plugin;
@@ -253,10 +253,11 @@ public class RandomQuestPlugin implements SubPlugin {
 			&& profession != Villager.Profession.NITWIT;
 
 		conversationManager.startConversation(player, villager.getUniqueId(),
-			uniqueName, profession.name(), isQuestAvailable(villager), tradeable);
+			uniqueName, profession.name(), isQuestAvailable(villager, player),
+			tradeable);
 	}
 
-	private boolean isQuestAvailable(final Villager villager) {
+	private boolean isQuestAvailable(final Villager villager, final Player player) {
 		final Npc npc = questManager.getVillagerData(villager.getUniqueId());
 		final long twoHoursMillis = 2L * 60 * 60 * 1000;
 
@@ -265,7 +266,8 @@ public class RandomQuestPlugin implements SubPlugin {
 			return npc.isQuest();
 		}
 		questManager.setVillagerData(villager.getUniqueId(), null);
-		return Math.random() <= QUEST_CHANCE;
+		return Math.random() <= RelicEffects.questOfferChance(RelicItems.holds(
+			player.getInventory().getContents(), QuestRelic.WHISPERING_LOCKET));
 	}
 
 	/**
@@ -506,10 +508,13 @@ public class RandomQuestPlugin implements SubPlugin {
 		});
 	}
 	private void rewardPlayer(Player player, Quest quest) {
+		final boolean quill = RelicItems.holds(
+			player.getInventory().getContents(), QuestRelic.ELDERS_QUILL);
 		final String skill = quest.getRewardTarget();
-		final int xp = quest.getRewardAmount();
+		final int xp = RelicEffects.questXp(quest.getRewardAmount(), quill);
 		ExperienceAPI.addXP(player, skill, xp, "COMMAND");
-		player.sendMessage("§aYou earned " + xp + " MCMMO XP in " + skill + "!");
+		player.sendMessage("§aYou earned " + xp + " MCMMO XP in " + skill + "!"
+			+ (quill ? " §6(Elder's Quill +25%)" : ""));
 	}
 	private void removeQuestIndicator(UUID villagerId) {
 		final UUID standId = questManager.getIndicator(villagerId);
@@ -568,7 +573,8 @@ public class RandomQuestPlugin implements SubPlugin {
 		final ThreadLocalRandom rng, final ItemStack[] rare,
 		final java.util.Set<QuestRelic> owned) {
 
-		if (rng.nextDouble() < 0.15) {
+		if (rng.nextDouble() < RelicEffects.treasureRareChance(
+			owned.contains(QuestRelic.PROSPECTORS_CHARM))) {
 			inv.addItem(EnumUtil.random(rare).clone());
 		}
 		final QuestRelic jackpot = RelicRoll.roll(rng,
