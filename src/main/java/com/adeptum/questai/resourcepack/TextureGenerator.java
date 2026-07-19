@@ -589,10 +589,10 @@ final class TextureGenerator {
 		fillRect(img, 4, 8, 8, 2, BRASS_MID);
 		fillRect(img, 3, 10, 10, 1, BRASS_MID);
 		fillRect(img, 3, 11, 10, 1, BRASS_DARK);
-		// Shading and the clapper below the rim
+		// Shading along the edges and the clapper below the rim
 		fillRect(img, 6, 5, 1, 5, BRASS_LIGHT);
-		fillRect(img, 10, 8, 1, 2, BRASS_DARK);
-		setPixel(img, 9, 6, BRASS_DARK);
+		fillRect(img, 10, 6, 1, 2, BRASS_DARK);
+		fillRect(img, 11, 8, 1, 2, BRASS_DARK);
 		fillRect(img, 7, 12, 2, 2, INK);
 		// Motion strokes
 		setPixel(img, 1, 7, ICON_SHADOW);
