@@ -74,7 +74,7 @@ public final class RelicItems {
 	}
 
 	/** All distinct relics present in the given inventory contents. */
-	public static Set<QuestRelic> ownedRelics(final ItemStack[] contents) {
+	public static Set<QuestRelic> ownedRelics(final ItemStack... contents) {
 		final Set<QuestRelic> owned = EnumSet.noneOf(QuestRelic.class);
 		for (final ItemStack item : contents) {
 			final QuestRelic relic = relicOf(item);

@@ -22,6 +22,7 @@ package com.adeptum.questai;
 
 import com.adeptum.questai.dialogue.ConversationManager;
 import com.adeptum.questai.quest.QuestLogListener;
+import com.adeptum.questai.relic.RelicListener;
 import com.adeptum.questai.resourcepack.ResourcePackManager;
 import com.adeptum.questai.service.QuestGenerationService;
 import com.adeptum.questai.villager.VillagerProfileStore;
@@ -71,11 +72,13 @@ public class Plugin extends JavaPlugin implements Listener {
 
 		final RandomQuestPlugin randomQuestPlugin = new RandomQuestPlugin(
 			this, conversationManager, questService, chatModel, profileStore);
+		final WanderingPeasantPlugin peasantPlugin = new WanderingPeasantPlugin(
+			this, conversationManager, questService, chatModel);
 		plugins.add(new AutoVillagerPlugin(this));
 		plugins.add(randomQuestPlugin);
-		plugins.add(new WanderingPeasantPlugin(this, conversationManager,
-			questService, chatModel));
+		plugins.add(peasantPlugin);
 		plugins.add(new FlyingPigPlugin(this));
+		plugins.add(new RelicListener(profileStore, peasantPlugin));
 
 		plugins.forEach(p -> {
 			pm.registerEvents(p, this);

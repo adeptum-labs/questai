@@ -400,7 +400,7 @@ final class TextureGenerator {
 	// Relic item textures — 16x16 pixel art on transparency
 
 	/** A golden quill resting on a parchment scrap. */
-	static byte[] relicQuill() {
+	/* default */ static byte[] relicQuill() {
 		final BufferedImage img = create();
 		drawParchmentScrap(img);
 		drawGoldenFeather(img);
@@ -438,7 +438,7 @@ final class TextureGenerator {
 	}
 
 	/** A lucky gold nugget hanging from a leather cord. */
-	static byte[] relicCharm() {
+	/* default */ static byte[] relicCharm() {
 		final BufferedImage img = create();
 		drawCord(img);
 		drawNugget(img);
@@ -473,7 +473,7 @@ final class TextureGenerator {
 	}
 
 	/** A brass compass whose needle seeks people, on a parchment corner. */
-	static byte[] relicCompass() {
+	/* default */ static byte[] relicCompass() {
 		final BufferedImage img = create();
 		// Parchment scrap peeking out bottom-right, drawn under the dial
 		fillRect(img, 9, 9, 6, 6, PARCHMENT);
@@ -527,7 +527,7 @@ final class TextureGenerator {
 	}
 
 	/** A golden locket holding a tiny villager portrait. */
-	static byte[] relicLocket() {
+	/* default */ static byte[] relicLocket() {
 		final BufferedImage img = create();
 		drawLocketFrame(img);
 		drawLocketFace(img);
@@ -567,7 +567,7 @@ final class TextureGenerator {
 	}
 
 	/** A brass hand-bell with a wooden handle. */
-	static byte[] relicBell() {
+	/* default */ static byte[] relicBell() {
 		final BufferedImage img = create();
 		drawBellHandle(img);
 		drawBellBody(img);

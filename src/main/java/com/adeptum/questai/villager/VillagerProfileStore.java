@@ -147,6 +147,14 @@ public final class VillagerProfileStore {
 		return snapshots;
 	}
 
+	/** All villagers in the given world with a known location. */
+	public synchronized List<DeliveryRecipientPicker.Candidate> locatedVillagers(
+		final UUID worldId) {
+
+		// A null exclusion id matches no villager, so nothing is excluded
+		return deliveryCandidates(null, worldId);
+	}
+
 	/**
 	 * Returns all villagers in the given world with a known location that
 	 * could receive a delivery, excluding the quest giver.

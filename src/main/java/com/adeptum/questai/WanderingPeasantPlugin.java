@@ -101,27 +101,36 @@ public class WanderingPeasantPlugin implements SubPlugin {
 		plugin.getLogger().info("[WanderingPeasantPlugin] Disabled.");
 	}
 	private void trySpawnPeasant(Player player) {
-		// Check if there's already a peasant nearby
+		if (Math.random() > SPAWN_CHANCE) {
+			return;
+		}
+		summonPeasant(player);
+	}
+
+	/**
+	 * Spawns a wandering peasant near the player, bypassing the periodic
+	 * chance roll. Fails when a peasant is already nearby, the world is
+	 * not the overworld, or no surface location can be found.
+	 *
+	 * @return true when a peasant was spawned
+	 */
+	public boolean summonPeasant(Player player) {
 		final boolean nearbyPeasant = player.getWorld()
 			.getNearbyEntities(player.getLocation(), 100, 100, 100)
 			.stream()
 			.anyMatch(e -> peasantIds.contains(e.getUniqueId()));
 		if (nearbyPeasant) {
-			return;
-		}
-
-		if (Math.random() > SPAWN_CHANCE) {
-			return;
+			return false;
 		}
 
 		final World world = player.getWorld();
 		if (world.getEnvironment() != World.Environment.NORMAL) {
-			return;
+			return false;
 		}
 
 		final Location spawnLoc = getRandomLocationNear(player.getLocation());
 		if (spawnLoc == null) {
-			return;
+			return false;
 		}
 
 		final WanderingTrader trader = (WanderingTrader)
@@ -138,6 +147,7 @@ public class WanderingPeasantPlugin implements SubPlugin {
 
 		// Generate name async
 		generatePeasantName(trader);
+		return true;
 	}
 
 	private Location getRandomLocationNear(Location center) {
