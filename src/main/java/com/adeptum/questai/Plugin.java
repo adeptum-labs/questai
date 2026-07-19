@@ -26,6 +26,7 @@ import com.adeptum.questai.mob.MobForge;
 import com.adeptum.questai.quest.QuestLogListener;
 import com.adeptum.questai.relic.RelicListener;
 import com.adeptum.questai.resourcepack.ResourcePackManager;
+import com.adeptum.questai.star.StarfallManager;
 import com.adeptum.questai.service.QuestGenerationService;
 import com.adeptum.questai.villager.VillagerProfileStore;
 import dev.langchain4j.model.openai.OpenAiChatModel;
@@ -86,6 +87,7 @@ public class Plugin extends JavaPlugin implements Listener {
 		plugins.add(new RelicListener(profileStore, peasantPlugin));
 		final MobForge mobForge = new MobForge();
 		plugins.add(mobForge);
+		plugins.add(new StarfallManager(this, mobForge));
 		plugins.add(eventManager);
 
 		plugins.forEach(p -> {

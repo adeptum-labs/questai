@@ -54,7 +54,6 @@ public final class Starfall {
 	private static final long NIGHT_START = 13_000L;
 	private static final long NIGHT_END = 23_000L;
 	private static final double CRATER_RADIUS = 3.5;
-	private static final int CRATER_DEPTH = 3;
 	private static final double SHELL_RADIUS = 4.5;
 	private static final double RIM_RADIUS = 5.0;
 	private static final double ARC_HEIGHT = 40.0;
