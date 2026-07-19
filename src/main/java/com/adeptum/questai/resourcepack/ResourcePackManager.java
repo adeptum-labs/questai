@@ -61,7 +61,8 @@ public class ResourcePackManager {
 	 */
 	public static final String DIALOGUE_BANNER_GLYPH = "\uE000";
 
-	private static final int PACK_FORMAT = 34; // MC 1.21
+	private static final int PACK_FORMAT = 34; // MC 1.21-1.21.1 baseline
+	private static final int PACK_FORMAT_MAX = 75; // MC 1.21.11
 
 	private byte[] packBytes;
 	private byte[] packHash;
@@ -181,31 +182,40 @@ public class ResourcePackManager {
 	/* default */ static Map<String, byte[]> packEntries() {
 		final Map<String, byte[]> files = new LinkedHashMap<>();
 
+		// pack_format serves pre-1.20.2 clients, supported_formats covers
+		// 1.20.2-1.21.8, and min/max_format covers 1.21.9 onward
 		files.put("pack.mcmeta", utf8(
 			"{\"pack\":{\"pack_format\":" + PACK_FORMAT
-				+ ",\"description\":\"QuestAI dialogue UI\"}}"));
+				+ ",\"supported_formats\":{\"min_inclusive\":" + PACK_FORMAT
+				+ ",\"max_inclusive\":" + PACK_FORMAT_MAX + "}"
+				+ ",\"min_format\":[" + PACK_FORMAT + ",0]"
+				+ ",\"max_format\":[" + PACK_FORMAT_MAX + ",0]"
+				+ ",\"description\":\"QuestAI dialogue UI, relic and star"
+				+ " fragment sprites\"}}"));
 
-		// Vanilla model overrides — texture path must match the real vanilla
-		// texture location (block/ for blocks, item/ for items).
-		vanillaOverride(files, "yellow_dye", "item/yellow_dye",
+		// Every skinned item is emitted in both formats — legacy predicate
+		// overrides for pre-1.21.4 clients and item definitions for newer
+		// ones. Texture paths must match the real vanilla texture location
+		// (block/ for blocks, item/ for items).
+		overriddenItem(files, "yellow_dye", "item/yellow_dye",
 			CMD, "questai:item/btn_chat");
-		vanillaOverride(files, "green_dye", "item/green_dye",
+		overriddenItem(files, "green_dye", "item/green_dye",
 			CMD, "questai:item/btn_help",
 			CMD + 1, "questai:item/btn_continue");
-		vanillaOverride(files, "red_dye", "item/red_dye",
+		overriddenItem(files, "red_dye", "item/red_dye",
 			CMD, "questai:item/btn_goodbye");
-		vanillaOverride(files, "emerald", "item/emerald",
+		overriddenItem(files, "emerald", "item/emerald",
 			CMD, "questai:item/btn_trade");
-		vanillaOverride(files, "green_wool", "block/green_wool",
+		overriddenItem(files, "green_wool", "block/green_wool",
 			CMD, "questai:item/btn_accept");
-		vanillaOverride(files, "red_wool", "block/red_wool",
+		overriddenItem(files, "red_wool", "block/red_wool",
 			CMD, "questai:item/btn_reject");
-		vanillaOverride(files, "clock", "item/clock_00",
+		overriddenItem(files, "clock", "item/clock_00",
 			CMD, "questai:item/btn_wait");
-		vanillaOverride(files, "gray_stained_glass_pane",
+		overriddenItem(files, "gray_stained_glass_pane",
 			"block/gray_stained_glass_pane_top",
 			CMD, "questai:item/filler_pane");
-		vanillaOverride(files, "paper", "item/paper",
+		overriddenItem(files, "paper", "item/paper",
 			CMD, "questai:item/dialogue_paper");
 
 		// Custom models + textures
@@ -222,7 +232,7 @@ public class ResourcePackManager {
 
 		registerRelics(files);
 
-		vanillaOverride(files, "echo_shard", "item/echo_shard",
+		overriddenItem(files, "echo_shard", "item/echo_shard",
 			StarFragment.CMD, "questai:item/star_fragment");
 		customItem(files, "star_fragment", TextureGenerator.starFragment());
 
@@ -247,9 +257,50 @@ public class ResourcePackManager {
 		final QuestRelic relic, final byte[] texture) {
 
 		final String itemName = relic.getMaterial().name().toLowerCase(Locale.ROOT);
-		vanillaOverride(files, itemName, "item/" + itemName,
+		overriddenItem(files, itemName, "item/" + itemName,
 			relic.getCustomModelData(), "questai:item/relic_" + relic.getId());
 		customItem(files, "relic_" + relic.getId(), texture);
+	}
+
+	/**
+	 * Registers a skinned vanilla item in both formats: legacy predicate
+	 * overrides for pre-1.21.4 clients and an item definition for newer
+	 * clients, which ignore predicates entirely.
+	 */
+	private static void overriddenItem(final Map<String, byte[]> files,
+		final String itemName, final String vanillaTexture,
+		final Object... cmdModelPairs) {
+
+		vanillaOverride(files, itemName, vanillaTexture, cmdModelPairs);
+		itemDefinition(files, itemName, cmdModelPairs);
+	}
+
+	/**
+	 * Writes the 1.21.4+ item definition: a range dispatch over the custom
+	 * model data component falling back to the vanilla item model.
+	 */
+	private static void itemDefinition(final Map<String, byte[]> files,
+		final String itemName, final Object... cmdModelPairs) {
+
+		final StringBuilder sb = new StringBuilder(256);
+		sb.append("{\"model\":{\"type\":\"minecraft:range_dispatch\",")
+			.append("\"property\":\"minecraft:custom_model_data\",")
+			.append("\"entries\":[");
+		for (int i = 0; i < cmdModelPairs.length; i += 2) {
+			if (i > 0) {
+				sb.append(',');
+			}
+			sb.append("{\"threshold\":").append(cmdModelPairs[i])
+				.append(",\"model\":{\"type\":\"minecraft:model\",")
+				.append("\"model\":\"").append(cmdModelPairs[i + 1])
+				.append("\"}}");
+		}
+		sb.append("],\"fallback\":{\"type\":\"minecraft:model\",")
+			.append("\"model\":\"minecraft:item/").append(itemName)
+			.append("\"}}}");
+
+		files.put("assets/minecraft/items/" + itemName + ".json",
+			utf8(sb.toString()));
 	}
 
 	private static void registerDialogueFont(final Map<String, byte[]> files) {
