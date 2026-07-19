@@ -110,6 +110,81 @@ class MemorySummarizerTest {
 	}
 
 	@Test
+	void hearsayUsesRumorPhrasingPerType() {
+		final VillagerProfile profile =
+			VillagerProfile.builder().name("Goran Dusk").build();
+		final PlayerMemory memory = new PlayerMemory();
+		memory.getHearsay().add(new HearsayEvent(
+			MemoryEvent.Type.QUEST_COMPLETED, "Turnip Trouble",
+			"Edric Stone", 1));
+		memory.getHearsay().add(new HearsayEvent(
+			MemoryEvent.Type.QUEST_REJECTED, "Wolf Cull", "Mira Bloom", 2));
+		profile.getPlayers().put(PLAYER, memory);
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+		assertTrue(context.contains("Word in the village is that they"
+			+ " completed 'Turnip Trouble' for Edric Stone."));
+		assertTrue(context.contains(
+			"turned down Mira Bloom's request."));
+	}
+
+	@Test
+	void hearsayFollowsFirstHandAndCapsAtTwo() {
+		final VillagerProfile profile =
+			VillagerProfile.builder().name("Goran Dusk").build();
+		final PlayerMemory memory = new PlayerMemory();
+		memory.getEvents().add(new MemoryEvent(
+			MemoryEvent.Type.QUEST_COMPLETED, "First Hand", 1));
+		for (int i = 0; i < 3; i++) {
+			memory.getHearsay().add(new HearsayEvent(
+				MemoryEvent.Type.QUEST_ACCEPTED, "Rumor " + i,
+				"Villager " + i, i));
+		}
+		profile.getPlayers().put(PLAYER, memory);
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+		assertTrue(context.indexOf("First Hand")
+			< context.indexOf("Word in the village"));
+		assertTrue(context.contains("Villager 2"));
+		assertTrue(context.contains("Villager 1"));
+		assertFalse(context.contains("Villager 0"));
+	}
+
+	@Test
+	void lengthCapDropsHearsayBeforeFirstHand() {
+		final VillagerProfile profile =
+			VillagerProfile.builder().name("Goran Dusk").build();
+		final PlayerMemory memory = new PlayerMemory();
+		final String longTitle = "T".repeat(120);
+		for (int i = 0; i < 4; i++) {
+			memory.getEvents().add(new MemoryEvent(
+				MemoryEvent.Type.QUEST_COMPLETED, longTitle + i, i));
+		}
+		memory.getHearsay().add(new HearsayEvent(
+			MemoryEvent.Type.QUEST_COMPLETED, "Rumor", "Edric Stone", 1));
+		profile.getPlayers().put(PLAYER, memory);
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+		assertTrue(context.contains(longTitle + "3"));
+		assertFalse(context.contains("Word in the village"));
+	}
+
+	@Test
+	void hearsayOnlyStrangerStillGetsContext() {
+		final VillagerProfile profile =
+			VillagerProfile.builder().name("Goran Dusk").build();
+		final PlayerMemory memory = new PlayerMemory();
+		memory.getHearsay().add(new HearsayEvent(
+			MemoryEvent.Type.PARCEL_RECEIVED, "Edric Stone",
+			"Mira Bloom", 1));
+		profile.getPlayers().put(PLAYER, memory);
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+		assertTrue(context.contains(
+			"delivered a parcel for Mira Bloom."));
+	}
+
+	@Test
 	void overlongContextDropsOldestEventClauses() {
 		final VillagerProfile profile = VillagerProfile.builder()
 			.name("Edric Stone")

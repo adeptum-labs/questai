@@ -32,6 +32,7 @@ import java.util.UUID;
 public final class MemorySummarizer {
 
 	private static final int MAX_EVENT_CLAUSES = 4;
+	private static final int MAX_HEARSAY_CLAUSES = 2;
 	private static final int MAX_LENGTH = 400;
 
 	private MemorySummarizer() {
@@ -61,6 +62,9 @@ public final class MemorySummarizer {
 
 		final int baseParts = parts.size();
 		parts.addAll(eventClauses(memory));
+		// Hearsay goes last so the length cap drops it before first-hand
+		// memories
+		parts.addAll(hearsayClauses(memory));
 		return capLength(parts, baseParts);
 	}
 
@@ -86,6 +90,31 @@ public final class MemorySummarizer {
 			clauses.add(describe(events.get(i)));
 		}
 		return clauses;
+	}
+
+	private static List<String> hearsayClauses(final PlayerMemory memory) {
+		if (memory == null) {
+			return List.of();
+		}
+		final List<String> clauses = new ArrayList<>();
+		final List<HearsayEvent> hearsay = memory.getHearsay();
+		for (int i = hearsay.size() - 1;
+			i >= 0 && clauses.size() < MAX_HEARSAY_CLAUSES; i--) {
+			clauses.add(describeHearsay(hearsay.get(i)));
+		}
+		return clauses;
+	}
+
+	private static String describeHearsay(final HearsayEvent event) {
+		return "Word in the village is that they " + switch (event.type()) {
+			case QUEST_COMPLETED -> "completed '" + event.questTitle()
+				+ "' for " + event.sourceName() + ".";
+			case QUEST_REJECTED ->
+				"turned down " + event.sourceName() + "'s request.";
+			case QUEST_ACCEPTED -> "agreed to help " + event.sourceName() + ".";
+			case PARCEL_RECEIVED ->
+				"delivered a parcel for " + event.sourceName() + ".";
+		};
 	}
 
 	private static String describe(final MemoryEvent event) {

@@ -96,7 +96,8 @@ public final class DialoguePrompts {
 		}
 		return " Personality and shared history: " + context
 			+ (acknowledge
-				? " If you have met this player before, acknowledge it naturally."
+				? " If you have met this player before, or only heard of"
+					+ " them, acknowledge it naturally."
 				: "");
 	}
 }
