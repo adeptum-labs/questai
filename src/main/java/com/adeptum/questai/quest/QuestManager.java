@@ -286,13 +286,13 @@ public class QuestManager {
 				continue;
 			}
 
-			updateTimerBar(player, progress, remaining, sixHoursMillis);
+			updateTimerBar(progress, remaining, sixHoursMillis);
 
 			final Quest quest = progress.getQuest();
 			if (EnumSet.of(FIND_NPC, TREASURE).contains(quest.getObjective().getType())) {
 				updateDistanceProgress(player, progress, quest);
 			} else if (EnumSet.of(KILL, COLLECT).contains(quest.getObjective().getType())) {
-				updateCountProgress(player, progress);
+				updateCountProgress(progress);
 			}
 		}
 
@@ -317,7 +317,7 @@ public class QuestManager {
 		}
 	}
 
-	private void updateTimerBar(final Player player, final QuestProgress progress,
+	private void updateTimerBar(final QuestProgress progress,
 		final long remaining, final long sixHoursMillis) {
 
 		final double timerProgress = Math.max(remaining / (double) sixHoursMillis, 0);
@@ -349,9 +349,7 @@ public class QuestManager {
 		});
 	}
 
-	private void updateCountProgress(final Player player,
-		final QuestProgress progress) {
-
+	private void updateCountProgress(final QuestProgress progress) {
 		final int current = progress.getCurrent();
 		final int required = progress.getQuest().getObjective().getAmount();
 		final double progressPercent = Math.min(

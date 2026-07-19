@@ -83,14 +83,12 @@ public class QuestGenerationService {
 	public Quest buildQuest(final QuestObjective objective, final UUID npcUuid,
 		final World world) {
 
-		final String[] possibleSkills = SKILLS;
 		final String rewardSkill =
-			possibleSkills[ThreadLocalRandom.current().nextInt(possibleSkills.length)];
+			SKILLS[ThreadLocalRandom.current().nextInt(SKILLS.length)];
 		final int rewardXP = ThreadLocalRandom.current().nextInt(50, 201);
 
 		final Quest quest = new Quest();
 		quest.setObjective(objective);
-		quest.setRewardType("MCMMO");
 		quest.setRewardTarget(rewardSkill);
 		quest.setRewardAmount(rewardXP);
 		quest.setVillagerUuid(npcUuid);

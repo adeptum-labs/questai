@@ -28,12 +28,7 @@ import lombok.Data;
 @Builder
 public class Npc {
 	private Quest quest;
-	private String nonsensePhrase;
 	private long timestamp;
-
-	public boolean isPhrase() {
-		return nonsensePhrase != null;
-	}
 
 	public boolean isQuest() {
 		return quest != null;

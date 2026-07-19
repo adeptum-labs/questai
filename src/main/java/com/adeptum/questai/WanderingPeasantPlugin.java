@@ -103,10 +103,6 @@ public class WanderingPeasantPlugin implements SubPlugin {
 		plugin.getLogger().info("[WanderingPeasantPlugin] Disabled.");
 	}
 	private void trySpawnPeasant(Player player) {
-		if (!player.isOnline()) {
-			return;
-		}
-
 		// Check if there's already a peasant nearby
 		final boolean nearbyPeasant = player.getWorld()
 			.getNearbyEntities(player.getLocation(), 100, 100, 100)

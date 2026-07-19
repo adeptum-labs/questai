@@ -76,10 +76,4 @@ public final class DialoguePrompts {
 			+ "Output ONLY the dialogue text, no quotes.")
 				.formatted(npcName, profession);
 	}
-
-	public static String farewell(final String npcName) {
-		return ("You are %s. Say a brief goodbye to the player (1 sentence). "
-			+ "Stay in character. Output ONLY the text, no quotes.")
-				.formatted(npcName);
-	}
 }

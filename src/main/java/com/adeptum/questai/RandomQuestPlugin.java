@@ -247,7 +247,6 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		final Player player = (Player) event.getPlayer();
 		if (conversationManager.isInConversation(player)) {
-			conversationManager.getState(player);
 			Bukkit.getScheduler().runTask(plugin, () -> {
 				if (conversationManager.isInConversation(player)) {
 					final var view = player.getOpenInventory();

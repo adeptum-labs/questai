@@ -72,7 +72,6 @@ class QuestTest {
 
 		final Quest quest = new Quest();
 		quest.setObjective(objective);
-		quest.setRewardType("MCMMO");
 		quest.setRewardTarget("MINING");
 		quest.setRewardAmount(100);
 		return quest;

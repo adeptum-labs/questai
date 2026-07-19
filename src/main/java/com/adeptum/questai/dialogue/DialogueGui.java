@@ -99,7 +99,7 @@ public final class DialogueGui {
 		head.setItemMeta(headMeta);
 		inv.setItem(0, head);
 
-		final ItemStack filler = item(Material.GRAY_STAINED_GLASS_PANE, " ", CMD);
+		final ItemStack filler = button(Material.GRAY_STAINED_GLASS_PANE, " ", CMD);
 		for (final int slot : FILLER_SLOTS) {
 			inv.setItem(slot, filler.clone());
 		}
@@ -152,13 +152,7 @@ public final class DialogueGui {
 	public static Inventory createQuestOffer(final String npcName,
 		final String narrativeText) {
 
-		return createQuestOffer(npcName, "", narrativeText, null);
-	}
-
-	public static Inventory createQuestOffer(final String npcName, final String profession,
-		final String narrativeText, final Quest quest) {
-
-		final Inventory inv = createBase(npcName, profession, narrativeText);
+		final Inventory inv = createBase(npcName, "", narrativeText);
 		inv.setItem(CENTER_SLOT,
 			button(Material.GREEN_DYE, "\u00a7a\u00a7lContinue \u2192", CMD + 1));
 		return inv;
@@ -212,17 +206,6 @@ public final class DialogueGui {
 	}
 
 	private static ItemStack button(final Material material, final String displayName,
-		final int customModelData) {
-
-		final ItemStack stack = new ItemStack(material);
-		final ItemMeta meta = stack.getItemMeta();
-		meta.displayName(Component.text(displayName));
-		meta.setCustomModelData(customModelData);
-		stack.setItemMeta(meta);
-		return stack;
-	}
-
-	private static ItemStack item(final Material material, final String displayName,
 		final int customModelData) {
 
 		final ItemStack stack = new ItemStack(material);

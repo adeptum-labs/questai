@@ -73,12 +73,4 @@ class DialoguePromptsTest {
 		assertTrue(prompt.contains("LIBRARIAN"));
 		assertTrue(prompt.contains("help"));
 	}
-
-	@Test
-	void farewellContainsNpcName() {
-		final String prompt = DialoguePrompts.farewell("Goran Dusk");
-
-		assertTrue(prompt.contains("Goran Dusk"));
-		assertTrue(prompt.contains("goodbye"));
-	}
 }

@@ -29,12 +29,10 @@ public class Quest {
 	private String shortTitle;
 	private String title;
 	private QuestObjective objective;
-	private String rewardType;   // e.g. "MCMMO"
 	private String rewardTarget; // e.g. "MINING"
 	private int rewardAmount;
 	private Location destination;
 	private UUID villagerUuid;
-	private String narrative;
 
 	public String prompt() {
 		final StringBuilder sb = new StringBuilder(320);

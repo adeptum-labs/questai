@@ -89,7 +89,6 @@ class QuestGenerationServiceTest {
 
 		assertSame(obj, quest.getObjective());
 		assertEquals(npcUuid, quest.getVillagerUuid());
-		assertEquals("MCMMO", quest.getRewardType());
 		assertNotNull(quest.getRewardTarget());
 		assertTrue(quest.getRewardAmount() >= 50 && quest.getRewardAmount() <= 200);
 		assertNull(quest.getDestination()); // KILL quests have no destination

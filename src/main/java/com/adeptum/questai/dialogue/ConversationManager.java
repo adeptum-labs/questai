@@ -124,7 +124,7 @@ public class ConversationManager {
 		final String profession = state.getNpcProfession();
 
 		switch (state.getPhase()) {
-			case GREETING -> handleGreeting(player, slot, state, npcName, profession);
+			case GREETING -> handleGreeting(player, slot, state, npcName);
 			case OPTIONS -> handleOptions(player, slot, state, npcName, profession);
 			case QUEST_OFFER -> handleQuestOffer(player, slot, state, npcName);
 			case QUEST_ACCEPT_REJECT -> handleQuestAcceptReject(player, slot, state);
@@ -146,7 +146,7 @@ public class ConversationManager {
 	}
 
 	private void handleGreeting(final Player player, final int slot,
-		final ConversationState state, final String npcName, final String profession) {
+		final ConversationState state, final String npcName) {
 
 		if (slot != DialogueGui.CENTER_SLOT) {
 			return;

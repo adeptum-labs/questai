@@ -111,10 +111,6 @@ public class AutoVillagerPlugin implements SubPlugin {
 	 * @param logger The logger for spawn messages.
 	 */
 	private void checkAndRepopulateNearbyVillages(Player player, Logger logger) {
-		if (!player.isOnline()) {
-			return;
-		}
-
 		Location playerLoc = player.getLocation();
 		World world = playerLoc.getWorld();
 		if (world == null || !isNearSurface(world, playerLoc)) {
