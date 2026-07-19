@@ -113,21 +113,6 @@ final class TextureGenerator {
 		return encode(img);
 	}
 
-	static byte[] npcHead() {
-		final BufferedImage img = create();
-		// Simple villager-like face on parchment bg
-		fillRect(img, 0, 0, 16, 16, PARCHMENT);
-		drawRect(img, 0, 0, 16, 16, PARCHMENT_EDGE);
-		// Face outline
-		fillRect(img, 4, 3, 8, 10, new Color(0xC8A878));
-		// Eyes
-		fillRect(img, 5, 6, 2, 2, new Color(0x3C2A1A));
-		fillRect(img, 9, 6, 2, 2, new Color(0x3C2A1A));
-		// Nose
-		fillRect(img, 7, 8, 2, 3, new Color(0xB09060));
-		return encode(img);
-	}
-
 	static byte[] chatButton() {
 		return makeButton(YELLOW_BG, YELLOW_BORDER, YELLOW_HIGHLIGHT,
 			TextureGenerator::drawSpeechBubble);
