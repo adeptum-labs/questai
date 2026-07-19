@@ -25,10 +25,30 @@ import lombok.Data;
 @Data
 public class QuestObjective {
 	public enum Type {
-		TREASURE, FIND_NPC, KILL, COLLECT
+		TREASURE, FIND_NPC, KILL, COLLECT;
+
+		/** True for objectives that place something at a destination. */
+		public boolean needsDestination() {
+			return this == TREASURE || this == FIND_NPC;
+		}
+
+		/** True for objectives completed by accumulating a count. */
+		public boolean isCountable() {
+			return this == KILL || this == COLLECT;
+		}
 	}
 
 	private Type type;
 	private String target;
 	private int amount;
+
+	/** Single source of the human-readable objective phrase. */
+	public String describe() {
+		return switch (type) {
+			case KILL -> "Kill %d %s".formatted(amount, target);
+			case COLLECT -> "Collect %d %s".formatted(amount, target);
+			case TREASURE -> "Find a hidden treasure chest";
+			case FIND_NPC -> "Locate a missing person";
+		};
+	}
 }

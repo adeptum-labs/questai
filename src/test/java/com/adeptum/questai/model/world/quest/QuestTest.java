@@ -53,7 +53,7 @@ class QuestTest {
 		final Quest quest = createQuest(QuestObjective.Type.TREASURE, "NONE", 1);
 		final String prompt = quest.prompt();
 
-		assertTrue(prompt.contains("hidden chest"));
+		assertTrue(prompt.contains("hidden treasure chest"));
 	}
 
 	@Test
@@ -61,7 +61,7 @@ class QuestTest {
 		final Quest quest = createQuest(QuestObjective.Type.FIND_NPC, "NONE", 1);
 		final String prompt = quest.prompt();
 
-		assertTrue(prompt.contains("- Objective: Locate an NPC"));
+		assertTrue(prompt.contains("- Objective: Locate a missing person"));
 	}
 
 	private Quest createQuest(QuestObjective.Type type, String target, int amount) {

@@ -41,14 +41,7 @@ public class Quest {
 		sb.append("Please provide a short title (max 5 words) and a short, engaging quest description ");
 		sb.append("(1-3 sentences).\n");
 		sb.append("Quest data:\n");
-
-		final String objectiveLine = switch (objective.getType()) {
-			case KILL -> "- Objective: Kill %d %s".formatted(objective.getAmount(), objective.getTarget());
-			case COLLECT -> "- Objective: Collect %d %s".formatted(objective.getAmount(), objective.getTarget());
-			case TREASURE -> "- Objective: Find a hidden chest in the world.";
-			case FIND_NPC -> "- Objective: Locate an NPC.";
-		};
-		sb.append(objectiveLine).append('\n');
+		sb.append("- Objective: ").append(objective.describe()).append('\n');
 
 		sb.append("- Reward: %d MCMMO XP in %s\n".formatted(rewardAmount, rewardTarget));
 		sb.append("\nProvide the short title and description separated by a newline.");

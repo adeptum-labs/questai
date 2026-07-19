@@ -90,20 +90,12 @@ public final class QuestLogGui {
 		final ItemMeta meta = item.getItemMeta();
 		meta.displayName(Component.text("\u00a76" + quest.getShortTitle()));
 
-		final String objectiveLine = switch (obj.getType()) {
-			case KILL -> "Kill " + obj.getTarget() + " x" + obj.getAmount();
-			case COLLECT -> "Collect " + obj.getTarget() + " x" + obj.getAmount();
-			case TREASURE -> "Find a hidden treasure chest";
-			case FIND_NPC -> "Locate a missing person";
-		};
-
-		final String progressLine = switch (obj.getType()) {
-			case KILL, COLLECT -> progress.getCurrent() + "/" + obj.getAmount();
-			case TREASURE, FIND_NPC -> "Follow your quest map";
-		};
+		final String progressLine = obj.getType().isCountable()
+			? progress.getCurrent() + "/" + obj.getAmount()
+			: "Follow your quest map";
 
 		meta.setLore(List.of(
-			"\u00a77Objective: \u00a7f" + objectiveLine,
+			"\u00a77Objective: \u00a7f" + obj.describe(),
 			"\u00a77Progress: \u00a7f" + progressLine,
 			"\u00a77Reward: \u00a7a" + quest.getRewardAmount()
 				+ " MCMMO XP in " + quest.getRewardTarget(),

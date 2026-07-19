@@ -47,4 +47,44 @@ class QuestObjectiveTest {
 		assertNotNull(QuestObjective.Type.valueOf("KILL"));
 		assertNotNull(QuestObjective.Type.valueOf("COLLECT"));
 	}
+
+	@Test
+	void needsDestinationOnlyForPlacedObjectives() {
+		assertTrue(QuestObjective.Type.TREASURE.needsDestination());
+		assertTrue(QuestObjective.Type.FIND_NPC.needsDestination());
+		assertFalse(QuestObjective.Type.KILL.needsDestination());
+		assertFalse(QuestObjective.Type.COLLECT.needsDestination());
+	}
+
+	@Test
+	void isCountableOnlyForCountedObjectives() {
+		assertTrue(QuestObjective.Type.KILL.isCountable());
+		assertTrue(QuestObjective.Type.COLLECT.isCountable());
+		assertFalse(QuestObjective.Type.TREASURE.isCountable());
+		assertFalse(QuestObjective.Type.FIND_NPC.isCountable());
+	}
+
+	@Test
+	void describeIncludesAmountAndTargetForCountedObjectives() {
+		final QuestObjective objective = new QuestObjective();
+		objective.setType(QuestObjective.Type.KILL);
+		objective.setTarget("ZOMBIE");
+		objective.setAmount(5);
+		assertEquals("Kill 5 ZOMBIE", objective.describe());
+
+		objective.setType(QuestObjective.Type.COLLECT);
+		objective.setTarget("WHEAT");
+		objective.setAmount(20);
+		assertEquals("Collect 20 WHEAT", objective.describe());
+	}
+
+	@Test
+	void describeUsesFixedPhraseForPlacedObjectives() {
+		final QuestObjective objective = new QuestObjective();
+		objective.setType(QuestObjective.Type.TREASURE);
+		assertEquals("Find a hidden treasure chest", objective.describe());
+
+		objective.setType(QuestObjective.Type.FIND_NPC);
+		assertEquals("Locate a missing person", objective.describe());
+	}
 }

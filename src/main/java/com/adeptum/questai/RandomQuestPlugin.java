@@ -43,7 +43,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -156,7 +155,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		final List<QuestProgress> completed = quests.stream()
 			.filter(p -> {
 				final QuestObjective obj = p.getQuest().getObjective();
-				return (obj.getType() == KILL || obj.getType() == COLLECT)
+				return obj.getType().isCountable()
 					&& p.getCurrent() >= obj.getAmount();
 			})
 			.toList();
@@ -295,7 +294,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		}
 
 		// Remove quest maps from player inventory
-		if (EnumSet.of(TREASURE, FIND_NPC).contains(type)) {
+		if (type.needsDestination()) {
 			removeQuestMaps(player, quest);
 		}
 
@@ -588,7 +587,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		}
 
 		final Quest quest = npc.getQuest();
-		if (!EnumSet.of(TREASURE, FIND_NPC).contains(quest.getObjective().getType())) {
+		if (!quest.getObjective().getType().needsDestination()) {
 			return;
 		}
 		if (quest.getDestination().distance(player.getLocation()) > 10) {

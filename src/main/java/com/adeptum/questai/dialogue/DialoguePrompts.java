@@ -21,7 +21,6 @@
 package com.adeptum.questai.dialogue;
 
 import com.adeptum.questai.model.world.quest.Quest;
-import com.adeptum.questai.model.world.quest.QuestObjective;
 
 /**
  * Utility class providing prompt templates for NPC dialogue AI generation.
@@ -41,13 +40,9 @@ public final class DialoguePrompts {
 	public static String questNarrative(final String npcName, final String profession,
 		final Quest quest) {
 
-		final QuestObjective obj = quest.getObjective();
-		final String objectiveDesc = switch (obj.getType()) {
-			case KILL -> "kill %d %s".formatted(obj.getAmount(), obj.getTarget());
-			case COLLECT -> "collect %d %s".formatted(obj.getAmount(), obj.getTarget());
-			case TREASURE -> "find a hidden treasure chest";
-			case FIND_NPC -> "locate a missing person";
-		};
+		final String described = quest.getObjective().describe();
+		final String objectiveDesc =
+			Character.toLowerCase(described.charAt(0)) + described.substring(1);
 
 		return ("You are %s, a %s in a Minecraft village. You need the player's help to %s. "
 			+ "The reward is %d MCMMO XP in %s. Describe this quest conversationally in "

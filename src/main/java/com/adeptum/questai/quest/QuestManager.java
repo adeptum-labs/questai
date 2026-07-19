@@ -20,17 +20,11 @@
 
 package com.adeptum.questai.quest;
 
-import static com.adeptum.questai.model.world.quest.QuestObjective.Type.COLLECT;
-import static com.adeptum.questai.model.world.quest.QuestObjective.Type.FIND_NPC;
-import static com.adeptum.questai.model.world.quest.QuestObjective.Type.KILL;
-import static com.adeptum.questai.model.world.quest.QuestObjective.Type.TREASURE;
-
 import com.adeptum.questai.model.world.Npc;
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -92,7 +86,7 @@ public class QuestManager {
 
 		final QuestProgress progress = new QuestProgress(quest);
 
-		if (EnumSet.of(FIND_NPC, TREASURE).contains(quest.getObjective().getType())) {
+		if (quest.getObjective().getType().needsDestination()) {
 			final Location playerLocation = player.getLocation();
 			final Location destination = quest.getDestination();
 			progress.setMaxDistance(playerLocation.distance(destination));
@@ -289,9 +283,9 @@ public class QuestManager {
 			updateTimerBar(progress, remaining, sixHoursMillis);
 
 			final Quest quest = progress.getQuest();
-			if (EnumSet.of(FIND_NPC, TREASURE).contains(quest.getObjective().getType())) {
+			if (quest.getObjective().getType().needsDestination()) {
 				updateDistanceProgress(player, progress, quest);
-			} else if (EnumSet.of(KILL, COLLECT).contains(quest.getObjective().getType())) {
+			} else if (quest.getObjective().getType().isCountable()) {
 				updateCountProgress(progress);
 			}
 		}

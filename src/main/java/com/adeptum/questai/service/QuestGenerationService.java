@@ -32,7 +32,6 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.EnumSet;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
@@ -40,9 +39,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static com.adeptum.questai.model.world.quest.QuestObjective.Type.COLLECT;
-import static com.adeptum.questai.model.world.quest.QuestObjective.Type.FIND_NPC;
 import static com.adeptum.questai.model.world.quest.QuestObjective.Type.KILL;
-import static com.adeptum.questai.model.world.quest.QuestObjective.Type.TREASURE;
 
 /**
  * Stateless service that generates random quests and their AI descriptions.
@@ -93,7 +90,7 @@ public class QuestGenerationService {
 		quest.setRewardAmount(rewardXP);
 		quest.setVillagerUuid(npcUuid);
 
-		if (EnumSet.of(FIND_NPC, TREASURE).contains(objective.getType())) {
+		if (objective.getType().needsDestination()) {
 			final Location loc = getLogarithmicLocation(world);
 			quest.setDestination(loc);
 		}

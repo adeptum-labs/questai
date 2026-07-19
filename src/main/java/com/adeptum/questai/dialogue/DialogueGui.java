@@ -24,7 +24,6 @@ import static com.adeptum.questai.resourcepack.ResourcePackManager.CMD;
 import static com.adeptum.questai.resourcepack.ResourcePackManager.DIALOGUE_BANNER_GLYPH;
 
 import com.adeptum.questai.model.world.quest.Quest;
-import com.adeptum.questai.model.world.quest.QuestObjective;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -161,16 +160,8 @@ public final class DialogueGui {
 	public static Inventory createQuestAcceptReject(final String npcName,
 		final Quest quest) {
 
-		final QuestObjective obj = quest.getObjective();
-
-		final String objectiveLine = switch (obj.getType()) {
-			case KILL -> "Kill " + obj.getTarget() + " x" + obj.getAmount();
-			case COLLECT -> "Collect " + obj.getTarget() + " x" + obj.getAmount();
-			case TREASURE -> "Find a hidden treasure chest";
-			case FIND_NPC -> "Locate a missing person";
-		};
-
-		final String dialogueText = "\u00a77Objective: \u00a7f" + objectiveLine
+		final String dialogueText = "\u00a77Objective: \u00a7f"
+			+ quest.getObjective().describe()
 			+ "\n\u00a77Reward: \u00a7a" + quest.getRewardAmount()
 			+ " MCMMO XP in " + quest.getRewardTarget();
 
