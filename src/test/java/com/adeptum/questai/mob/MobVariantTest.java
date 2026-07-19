@@ -41,23 +41,24 @@ class MobVariantTest {
 	@Test
 	void everyVariantHasSaneValues() {
 		for (final MobVariant variant : MobVariant.values()) {
+			final MobVariant.Combat combat = variant.getCombat();
 			assertTrue(variant.getDisplayName().startsWith("\u00a7"));
 			assertTrue(variant.getDropChance() > 0
 				&& variant.getDropChance() < 1);
 			assertTrue(variant.getBonusXp() >= 0);
-			assertTrue(variant.getScale() > 0);
-			assertTrue(variant.getMaxHealth() > 0);
-			assertTrue(variant.getMovementSpeed() > 0);
-			assertTrue(variant.getAttackDamage() > 0);
-			assertTrue(variant.getKnockbackResistance() >= 0
-				&& variant.getKnockbackResistance() <= 1);
+			assertTrue(combat.scale() > 0);
+			assertTrue(combat.maxHealth() > 0);
+			assertTrue(combat.movementSpeed() > 0);
+			assertTrue(combat.attackDamage() > 0);
+			assertTrue(combat.knockbackResistance() >= 0
+				&& combat.knockbackResistance() <= 1);
 		}
 	}
 
 	@Test
 	void gravehulkIsTheGiant() {
-		assertEquals(2.0, MobVariant.GRAVEHULK.getScale());
-		assertTrue(MobVariant.GRAVELING.getScale() < 1.0);
-		assertTrue(MobVariant.CINDERLING.getScale() < 1.0);
+		assertEquals(2.0, MobVariant.GRAVEHULK.getCombat().scale());
+		assertTrue(MobVariant.GRAVELING.getCombat().scale() < 1.0);
+		assertTrue(MobVariant.CINDERLING.getCombat().scale() < 1.0);
 	}
 }

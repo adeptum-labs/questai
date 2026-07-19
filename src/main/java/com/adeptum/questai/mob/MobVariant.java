@@ -32,40 +32,30 @@ public enum MobVariant {
 
 	/** A towering zombie: slow, hard-hitting and hard to budge. */
 	GRAVEHULK("gravehulk", "\u00a74Gravehulk", 0.08, 20,
-		2.0, 40.0, 0.18, 7.0, 0.6),
+		new Combat(2.0, 40.0, 0.18, 7.0, 0.6)),
 
 	/** A knee-high zombie that hunts in swarms. */
 	GRAVELING("graveling", "\u00a72Graveling", 0.01, 2,
-		0.5, 8.0, 0.32, 2.0, 0.0),
+		new Combat(0.5, 8.0, 0.32, 2.0, 0.0)),
 
 	/** A small blaze-touched spider that sets its prey alight. */
 	CINDERLING("cinderling", "\u00a76Cinderling", 0.05, 8,
-		0.7, 12.0, 0.38, 2.0, 0.0);
+		new Combat(0.7, 12.0, 0.38, 2.0, 0.0));
 
 	private final String id;
 	private final String displayName;
 	private final double dropChance;
 	private final int bonusXp;
-	private final double scale;
-	private final double maxHealth;
-	private final double movementSpeed;
-	private final double attackDamage;
-	private final double knockbackResistance;
+	private final Combat combat;
 
 	MobVariant(final String id, final String displayName,
-		final double dropChance, final int bonusXp, final double scale,
-		final double maxHealth, final double movementSpeed,
-		final double attackDamage, final double knockbackResistance) {
+		final double dropChance, final int bonusXp, final Combat combat) {
 
 		this.id = id;
 		this.displayName = displayName;
 		this.dropChance = dropChance;
 		this.bonusXp = bonusXp;
-		this.scale = scale;
-		this.maxHealth = maxHealth;
-		this.movementSpeed = movementSpeed;
-		this.attackDamage = attackDamage;
-		this.knockbackResistance = knockbackResistance;
+		this.combat = combat;
 	}
 
 	/** Resolves a stored variant id, or null when unknown. */
@@ -76,5 +66,10 @@ public enum MobVariant {
 			}
 		}
 		return null;
+	}
+
+	/** The combat profile applied to a forged mob. */
+	public record Combat(double scale, double maxHealth, double movementSpeed,
+		double attackDamage, double knockbackResistance) {
 	}
 }

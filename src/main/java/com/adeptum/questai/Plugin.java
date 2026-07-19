@@ -22,6 +22,7 @@ package com.adeptum.questai;
 
 import com.adeptum.questai.dialogue.ConversationManager;
 import com.adeptum.questai.event.VillageEventManager;
+import com.adeptum.questai.mob.MobForge;
 import com.adeptum.questai.quest.QuestLogListener;
 import com.adeptum.questai.relic.RelicListener;
 import com.adeptum.questai.resourcepack.ResourcePackManager;
@@ -83,6 +84,7 @@ public class Plugin extends JavaPlugin implements Listener {
 		plugins.add(peasantPlugin);
 		plugins.add(new FlyingPigPlugin(this));
 		plugins.add(new RelicListener(profileStore, peasantPlugin));
+		plugins.add(new MobForge());
 		plugins.add(eventManager);
 
 		plugins.forEach(p -> {
