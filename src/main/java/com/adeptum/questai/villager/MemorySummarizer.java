@@ -55,15 +55,7 @@ public final class MemorySummarizer {
 		}
 
 		final PlayerMemory memory = profile.getPlayers().get(playerId);
-		if (memory != null && memory.getConversations() > 0) {
-			parts.add("You have talked with this player "
-				+ memory.getConversations() + " time(s) before.");
-		}
-		if (memory != null && memory.getChain() != null) {
-			parts.add("You have unfinished business with this player: after '"
-				+ memory.getChain().lastTitle()
-				+ "' you promised them more work.");
-		}
+		addRelationshipParts(parts, memory);
 
 		final int baseParts = parts.size();
 		parts.addAll(eventClauses(memory));
@@ -82,6 +74,23 @@ public final class MemorySummarizer {
 			parts.remove(parts.size() - 1);
 		}
 		return String.join(" ", parts);
+	}
+
+	private static void addRelationshipParts(final List<String> parts,
+		final PlayerMemory memory) {
+
+		if (memory == null) {
+			return;
+		}
+		if (memory.getConversations() > 0) {
+			parts.add("You have talked with this player "
+				+ memory.getConversations() + " time(s) before.");
+		}
+		if (memory.getChain() != null) {
+			parts.add("You have unfinished business with this player: after '"
+				+ memory.getChain().lastTitle()
+				+ "' you promised them more work.");
+		}
 	}
 
 	private static List<String> eventClauses(final PlayerMemory memory) {

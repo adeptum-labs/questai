@@ -30,13 +30,14 @@ import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
 import com.adeptum.questai.quest.DeliveryPackage;
 import com.adeptum.questai.quest.DestinationMarkerRenderer;
+import com.adeptum.questai.quest.PlacedEntityStore;
+import com.adeptum.questai.quest.QuestChains;
+import com.adeptum.questai.quest.QuestManager;
+import com.adeptum.questai.quest.QuestProgress;
 import com.adeptum.questai.relic.QuestRelic;
 import com.adeptum.questai.relic.RelicEffects;
 import com.adeptum.questai.relic.RelicItems;
 import com.adeptum.questai.relic.RelicRoll;
-import com.adeptum.questai.quest.PlacedEntityStore;
-import com.adeptum.questai.quest.QuestManager;
-import com.adeptum.questai.quest.QuestProgress;
 import com.adeptum.questai.service.QuestGenerationService;
 import com.adeptum.questai.utility.AiChat;
 import com.adeptum.questai.utility.EnumUtil;
@@ -196,15 +197,61 @@ public class RandomQuestPlugin implements SubPlugin {
 					+ "§7 is grateful.";
 			}
 		}
+		final double relicChance = progressChain(player, quest);
 		player.sendMessage(completionMessage);
 		rewardPlayer(player, quest);
-		maybeAwardRelic(player);
+		maybeAwardRelic(player, relicChance);
 		return true;
 	}
 
-	private void maybeAwardRelic(final Player player) {
+	/**
+	 * Advances, finishes or possibly opens a quest chain for the giver.
+	 *
+	 * @return the relic chance to use for this completion
+	 */
+	private double progressChain(final Player player, final Quest quest) {
+		final UUID giver = quest.getVillagerUuid();
+		if (giver == null) {
+			return RelicRoll.QUEST_AWARD_CHANCE;
+		}
+		if (quest.getChainStep() > 0) {
+			return advanceChain(player, quest, giver);
+		}
+		maybeOpenChain(player, quest, giver);
+		return RelicRoll.QUEST_AWARD_CHANCE;
+	}
+
+	private double advanceChain(final Player player, final Quest quest,
+		final UUID giver) {
+
+		if (QuestChains.isFinale(quest.getChainStep(), quest.getChainLength())) {
+			profileStore.clearChain(giver, player.getUniqueId());
+			player.sendMessage(
+				"§6You have seen this matter through to its end!");
+			return QuestChains.finaleRelicChance();
+		}
+		profileStore.advanceChain(giver, player.getUniqueId(),
+			quest.getShortTitle());
+		player.sendMessage("§eIt seems the matter is not yet finished...");
+		return RelicRoll.QUEST_AWARD_CHANCE;
+	}
+
+	private void maybeOpenChain(final Player player, final Quest quest,
+		final UUID giver) {
+
+		final ThreadLocalRandom rng = ThreadLocalRandom.current();
+		if (QuestChains.opens(rng) && profileStore.openChain(giver,
+			player.getUniqueId(), QuestChains.rollLength(rng),
+			quest.getShortTitle())) {
+			final String name = profileStore.getName(giver);
+			player.sendMessage("§e" + (name == null ? "The villager" : name)
+				+ " has more work for you. Come back soon.");
+		}
+	}
+
+	private void maybeAwardRelic(final Player player, final double chance) {
 		final QuestRelic relic = RelicRoll.roll(ThreadLocalRandom.current(),
-			RelicRoll.QUEST_AWARD_CHANCE,
+			chance,
 			RelicItems.ownedRelics(player.getInventory().getContents()));
 		if (relic == null) {
 			return;
@@ -434,8 +481,12 @@ public class RandomQuestPlugin implements SubPlugin {
 			removeQuestMaps(player, quest);
 		}
 
-		// Clear villager NPC data and indicator
+		// Clear villager NPC data, indicator and any broken chain
 		if (quest.getVillagerUuid() != null) {
+			if (quest.getChainStep() > 0) {
+				profileStore.clearChain(quest.getVillagerUuid(),
+					player.getUniqueId());
+			}
 			questManager.setVillagerData(quest.getVillagerUuid(), null);
 			removeQuestIndicator(quest.getVillagerUuid());
 		}
