@@ -55,6 +55,20 @@ class AmbientGreetingTaskTest {
 	}
 
 	@Test
+	void recognitionUsesItsOwnCooldown() {
+		final AmbientGreetingTask task = new AmbientGreetingTask(null, null);
+		final AmbientGreetingTask.PairKey key = new AmbientGreetingTask.PairKey(
+			UUID.randomUUID(), UUID.randomUUID());
+
+		assertTrue(task.shouldRecognize(key, 1000L));
+		assertFalse(task.shouldRecognize(key, 1000L + 9 * 60_000));
+		assertTrue(task.shouldRecognize(key, 1000L + 10 * 60_000));
+
+		// Independent of the greeting cooldown on the same pair
+		assertTrue(task.shouldGreet(key, 1000L + 9 * 60_000));
+	}
+
+	@Test
 	void cooldownsAreIndependentPerPair() {
 		final AmbientGreetingTask task = new AmbientGreetingTask(null, null);
 		final UUID villager = UUID.randomUUID();

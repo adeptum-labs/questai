@@ -40,6 +40,7 @@ public final class AmbientGreetingTask implements Runnable {
 
 	private static final long GREETING_COOLDOWN_MILLIS = 5 * 60 * 1000L;
 	private static final long HINT_COOLDOWN_MILLIS = 30 * 1000L;
+	private static final long RECOGNITION_COOLDOWN_MILLIS = 10 * 60 * 1000L;
 	private static final int PRUNE_THRESHOLD = 256;
 	private static final double RANGE_XZ = 6;
 	private static final double RANGE_Y = 4;
@@ -48,6 +49,7 @@ public final class AmbientGreetingTask implements Runnable {
 	private final ConversationManager conversationManager;
 	private final Map<PairKey, Long> lastGreeted = new HashMap<>();
 	private final Map<PairKey, Long> lastHinted = new HashMap<>();
+	private final Map<PairKey, Long> lastRecognized = new HashMap<>();
 
 	/* default */ record PairKey(UUID villager, UUID player) {
 	}
@@ -105,6 +107,22 @@ public final class AmbientGreetingTask implements Runnable {
 			}
 			return false;
 		}
+		return showAmbientLine(player, profile, key, now);
+	}
+
+	/**
+	 * Shows a recognition line for players the villager only knows from
+	 * hearsay, otherwise the cached greeting.
+	 */
+	private boolean showAmbientLine(final Player player,
+		final VillagerProfile profile, final PairKey key, final long now) {
+
+		if (hearsayOnly(profile.getPlayers().get(player.getUniqueId()))
+			&& shouldRecognize(key, now)) {
+			player.sendActionBar(Component.text("§7" + profile.getName()
+				+ " eyes you curiously."));
+			return true;
+		}
 
 		if (profile.getGreeting() != null && shouldGreet(key, now)) {
 			player.sendActionBar(Component.text("§a" + profile.getName()
@@ -114,12 +132,21 @@ public final class AmbientGreetingTask implements Runnable {
 		return false;
 	}
 
+	private static boolean hearsayOnly(final PlayerMemory memory) {
+		return memory != null && memory.getConversations() == 0
+			&& memory.getEvents().isEmpty() && !memory.getHearsay().isEmpty();
+	}
+
 	/* default */ boolean shouldGreet(final PairKey key, final long now) {
 		return shouldNotify(lastGreeted, key, now, GREETING_COOLDOWN_MILLIS);
 	}
 
 	/* default */ boolean shouldHint(final PairKey key, final long now) {
 		return shouldNotify(lastHinted, key, now, HINT_COOLDOWN_MILLIS);
+	}
+
+	/* default */ boolean shouldRecognize(final PairKey key, final long now) {
+		return shouldNotify(lastRecognized, key, now, RECOGNITION_COOLDOWN_MILLIS);
 	}
 
 	/**
