@@ -37,27 +37,19 @@ import com.adeptum.questai.quest.QuestProgress;
 import com.adeptum.questai.service.QuestGenerationService;
 import com.adeptum.questai.utility.AiChat;
 import com.adeptum.questai.utility.EnumUtil;
+import com.adeptum.questai.villager.VillagerPersona;
+import com.adeptum.questai.villager.VillagerProfileStore;
 import com.gmail.nossr50.api.ExperienceAPI;
 import dev.langchain4j.model.openai.OpenAiChatModel;
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.World;
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.FileConfiguration;
-import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
@@ -92,29 +84,26 @@ public class RandomQuestPlugin implements SubPlugin {
 	private final ConversationManager conversationManager;
 	private final QuestGenerationService questService;
 	private final OpenAiChatModel chatModel;
+	private final VillagerProfileStore profileStore;
 
 	private QuestManager questManager;
 	private PlacedEntityStore placedEntityStore;
 
-	private final Map<UUID, String> villagerUniqueNames =
-		Collections.synchronizedMap(new HashMap<>());
-	private final ReentrantLock villagerUniqueNamesLock = new ReentrantLock();
-
 	public RandomQuestPlugin(JavaPlugin plugin, ConversationManager conversationManager,
-		QuestGenerationService questService, OpenAiChatModel chatModel) {
+		QuestGenerationService questService, OpenAiChatModel chatModel,
+		VillagerProfileStore profileStore) {
 
 		super();
 		this.plugin = plugin;
 		this.conversationManager = conversationManager;
 		this.questService = questService;
 		this.chatModel = chatModel;
+		this.profileStore = profileStore;
 	}
 	@Override
 	public void onEnable() {
 		final Logger logger = plugin.getLogger();
 		logger.info("[RandomQuestPlugin] onEnable() start");
-
-		loadVillagerNames();
 
 		this.placedEntityStore = new PlacedEntityStore(plugin);
 		final int swept = placedEntityStore.sweepOrphans();
@@ -135,7 +124,6 @@ public class RandomQuestPlugin implements SubPlugin {
 	@Override
 	public void onDisable() {
 		questManager.cleanupAllQuests();
-		saveVillagerUniqueNames();
 	}
 
 	public QuestManager getQuestManager() {
@@ -202,7 +190,7 @@ public class RandomQuestPlugin implements SubPlugin {
 			return;
 		}
 
-		final String uniqueName = villagerUniqueNames.get(villager.getUniqueId());
+		final String uniqueName = profileStore.getName(villager.getUniqueId());
 		if (uniqueName == null) {
 			return;
 		}
@@ -328,25 +316,6 @@ public class RandomQuestPlugin implements SubPlugin {
 			}
 		}
 	}
-	private void loadVillagerNames() {
-		final File configFile = new File(plugin.getDataFolder(), "config.yml");
-		final FileConfiguration cfg = YamlConfiguration.loadConfiguration(configFile);
-		final ConfigurationSection nameSection =
-			cfg.getConfigurationSection("villagerUniqueNames");
-
-		if (nameSection != null) {
-			for (String key : nameSection.getKeys(false)) {
-				final UUID villagerId = UUID.fromString(key);
-				final String name = nameSection.getString(key);
-				if (name != null) {
-					villagerUniqueNames.put(villagerId, name);
-				}
-			}
-			plugin.getLogger().info("[onEnable] Loaded " + villagerUniqueNames.size()
-				+ " villager unique names from config.");
-		}
-	}
-
 	private void assignUniqueNamesToAllVillagers() {
 		for (World world : Bukkit.getWorlds()) {
 			world.getEntitiesByClass(Villager.class).forEach(this::applyVillagerName);
@@ -358,7 +327,7 @@ public class RandomQuestPlugin implements SubPlugin {
 	 * villager has not been named yet.
 	 */
 	private void applyVillagerName(Villager villager) {
-		final String name = villagerUniqueNames.get(villager.getUniqueId());
+		final String name = profileStore.getName(villager.getUniqueId());
 		if (name == null) {
 			generateUniqueNameForVillager(villager);
 		} else {
@@ -372,37 +341,24 @@ public class RandomQuestPlugin implements SubPlugin {
 		if (!(event.getEntity() instanceof Villager villager)) {
 			return;
 		}
-		if (!villagerUniqueNames.containsKey(villager.getUniqueId())) {
+		if (!profileStore.hasProfile(villager.getUniqueId())) {
 			generateUniqueNameForVillager(villager);
 		}
 	}
 
 	private void generateUniqueNameForVillager(Villager villager) {
 		final Logger logger = plugin.getLogger();
+		final String profession = villager.getProfession().name();
+
 		Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
 			try {
-				final String prompt = "Provide a unique and creative name for a Minecraft"
-					+ " villager with UUID: " + villager.getUniqueId()
-					+ ". This villager is a " + villager.getProfession().name()
-					+ ". *Output only first name and surname*";
+				final VillagerPersona persona = VillagerPersona.parse(
+					AiChat.ask(chatModel,
+						VillagerPersona.prompt(villager.getUniqueId(), profession),
+						"Villager"));
+				final String uniqueName = profileStore.register(
+					villager.getUniqueId(), persona, profession);
 
-				String name = AiChat.ask(chatModel, prompt, "Villager");
-				villagerUniqueNamesLock.lock();
-				try {
-					if (villagerUniqueNames.containsValue(name)) {
-						name = name + "_"
-							+ ThreadLocalRandom.current().nextInt(1000, 10000);
-					}
-					villagerUniqueNames.put(villager.getUniqueId(), name);
-				} finally {
-					villagerUniqueNamesLock.unlock();
-				}
-
-				// Persist here on the async thread to keep file I/O off the
-				// main thread.
-				saveVillagerUniqueNames();
-
-				final String uniqueName = name;
 				Bukkit.getScheduler().runTask(plugin, () -> {
 					villager.setCustomName("§a" + uniqueName);
 					villager.setCustomNameVisible(true);
@@ -414,28 +370,6 @@ public class RandomQuestPlugin implements SubPlugin {
 					() -> villager.setCustomName("§aVillager"));
 			}
 		});
-	}
-
-	private synchronized void saveVillagerUniqueNames() {
-		final File configFile = new File(plugin.getDataFolder(), "config.yml");
-		final FileConfiguration cfg = YamlConfiguration.loadConfiguration(configFile);
-		final ConfigurationSection nameSection = cfg.createSection("villagerUniqueNames");
-
-		villagerUniqueNamesLock.lock();
-		try {
-			for (Map.Entry<UUID, String> entry : villagerUniqueNames.entrySet()) {
-				nameSection.set(entry.getKey().toString(), entry.getValue());
-			}
-		} finally {
-			villagerUniqueNamesLock.unlock();
-		}
-
-		try {
-			cfg.save(configFile);
-		} catch (IOException e) {
-			plugin.getLogger().log(Level.SEVERE,
-				"[saveVillagerUniqueNames] Failed to save config.", e);
-		}
 	}
 	private void rewardPlayer(Player player, Quest quest) {
 		final String skill = quest.getRewardTarget();

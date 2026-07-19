@@ -25,6 +25,7 @@ import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.quest.QuestManager;
 import com.adeptum.questai.service.QuestGenerationService;
 import com.adeptum.questai.utility.AiChat;
+import com.adeptum.questai.villager.VillagerProfileStore;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import java.util.Map;
 import java.util.UUID;
@@ -46,15 +47,19 @@ public class ConversationManager {
 
 	private final JavaPlugin plugin;
 	private final OpenAiChatModel chatModel;
+	private final VillagerProfileStore profileStore;
 	private final Map<UUID, ConversationState> conversations = new ConcurrentHashMap<>();
 
 	private QuestManager questManager;
 	private QuestGenerationService questService;
 	private BiConsumer<Player, Quest> questAcceptHandler;
 
-	public ConversationManager(final JavaPlugin plugin, final OpenAiChatModel chatModel) {
+	public ConversationManager(final JavaPlugin plugin, final OpenAiChatModel chatModel,
+		final VillagerProfileStore profileStore) {
+
 		this.plugin = plugin;
 		this.chatModel = chatModel;
+		this.profileStore = profileStore;
 	}
 
 	public void setQuestManager(final QuestManager questManager) {

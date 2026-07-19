@@ -24,6 +24,7 @@ import com.adeptum.questai.dialogue.ConversationManager;
 import com.adeptum.questai.quest.QuestLogListener;
 import com.adeptum.questai.resourcepack.ResourcePackManager;
 import com.adeptum.questai.service.QuestGenerationService;
+import com.adeptum.questai.villager.VillagerProfileStore;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,14 +62,15 @@ public class Plugin extends JavaPlugin implements Listener {
 
 		final QuestGenerationService questService =
 			new QuestGenerationService(this, chatModel);
+		final VillagerProfileStore profileStore = new VillagerProfileStore(this);
 		final ConversationManager conversationManager =
-			new ConversationManager(this, chatModel);
+			new ConversationManager(this, chatModel, profileStore);
 		conversationManager.setQuestService(questService);
 
 		final PluginManager pm = getServer().getPluginManager();
 
-		final RandomQuestPlugin randomQuestPlugin =
-			new RandomQuestPlugin(this, conversationManager, questService, chatModel);
+		final RandomQuestPlugin randomQuestPlugin = new RandomQuestPlugin(
+			this, conversationManager, questService, chatModel, profileStore);
 		plugins.add(new AutoVillagerPlugin(this));
 		plugins.add(randomQuestPlugin);
 		plugins.add(new WanderingPeasantPlugin(this, conversationManager,

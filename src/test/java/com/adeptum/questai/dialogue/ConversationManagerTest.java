@@ -47,7 +47,7 @@ class ConversationManagerTest {
 	void setUp() {
 		mocks = MockitoAnnotations.openMocks(this);
 		when(player.getUniqueId()).thenReturn(UUID.randomUUID());
-		conversationManager = new ConversationManager(null, null);
+		conversationManager = new ConversationManager(null, null, null);
 	}
 
 	@AfterEach
