@@ -24,8 +24,7 @@ import com.adeptum.questai.model.world.Npc;
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.quest.QuestManager;
 import com.adeptum.questai.service.QuestGenerationService;
-import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.request.ChatRequest;
+import com.adeptum.questai.utility.AiChat;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import java.util.Map;
 import java.util.UUID;
@@ -327,11 +326,7 @@ public class ConversationManager {
 	}
 
 	private String callAi(final String prompt) {
-		final ChatRequest request = ChatRequest.builder()
-			.messages(UserMessage.from(prompt))
-			.build();
-		final String text = chatModel.chat(request).aiMessage().text().trim();
-		return text.isEmpty() ? "..." : text;
+		return AiChat.ask(chatModel, prompt, "...");
 	}
 
 	private void openVillagerTrade(final Player player, final UUID npcUuid) {

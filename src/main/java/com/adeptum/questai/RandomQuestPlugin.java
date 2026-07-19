@@ -35,9 +35,8 @@ import com.adeptum.questai.quest.PlacedEntityStore;
 import com.adeptum.questai.quest.QuestManager;
 import com.adeptum.questai.quest.QuestProgress;
 import com.adeptum.questai.service.QuestGenerationService;
+import com.adeptum.questai.utility.AiChat;
 import com.gmail.nossr50.api.ExperienceAPI;
-import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import java.io.File;
 import java.io.IOException;
@@ -385,15 +384,8 @@ public class RandomQuestPlugin implements SubPlugin {
 					+ " villager with UUID: " + villager.getUniqueId()
 					+ ". This villager is a " + villager.getProfession().name()
 					+ ". *Output only first name and surname*";
-				final ChatRequest req = ChatRequest.builder()
-					.messages(UserMessage.from(prompt))
-					.build();
-				String response = chatModel.chat(req).aiMessage().text().trim();
-				if (response.isEmpty()) {
-					response = "Villager";
-				}
 
-				String name = response;
+				String name = AiChat.ask(chatModel, prompt, "Villager");
 				villagerUniqueNamesLock.lock();
 				try {
 					if (villagerUniqueNames.containsValue(name)) {

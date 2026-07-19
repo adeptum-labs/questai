@@ -22,8 +22,7 @@ package com.adeptum.questai;
 
 import com.adeptum.questai.dialogue.ConversationManager;
 import com.adeptum.questai.service.QuestGenerationService;
-import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.request.ChatRequest;
+import com.adeptum.questai.utility.AiChat;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import java.util.Map;
 import java.util.Set;
@@ -163,40 +162,27 @@ public class WanderingPeasantPlugin implements SubPlugin {
 		final UUID traderId = trader.getUniqueId();
 
 		Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+			String generated = "Wandering Peasant";
 			try {
 				final String prompt = "Provide a unique name for a wandering peasant"
 					+ " traveler in Minecraft."
 					+ " *Output only first name and surname*";
-				final ChatRequest req = ChatRequest.builder()
-					.messages(UserMessage.from(prompt))
-					.build();
-				String response = chatModel.chat(req).aiMessage().text().trim();
-				if (response.isEmpty()) {
-					response = "Wandering Peasant";
-				}
-
-				final String name = response;
-				peasantNames.put(traderId, name);
-
-				Bukkit.getScheduler().runTask(plugin, () -> {
-					final Entity entity = Bukkit.getEntity(traderId);
-					if (entity instanceof WanderingTrader wt) {
-						wt.setCustomName("§d" + name);
-						wt.setCustomNameVisible(true);
-					}
-				});
+				generated = AiChat.ask(chatModel, prompt, generated);
 			} catch (Exception e) {
 				plugin.getLogger().log(Level.SEVERE,
 					"[WanderingPeasantPlugin] Failed to generate peasant name.", e);
-				Bukkit.getScheduler().runTask(plugin, () -> {
-					final Entity entity = Bukkit.getEntity(traderId);
-					if (entity instanceof WanderingTrader wt) {
-						wt.setCustomName("§dWandering Peasant");
-						wt.setCustomNameVisible(true);
-					}
-					peasantNames.put(traderId, "Wandering Peasant");
-				});
 			}
+
+			final String name = generated;
+			peasantNames.put(traderId, name);
+
+			Bukkit.getScheduler().runTask(plugin, () -> {
+				final Entity entity = Bukkit.getEntity(traderId);
+				if (entity instanceof WanderingTrader wt) {
+					wt.setCustomName("§d" + name);
+					wt.setCustomNameVisible(true);
+				}
+			});
 		});
 	}
 

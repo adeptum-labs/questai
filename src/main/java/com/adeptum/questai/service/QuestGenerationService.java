@@ -22,9 +22,8 @@ package com.adeptum.questai.service;
 
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
+import com.adeptum.questai.utility.AiChat;
 import com.adeptum.questai.utility.EnumUtil;
-import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -105,14 +104,8 @@ public class QuestGenerationService {
 
 		Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
 			try {
-				final String prompt = quest.prompt();
-				final ChatRequest req = ChatRequest.builder()
-					.messages(UserMessage.from(prompt))
-					.build();
-				String response = chatModel.chat(req).aiMessage().text().trim();
-				if (response.isEmpty()) {
-					response = "Quest Title\nA mysterious quest awaits...";
-				}
+				final String response = AiChat.ask(chatModel, quest.prompt(),
+					"Quest Title\nA mysterious quest awaits...");
 
 				final String[] parts = response.split("\n", 2);
 				final String shortTitle = parts.length > 0 ? parts[0].trim() : "Quest";
