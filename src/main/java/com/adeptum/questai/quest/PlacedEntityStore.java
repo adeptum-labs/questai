@@ -109,17 +109,29 @@ public final class PlacedEntityStore {
 					swept++;
 				}
 			} else if (entry.kind() == Kind.HIDDEN_NPC) {
-				for (final Entity e : loc.getWorld().getNearbyEntities(loc, 5, 5, 5)) {
-					if (e instanceof Villager && hasHiddenName(e)) {
-						e.remove();
-						swept++;
-					}
-				}
+				swept += removeHiddenNpcsNear(loc);
 			}
 		}
 		entries.clear();
 		save();
 		return swept;
+	}
+
+	/**
+	 * Removes all hidden quest NPC villagers within a small radius of the
+	 * given location.
+	 *
+	 * @return the number of removed entities
+	 */
+	public static int removeHiddenNpcsNear(final Location loc) {
+		int removed = 0;
+		for (final Entity e : loc.getWorld().getNearbyEntities(loc, 5, 5, 5)) {
+			if (e instanceof Villager && hasHiddenName(e)) {
+				e.remove();
+				removed++;
+			}
+		}
+		return removed;
 	}
 
 	private static boolean hasHiddenName(final Entity entity) {

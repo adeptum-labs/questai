@@ -48,13 +48,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
-import org.bukkit.Chunk;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.configuration.ConfigurationSection;
@@ -161,14 +159,30 @@ public class RandomQuestPlugin implements SubPlugin {
 			.toList();
 
 		for (final QuestProgress progress : completed) {
-			final Quest quest = progress.getQuest();
-			questManager.removeBossBars(player, progress);
-			questManager.completeQuest(player, quest);
-			questManager.setVillagerData(quest.getVillagerUuid(), null);
-			removeQuestIndicator(quest.getVillagerUuid());
-			player.sendMessage("\u00a7aCompleted quest: " + quest.getShortTitle());
-			rewardPlayer(player, quest);
+			completeAndReward(player, progress, "\u00a7aCompleted quest: "
+				+ progress.getQuest().getShortTitle());
 		}
+	}
+
+	/**
+	 * Runs the shared quest-completion sequence: boss bars, quest removal,
+	 * villager data, indicator, completion message and reward.
+	 *
+	 * @return true if the quest was still active and is now completed
+	 */
+	private boolean completeAndReward(Player player, QuestProgress progress,
+		String message) {
+
+		final Quest quest = progress.getQuest();
+		questManager.removeBossBars(player, progress);
+		if (!questManager.completeQuest(player, quest)) {
+			return false;
+		}
+		questManager.setVillagerData(quest.getVillagerUuid(), null);
+		removeQuestIndicator(quest.getVillagerUuid());
+		player.sendMessage(message);
+		rewardPlayer(player, quest);
+		return true;
 	}
 
 	/**
@@ -283,13 +297,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		}
 
 		if (type == FIND_NPC && dest != null) {
-			dest.getWorld().getNearbyEntities(dest, 5, 5, 5).stream()
-				.filter(e -> e instanceof Villager)
-				.filter(e -> {
-					final String name = e.getCustomName();
-					return name != null && name.contains("Hidden NPC");
-				})
-				.forEach(Entity::remove);
+			PlacedEntityStore.removeHiddenNpcsNear(dest);
 			placedEntityStore.forget(PlacedEntityStore.Kind.HIDDEN_NPC, dest);
 		}
 
@@ -341,15 +349,21 @@ public class RandomQuestPlugin implements SubPlugin {
 
 	private void assignUniqueNamesToAllVillagers() {
 		for (World world : Bukkit.getWorlds()) {
-			for (Villager villager : world.getEntitiesByClass(Villager.class)) {
-				final UUID villagerId = villager.getUniqueId();
-				if (villagerUniqueNames.containsKey(villagerId)) {
-					villager.setCustomName("§a" + villagerUniqueNames.get(villagerId));
-					villager.setCustomNameVisible(true);
-				} else {
-					generateUniqueNameForVillager(villager);
-				}
-			}
+			world.getEntitiesByClass(Villager.class).forEach(this::applyVillagerName);
+		}
+	}
+
+	/**
+	 * Applies the stored unique name to a villager, or generates one if the
+	 * villager has not been named yet.
+	 */
+	private void applyVillagerName(Villager villager) {
+		final String name = villagerUniqueNames.get(villager.getUniqueId());
+		if (name == null) {
+			generateUniqueNameForVillager(villager);
+		} else {
+			villager.setCustomName("§a" + name);
+			villager.setCustomNameVisible(true);
 		}
 	}
 
@@ -378,23 +392,27 @@ public class RandomQuestPlugin implements SubPlugin {
 				if (response.isEmpty()) {
 					response = "Villager";
 				}
-				final AtomicReference<String> uniqueName = new AtomicReference<>(response);
 
+				String name = response;
 				villagerUniqueNamesLock.lock();
 				try {
-					if (villagerUniqueNames.containsValue(uniqueName.get())) {
-						uniqueName.set(uniqueName.get() + "_"
-							+ ThreadLocalRandom.current().nextInt(1000, 10000));
+					if (villagerUniqueNames.containsValue(name)) {
+						name = name + "_"
+							+ ThreadLocalRandom.current().nextInt(1000, 10000);
 					}
-					villagerUniqueNames.put(villager.getUniqueId(), uniqueName.get());
+					villagerUniqueNames.put(villager.getUniqueId(), name);
 				} finally {
 					villagerUniqueNamesLock.unlock();
 				}
 
+				// Persist here on the async thread to keep file I/O off the
+				// main thread.
+				saveVillagerUniqueNames();
+
+				final String uniqueName = name;
 				Bukkit.getScheduler().runTask(plugin, () -> {
-					villager.setCustomName("§a" + uniqueName.get());
+					villager.setCustomName("§a" + uniqueName);
 					villager.setCustomNameVisible(true);
-					saveVillagerUniqueNames();
 				});
 			} catch (Exception e) {
 				logger.log(Level.SEVERE,
@@ -405,7 +423,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		});
 	}
 
-	private void saveVillagerUniqueNames() {
+	private synchronized void saveVillagerUniqueNames() {
 		final File configFile = new File(plugin.getDataFolder(), "config.yml");
 		final FileConfiguration cfg = YamlConfiguration.loadConfiguration(configFile);
 		final ConfigurationSection nameSection = cfg.createSection("villagerUniqueNames");
@@ -521,55 +539,36 @@ public class RandomQuestPlugin implements SubPlugin {
 		if (killer == null) {
 			return;
 		}
-
-		final String killedMob = entity.getType().name();
-		final QuestProgress completed = questManager.incrementProgress(
-			killer, KILL, killedMob, 1);
-
-		if (completed != null) {
-			final Quest quest = completed.getQuest();
-			questManager.removeBossBars(killer, completed);
-			questManager.completeQuest(killer, quest);
-			questManager.setVillagerData(quest.getVillagerUuid(), null);
-			removeQuestIndicator(quest.getVillagerUuid());
-			killer.sendMessage("§6Quest Update: You've completed the objective!");
-			rewardPlayer(killer, quest);
-		} else {
-			// Show progress message if there's a matching quest in progress
-			final QuestProgress progress =
-				questManager.findQuest(killer, KILL, killedMob);
-			if (progress != null) {
-				final QuestObjective obj = progress.getQuest().getObjective();
-				killer.sendMessage("§eQuest Update: " + progress.getCurrent()
-					+ "/" + obj.getAmount() + " " + killedMob + "(s) killed.");
-			}
-		}
+		handleCountProgress(killer, KILL, entity.getType().name(), 1, "killed");
 	}
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
 	public void onPlayerPickupItem(PlayerPickupItemEvent event) {
-		final Player player = event.getPlayer();
 		final ItemStack item = event.getItem().getItemStack();
-		final String pickedItem = item.getType().name();
+		handleCountProgress(event.getPlayer(), COLLECT,
+			item.getType().name(), item.getAmount(), "collected");
+	}
+
+	/**
+	 * Applies count-based quest progress and either completes the quest
+	 * or shows the current progress to the player.
+	 */
+	private void handleCountProgress(Player player, QuestObjective.Type type,
+		String target, int amount, String verb) {
 
 		final QuestProgress completed = questManager.incrementProgress(
-			player, COLLECT, pickedItem, item.getAmount());
+			player, type, target, amount);
 
 		if (completed != null) {
-			final Quest quest = completed.getQuest();
-			questManager.removeBossBars(player, completed);
-			questManager.completeQuest(player, quest);
-			questManager.setVillagerData(quest.getVillagerUuid(), null);
-			removeQuestIndicator(quest.getVillagerUuid());
-			player.sendMessage("§6Quest Update: You've completed the objective!");
-			rewardPlayer(player, quest);
-		} else {
-			final QuestProgress progress =
-				questManager.findQuest(player, COLLECT, pickedItem);
-			if (progress != null) {
-				final QuestObjective obj = progress.getQuest().getObjective();
-				player.sendMessage("§eQuest Update: " + progress.getCurrent()
-					+ "/" + obj.getAmount() + " " + pickedItem + "(s) collected.");
-			}
+			completeAndReward(player, completed,
+				"§6Quest Update: You've completed the objective!");
+			return;
+		}
+
+		final QuestProgress progress = questManager.findQuest(player, type, target);
+		if (progress != null) {
+			final QuestObjective obj = progress.getQuest().getObjective();
+			player.sendMessage("§eQuest Update: " + progress.getCurrent()
+				+ "/" + obj.getAmount() + " " + target + "(s) " + verb + ".");
 		}
 	}
 	@EventHandler
@@ -601,19 +600,10 @@ public class RandomQuestPlugin implements SubPlugin {
 				&& p.getQuest().getVillagerUuid().equals(quest.getVillagerUuid()))
 			.findFirst().orElse(null);
 
-		if (matching == null) {
+		if (matching == null || !completeAndReward(player, matching,
+			"§aYou have completed the quest: " + quest.getTitle())) {
 			return;
 		}
-
-		questManager.removeBossBars(player, matching);
-		if (!questManager.completeQuest(player, matching.getQuest())) {
-			return;
-		}
-
-		player.sendMessage("§aYou have completed the quest: " + quest.getTitle());
-		rewardPlayer(player, quest);
-		questManager.setVillagerData(villager.getUniqueId(), null);
-		removeQuestIndicator(villager.getUniqueId());
 
 		if (quest.getObjective().getType() == TREASURE) {
 			quest.getDestination().getBlock().setType(Material.AIR);
@@ -626,30 +616,15 @@ public class RandomQuestPlugin implements SubPlugin {
 	}
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
 	public void onChunkLoad(ChunkLoadEvent event) {
-		final Chunk chunk = event.getChunk();
-		removeAllQuestIndicators(chunk);
-
-		for (Entity entity : chunk.getEntities()) {
-			if (entity instanceof Villager villager) {
-				final UUID villagerId = villager.getUniqueId();
-				if (villagerUniqueNames.containsKey(villagerId)) {
-					villager.setCustomName("§a" + villagerUniqueNames.get(villagerId));
-					villager.setCustomNameVisible(true);
-				} else {
-					generateUniqueNameForVillager(villager);
-				}
-			}
-		}
-	}
-
-	public void removeAllQuestIndicators(Chunk chunk) {
-		for (Entity entity : chunk.getEntities()) {
+		for (Entity entity : event.getChunk().getEntities()) {
 			if (entity instanceof ArmorStand armorStand) {
 				final String customName = armorStand.getCustomName();
 				if (customName != null && customName.contains("Quest")) {
 					armorStand.setPersistent(false);
 					armorStand.remove();
 				}
+			} else if (entity instanceof Villager villager) {
+				applyVillagerName(villager);
 			}
 		}
 	}
