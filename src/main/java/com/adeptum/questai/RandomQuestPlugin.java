@@ -37,6 +37,7 @@ import com.adeptum.questai.quest.QuestProgress;
 import com.adeptum.questai.service.QuestGenerationService;
 import com.adeptum.questai.utility.AiChat;
 import com.adeptum.questai.utility.EnumUtil;
+import com.adeptum.questai.villager.AmbientGreetingTask;
 import com.adeptum.questai.villager.MemoryEvent;
 import com.adeptum.questai.villager.VillagerPersona;
 import com.adeptum.questai.villager.VillagerProfileStore;
@@ -72,6 +73,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.MapMeta;
 import org.bukkit.map.MapView;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 
 /**
  * Plugin that creates generated villager quests and conversational dialogue.
@@ -89,6 +91,7 @@ public class RandomQuestPlugin implements SubPlugin {
 
 	private QuestManager questManager;
 	private PlacedEntityStore placedEntityStore;
+	private BukkitTask ambientGreetingTask;
 
 	public RandomQuestPlugin(JavaPlugin plugin, ConversationManager conversationManager,
 		QuestGenerationService questService, OpenAiChatModel chatModel,
@@ -119,11 +122,14 @@ public class RandomQuestPlugin implements SubPlugin {
 		conversationManager.setQuestAcceptHandler(this::onQuestAccepted);
 
 		assignUniqueNamesToAllVillagers();
+		this.ambientGreetingTask = Bukkit.getScheduler().runTaskTimer(plugin,
+			new AmbientGreetingTask(profileStore, conversationManager), 100L, 100L);
 		logger.info("[RandomQuestPlugin] onEnable() end -> plugin fully enabled.");
 	}
 
 	@Override
 	public void onDisable() {
+		ambientGreetingTask.cancel();
 		questManager.cleanupAllQuests();
 	}
 

@@ -96,6 +96,8 @@ public class ConversationManager {
 
 		conversations.put(player.getUniqueId(), state);
 		player.openInventory(DialogueGui.createThinking(npcName, profession));
+		player.playSound(player.getLocation(),
+			Sound.ENTITY_VILLAGER_AMBIENT, 1.0f, 1.0f);
 
 		final String context = contextFor(npcUuid, player);
 		if (profileStore != null) {
@@ -227,7 +229,7 @@ public class ConversationManager {
 			player.sendMessage("\u00a7cYou have rejected the quest: "
 				+ quest.getShortTitle());
 			player.playSound(player.getLocation(),
-				Sound.BLOCK_NOTE_BLOCK_BASS, 1.0f, 1.0f);
+				Sound.ENTITY_VILLAGER_NO, 1.0f, 1.0f);
 			endConversation(player);
 		}
 	}
