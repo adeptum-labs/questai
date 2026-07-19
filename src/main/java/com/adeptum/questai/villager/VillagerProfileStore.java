@@ -45,6 +45,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class VillagerProfileStore {
 
 	private static final int MAX_EVENTS = 8;
+	private static final int MAX_HEARSAY = 4;
 	private static final long PLAYER_MEMORY_TTL_MILLIS = 30L * 24 * 60 * 60 * 1000;
 
 	private final JavaPlugin plugin;
@@ -190,6 +191,31 @@ public final class VillagerProfileStore {
 		save();
 	}
 
+	/**
+	 * Stores one piece of hearsay, ignoring duplicates of the same deed and
+	 * gossip about the villager's own doings. Does not save; callers batch.
+	 *
+	 * @return true when the hearsay was stored
+	 */
+	/* default */ synchronized boolean addHearsay(final UUID villagerId,
+		final UUID playerId, final HearsayEvent hearsay) {
+
+		final VillagerProfile profile = profiles.get(villagerId);
+		if (profile == null || hearsay.sourceName().equals(profile.getName())) {
+			return false;
+		}
+		final PlayerMemory memory = profile.getPlayers()
+			.computeIfAbsent(playerId, k -> new PlayerMemory());
+		if (memory.getHearsay().stream().anyMatch(hearsay::sameDeed)) {
+			return false;
+		}
+		memory.getHearsay().add(hearsay);
+		while (memory.getHearsay().size() > MAX_HEARSAY) {
+			memory.getHearsay().remove(0);
+		}
+		return true;
+	}
+
 	private boolean isNameTaken(final UUID villagerId, final String name) {
 		return profiles.entrySet().stream()
 			.anyMatch(e -> !e.getKey().equals(villagerId)
@@ -259,19 +285,50 @@ public final class VillagerProfileStore {
 		}
 		for (final String key : playersSec.getKeys(false)) {
 			final ConfigurationSection sec = playersSec.getConfigurationSection(key);
-			if (sec == null) {
-				continue;
+			if (sec != null) {
+				loadPlayer(sec, key, profile, cutoff);
 			}
-			final long lastSeen = sec.getLong("lastSeen");
-			if (lastSeen < cutoff) {
-				continue;
-			}
+		}
+	}
 
-			final PlayerMemory memory = new PlayerMemory();
+	/**
+	 * Loads one player's memory. First-hand data is dropped entirely when
+	 * the player was last seen outside the retention window, while hearsay
+	 * rows are pruned individually by their own timestamps.
+	 */
+	private void loadPlayer(final ConfigurationSection sec, final String key,
+		final VillagerProfile profile, final long cutoff) {
+
+		final PlayerMemory memory = new PlayerMemory();
+		final long lastSeen = sec.getLong("lastSeen");
+		if (lastSeen >= cutoff) {
 			memory.setConversations(sec.getInt("conversations"));
 			memory.setLastSeen(lastSeen);
 			loadEvents(sec.getMapList("events"), memory);
+		}
+		loadHearsay(sec.getMapList("hearsay"), memory, cutoff);
+
+		if (memory.getLastSeen() >= cutoff || !memory.getHearsay().isEmpty()) {
 			profile.getPlayers().put(UUID.fromString(key), memory);
+		}
+	}
+
+	private void loadHearsay(final List<Map<?, ?>> rows,
+		final PlayerMemory memory, final long cutoff) {
+
+		for (final Map<?, ?> row : rows) {
+			try {
+				final long at = ((Number) row.get("at")).longValue();
+				if (at >= cutoff) {
+					memory.getHearsay().add(new HearsayEvent(
+						MemoryEvent.Type.valueOf(String.valueOf(row.get("type"))),
+						String.valueOf(row.get("title")),
+						String.valueOf(row.get("source")), at));
+				}
+			} catch (RuntimeException e) {
+				plugin.getLogger().log(Level.WARNING,
+					"[VillagerProfileStore] Skipping malformed hearsay", e);
+			}
 		}
 	}
 
@@ -376,6 +433,9 @@ public final class VillagerProfileStore {
 			if (!memory.getEvents().isEmpty()) {
 				cfg.set(playerBase + ".events", serializeEvents(memory));
 			}
+			if (!memory.getHearsay().isEmpty()) {
+				cfg.set(playerBase + ".hearsay", serializeHearsay(memory));
+			}
 		}
 	}
 
@@ -385,6 +445,19 @@ public final class VillagerProfileStore {
 			final Map<String, Object> row = new LinkedHashMap<>();
 			row.put("type", event.type().name());
 			row.put("title", event.questTitle());
+			row.put("at", event.at());
+			rows.add(row);
+		}
+		return rows;
+	}
+
+	private List<Map<String, Object>> serializeHearsay(final PlayerMemory memory) {
+		final List<Map<String, Object>> rows = new ArrayList<>();
+		for (final HearsayEvent event : memory.getHearsay()) {
+			final Map<String, Object> row = new LinkedHashMap<>();
+			row.put("type", event.type().name());
+			row.put("title", event.questTitle());
+			row.put("source", event.sourceName());
 			row.put("at", event.at());
 			rows.add(row);
 		}

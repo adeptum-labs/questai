@@ -228,6 +228,108 @@ class VillagerProfileStoreTest {
 		assertNull(reloaded.get(villagerId).getLocation());
 	}
 
+	private static HearsayEvent hearsay(final String title, final String source) {
+		return new HearsayEvent(MemoryEvent.Type.QUEST_COMPLETED,
+			title, source, System.currentTimeMillis());
+	}
+
+	@Test
+	void hearsayRoundTripsAcrossInstances() {
+		final UUID villagerId = UUID.randomUUID();
+		final UUID playerId = UUID.randomUUID();
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(villagerId, persona("Goran Dusk"), "CLERIC");
+
+		assertTrue(store.addHearsay(villagerId, playerId,
+			hearsay("Turnip Trouble", "Edric Stone")));
+		store.save();
+
+		final VillagerProfileStore reloaded = new VillagerProfileStore(plugin);
+		final HearsayEvent loaded = reloaded.get(villagerId)
+			.getPlayers().get(playerId).getHearsay().get(0);
+		assertEquals(MemoryEvent.Type.QUEST_COMPLETED, loaded.type());
+		assertEquals("Turnip Trouble", loaded.questTitle());
+		assertEquals("Edric Stone", loaded.sourceName());
+	}
+
+	@Test
+	void hearsayCapsAtFourDroppingTheOldest() {
+		final UUID villagerId = UUID.randomUUID();
+		final UUID playerId = UUID.randomUUID();
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(villagerId, persona("Goran Dusk"), "CLERIC");
+
+		for (int i = 0; i < 6; i++) {
+			store.addHearsay(villagerId, playerId,
+				hearsay("Quest " + i, "Edric Stone"));
+		}
+
+		final List<HearsayEvent> stored = store.get(villagerId)
+			.getPlayers().get(playerId).getHearsay();
+		assertEquals(4, stored.size());
+		assertEquals("Quest 2", stored.get(0).questTitle());
+		assertEquals("Quest 5", stored.get(3).questTitle());
+	}
+
+	@Test
+	void duplicateHearsayIsIgnored() {
+		final UUID villagerId = UUID.randomUUID();
+		final UUID playerId = UUID.randomUUID();
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(villagerId, persona("Goran Dusk"), "CLERIC");
+
+		assertTrue(store.addHearsay(villagerId, playerId,
+			hearsay("Turnip Trouble", "Edric Stone")));
+		assertFalse(store.addHearsay(villagerId, playerId,
+			hearsay("Turnip Trouble", "Edric Stone")));
+		assertEquals(1, store.get(villagerId)
+			.getPlayers().get(playerId).getHearsay().size());
+	}
+
+	@Test
+	void hearsayAboutOwnDeedsIsIgnored() {
+		final UUID villagerId = UUID.randomUUID();
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(villagerId, persona("Goran Dusk"), "CLERIC");
+
+		assertFalse(store.addHearsay(villagerId, UUID.randomUUID(),
+			hearsay("Turnip Trouble", "Goran Dusk")));
+	}
+
+	@Test
+	void hearsayOnlyMemorySurvivesReload() {
+		final UUID villagerId = UUID.randomUUID();
+		final UUID playerId = UUID.randomUUID();
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(villagerId, persona("Goran Dusk"), "CLERIC");
+		store.addHearsay(villagerId, playerId,
+			hearsay("Turnip Trouble", "Edric Stone"));
+		store.save();
+
+		final VillagerProfileStore reloaded = new VillagerProfileStore(plugin);
+		final PlayerMemory memory =
+			reloaded.get(villagerId).getPlayers().get(playerId);
+		assertNotNull(memory);
+		assertEquals(0, memory.getConversations());
+		assertEquals(1, memory.getHearsay().size());
+	}
+
+	@Test
+	void staleHearsayIsPrunedOnLoad() {
+		final UUID villagerId = UUID.randomUUID();
+		final UUID playerId = UUID.randomUUID();
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(villagerId, persona("Goran Dusk"), "CLERIC");
+		store.addHearsay(villagerId, playerId,
+			new HearsayEvent(MemoryEvent.Type.QUEST_COMPLETED, "Old News",
+				"Edric Stone",
+				System.currentTimeMillis() - 40L * 24 * 60 * 60 * 1000));
+		store.save();
+
+		final VillagerProfileStore reloaded = new VillagerProfileStore(plugin);
+		assertNull(reloaded.get(villagerId).getPlayers().get(playerId));
+	}
+
 	@Test
 	void oldPlayerMemoryIsPrunedOnLoad() {
 		final UUID villagerId = UUID.randomUUID();

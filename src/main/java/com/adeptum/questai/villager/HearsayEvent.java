@@ -20,18 +20,18 @@
 
 package com.adeptum.questai.villager;
 
-import java.util.ArrayList;
-import java.util.List;
-import lombok.Data;
-
 /**
- * What a villager remembers about one specific player, both first-hand
- * events and hearsay heard from other villagers.
+ * A second-hand memory: something a villager heard happened between the
+ * named source villager and a player. As in MemoryEvent, questTitle
+ * carries the sender's name for PARCEL_RECEIVED.
  */
-@Data
-public class PlayerMemory {
-	private int conversations;
-	private long lastSeen;
-	private final List<MemoryEvent> events = new ArrayList<>();
-	private final List<HearsayEvent> hearsay = new ArrayList<>();
+public record HearsayEvent(MemoryEvent.Type type, String questTitle,
+	String sourceName, long at) {
+
+	/** True when this and other describe the same underlying deed. */
+	public boolean sameDeed(final HearsayEvent other) {
+		return type == other.type()
+			&& questTitle.equals(other.questTitle())
+			&& sourceName.equals(other.sourceName());
+	}
 }
