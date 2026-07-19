@@ -25,6 +25,8 @@ import static com.adeptum.questai.model.world.quest.QuestObjective.Type.*;
 import com.adeptum.questai.dialogue.ConversationManager;
 import com.adeptum.questai.dialogue.DialogueGui;
 import com.adeptum.questai.dialogue.DialoguePrompts;
+import com.adeptum.questai.event.VillageEventManager;
+import com.adeptum.questai.event.VillageEvents;
 import com.adeptum.questai.model.world.Npc;
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
@@ -94,6 +96,7 @@ public class RandomQuestPlugin implements SubPlugin {
 	private final QuestGenerationService questService;
 	private final OpenAiChatModel chatModel;
 	private final VillagerProfileStore profileStore;
+	private final VillageEventManager eventManager;
 
 	private QuestManager questManager;
 	private PlacedEntityStore placedEntityStore;
@@ -102,7 +105,7 @@ public class RandomQuestPlugin implements SubPlugin {
 
 	public RandomQuestPlugin(JavaPlugin plugin, ConversationManager conversationManager,
 		QuestGenerationService questService, OpenAiChatModel chatModel,
-		VillagerProfileStore profileStore) {
+		VillagerProfileStore profileStore, VillageEventManager eventManager) {
 
 		super();
 		this.plugin = plugin;
@@ -110,6 +113,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		this.questService = questService;
 		this.chatModel = chatModel;
 		this.profileStore = profileStore;
+		this.eventManager = eventManager;
 	}
 	@Override
 	public void onEnable() {
@@ -567,11 +571,18 @@ public class RandomQuestPlugin implements SubPlugin {
 	private void rewardPlayer(Player player, Quest quest) {
 		final boolean quill = RelicItems.holds(
 			player.getInventory().getContents(), QuestRelic.ELDERS_QUILL);
+		final boolean festival =
+			eventManager.festivalBoostApplies(player.getLocation());
 		final String skill = quest.getRewardTarget();
-		final int xp = RelicEffects.questXp(quest.getRewardAmount(), quill);
+
+		int xp = RelicEffects.questXp(quest.getRewardAmount(), quill);
+		if (festival) {
+			xp = VillageEvents.festivalXp(xp);
+		}
 		ExperienceAPI.addXP(player, skill, xp, "COMMAND");
 		player.sendMessage("§aYou earned " + xp + " MCMMO XP in " + skill + "!"
-			+ (quill ? " §6(Elder's Quill +25%)" : ""));
+			+ (quill ? " §6(Elder's Quill +25%)" : "")
+			+ (festival ? " §6(Festival +50%)" : ""));
 	}
 	private void removeQuestIndicator(UUID villagerId) {
 		final UUID standId = questManager.getIndicator(villagerId);

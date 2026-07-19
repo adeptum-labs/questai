@@ -71,12 +71,13 @@ public class Plugin extends JavaPlugin implements Listener {
 
 		final PluginManager pm = getServer().getPluginManager();
 
-		final RandomQuestPlugin randomQuestPlugin = new RandomQuestPlugin(
-			this, conversationManager, questService, chatModel, profileStore);
-		final WanderingPeasantPlugin peasantPlugin = new WanderingPeasantPlugin(
-			this, conversationManager, questService, chatModel);
 		final VillageEventManager eventManager =
 			new VillageEventManager(this, profileStore);
+		final RandomQuestPlugin randomQuestPlugin =
+			new RandomQuestPlugin(this, conversationManager, questService,
+				chatModel, profileStore, eventManager);
+		final WanderingPeasantPlugin peasantPlugin = new WanderingPeasantPlugin(
+			this, conversationManager, questService, chatModel);
 		plugins.add(new AutoVillagerPlugin(this, eventManager));
 		plugins.add(randomQuestPlugin);
 		plugins.add(peasantPlugin);

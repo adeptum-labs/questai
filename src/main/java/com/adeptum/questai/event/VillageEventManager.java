@@ -60,7 +60,9 @@ public class VillageEventManager implements SubPlugin, VillageCheckListener {
 	private final VillagerProfileStore profileStore;
 
 	private final Map<VillageKey, RaidState> raids = new HashMap<>();
+	private final Map<VillageKey, FestivalState> festivals = new HashMap<>();
 	private final Map<VillageKey, Long> raidCooldownUntil = new HashMap<>();
+	private final Map<VillageKey, Long> festivalCooldownUntil = new HashMap<>();
 	private BukkitTask task;
 
 	public VillageEventManager(final JavaPlugin plugin,
@@ -87,6 +89,19 @@ public class VillageEventManager implements SubPlugin, VillageCheckListener {
 		final VillageInfo info) {
 
 		tryStartRaid(player, location);
+		tryStartFestival(location);
+	}
+
+	/** True when a quest completed at this location earns the festival bonus. */
+	public boolean festivalBoostApplies(final Location loc) {
+		final long now = System.currentTimeMillis();
+		for (final FestivalState festival : festivals.values()) {
+			if (festival.active(now) && festival.covers(
+				loc.getWorld().getUID(), loc.getX(), loc.getZ())) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private void tryStartRaid(final Player player, final Location loc) {
@@ -102,6 +117,31 @@ public class VillageEventManager implements SubPlugin, VillageCheckListener {
 		final List<Villager> defenders = profiledVillagersNear(loc);
 		if (!defenders.isEmpty()) {
 			startRaid(loc, defenders);
+		}
+	}
+
+	private void tryStartFestival(final Location loc) {
+		final World world = loc.getWorld();
+		final VillageKey key = VillageKey.from(world.getUID(),
+			loc.getBlockX(), loc.getBlockZ());
+		if (!VillageEvents.canStartFestival(world.getTime(),
+			ThreadLocalRandom.current().nextDouble())
+			|| festivals.containsKey(key)
+			|| onCooldown(festivalCooldownUntil, world.getUID(), loc)
+			|| profiledVillagersNear(loc).size() < 2) {
+			return;
+		}
+
+		festivals.put(key, new FestivalState(key, StoredLocation.from(loc),
+			System.currentTimeMillis() + VillageEvents.FESTIVAL_WINDOW_MILLIS));
+		stampCooldown(festivalCooldownUntil, key,
+			VillageEvents.FESTIVAL_COOLDOWN_MILLIS);
+
+		for (final Player nearby : playersNear(loc)) {
+			nearby.sendMessage("\u00a76The villagers gather —"
+				+ " a festival breaks out in the village!");
+			nearby.playSound(loc, Sound.BLOCK_BELL_USE, 1.0f, 1.0f);
+			nearby.playSound(loc, Sound.BLOCK_NOTE_BLOCK_BELL, 1.0f, 1.4f);
 		}
 	}
 
@@ -238,6 +278,45 @@ public class VillageEventManager implements SubPlugin, VillageCheckListener {
 			} else if (outcome == RaidState.Outcome.FAILED) {
 				iterator.remove();
 				removeRaiders(raid);
+			}
+		}
+		tickFestivals(now);
+	}
+
+	private void tickFestivals(final long now) {
+		final Iterator<FestivalState> iterator = festivals.values().iterator();
+		while (iterator.hasNext()) {
+			final FestivalState festival = iterator.next();
+			if (festival.active(now)) {
+				celebrateFestival(festival);
+			} else {
+				iterator.remove();
+				announceFestivalEnd(festival);
+			}
+		}
+	}
+
+	private void celebrateFestival(final FestivalState festival) {
+		final World world = Bukkit.getWorld(festival.center().worldId());
+		if (world == null) {
+			return;
+		}
+		final Location center = festival.center().toLocation();
+		for (final Villager villager : profiledVillagersNear(center)) {
+			world.spawnParticle(Particle.HAPPY_VILLAGER,
+				villager.getEyeLocation(), 10, 0.5, 0.5, 0.5);
+		}
+		world.spawnParticle(Particle.NOTE, center.clone().add(0, 2, 0),
+			5, 2, 1, 2);
+		world.playSound(center, Sound.BLOCK_NOTE_BLOCK_PLING, 0.6f,
+			0.8f + ThreadLocalRandom.current().nextFloat());
+	}
+
+	private void announceFestivalEnd(final FestivalState festival) {
+		if (Bukkit.getWorld(festival.center().worldId()) != null) {
+			for (final Player player
+				: playersNear(festival.center().toLocation())) {
+				player.sendMessage("\u00a77The festival winds down.");
 			}
 		}
 	}
