@@ -84,7 +84,8 @@ public class Plugin extends JavaPlugin implements Listener {
 		plugins.add(peasantPlugin);
 		plugins.add(new FlyingPigPlugin(this));
 		plugins.add(new RelicListener(profileStore, peasantPlugin));
-		plugins.add(new MobForge());
+		final MobForge mobForge = new MobForge();
+		plugins.add(mobForge);
 		plugins.add(eventManager);
 
 		plugins.forEach(p -> {

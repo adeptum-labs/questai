@@ -93,6 +93,11 @@ public class MobForge implements SubPlugin {
 		}
 	}
 
+	/** Forges an already-spawned entity into the given variant. */
+	public void forge(final LivingEntity mob, final MobVariant variant) {
+		upgrade(mob, variant);
+	}
+
 	private MobVariant rollFor(final EntityType type) {
 		// Exact types keep husks, drowned and cave spiders vanilla
 		return switch (type) {
