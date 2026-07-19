@@ -30,6 +30,9 @@ import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
 import com.adeptum.questai.quest.DeliveryPackage;
 import com.adeptum.questai.quest.DestinationMarkerRenderer;
+import com.adeptum.questai.relic.QuestRelic;
+import com.adeptum.questai.relic.RelicItems;
+import com.adeptum.questai.relic.RelicRoll;
 import com.adeptum.questai.quest.PlacedEntityStore;
 import com.adeptum.questai.quest.QuestManager;
 import com.adeptum.questai.quest.QuestProgress;
@@ -195,7 +198,25 @@ public class RandomQuestPlugin implements SubPlugin {
 		}
 		player.sendMessage(completionMessage);
 		rewardPlayer(player, quest);
+		maybeAwardRelic(player);
 		return true;
+	}
+
+	private void maybeAwardRelic(final Player player) {
+		final QuestRelic relic = RelicRoll.roll(ThreadLocalRandom.current(),
+			RelicRoll.QUEST_AWARD_CHANCE,
+			RelicItems.ownedRelics(player.getInventory().getContents()));
+		if (relic == null) {
+			return;
+		}
+
+		player.getInventory().addItem(RelicItems.create(relic)).values()
+			.forEach(rest -> player.getWorld()
+				.dropItemNaturally(player.getLocation(), rest));
+		player.sendMessage("§6§lA relic finds its way to you: §r"
+			+ relic.getDisplayName() + "§6§l!");
+		player.playSound(player.getLocation(),
+			org.bukkit.Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 1.2f);
 	}
 
 	/**
@@ -364,7 +385,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		final QuestObjective.Type type = quest.getObjective().getType();
 
 		if (type == TREASURE) {
-			spawnTreasureChest(quest.getDestination());
+			spawnTreasureChest(quest.getDestination(), player);
 			player.getInventory().addItem(
 				createMapItem(quest.getDestination(), "Treasure Hunt"));
 		} else if (type == FIND_NPC) {
@@ -500,16 +521,17 @@ public class RandomQuestPlugin implements SubPlugin {
 		}
 		questManager.removeIndicator(villagerId);
 	}
-	private void spawnTreasureChest(org.bukkit.Location loc) {
+	private void spawnTreasureChest(org.bukkit.Location loc, Player player) {
 		loc.getBlock().setType(Material.CHEST);
 		if (loc.getBlock().getState() instanceof org.bukkit.block.Chest cstate) {
-			final Inventory inv = cstate.getInventory();
-			fillTreasureLoot(inv);
+			fillTreasureLoot(cstate.getInventory(),
+				RelicItems.ownedRelics(player.getInventory().getContents()));
 		}
 		placedEntityStore.record(PlacedEntityStore.Kind.CHEST, loc);
 	}
 
-	private void fillTreasureLoot(final Inventory inv) {
+	private void fillTreasureLoot(final Inventory inv,
+		final java.util.Set<QuestRelic> owned) {
 		final var rng = ThreadLocalRandom.current();
 		final ItemStack[] common = {
 			new ItemStack(Material.IRON_INGOT, 4 + rng.nextInt(5)),
@@ -539,8 +561,20 @@ public class RandomQuestPlugin implements SubPlugin {
 		for (int i = 0; i < 1 + rng.nextInt(2); i++) {
 			inv.addItem(EnumUtil.random(uncommon).clone());
 		}
+		addTreasureExtras(inv, rng, rare, owned);
+	}
+
+	private void addTreasureExtras(final Inventory inv,
+		final ThreadLocalRandom rng, final ItemStack[] rare,
+		final java.util.Set<QuestRelic> owned) {
+
 		if (rng.nextDouble() < 0.15) {
 			inv.addItem(EnumUtil.random(rare).clone());
+		}
+		final QuestRelic jackpot = RelicRoll.roll(rng,
+			RelicRoll.TREASURE_JACKPOT_CHANCE, owned);
+		if (jackpot != null) {
+			inv.addItem(RelicItems.create(jackpot));
 		}
 	}
 
