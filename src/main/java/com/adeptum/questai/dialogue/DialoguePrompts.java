@@ -77,6 +77,17 @@ public final class DialoguePrompts {
 				.formatted(npcName, profession) + contextSuffix(context, false);
 	}
 
+	public static String deliveryReaction(final String npcName,
+		final String profession, final String giverName, final String context) {
+
+		return ("You are %s, a %s in a Minecraft village. A traveler has just "
+			+ "handed you a sealed package sent by %s. React in character to "
+			+ "receiving it — surprised, pleased, or curious — in 1-2 sentences. "
+			+ "Output ONLY the dialogue text, no quotes.")
+				.formatted(npcName, profession, giverName)
+			+ contextSuffix(context, false);
+	}
+
 	private static String contextSuffix(final String context,
 		final boolean acknowledge) {
 

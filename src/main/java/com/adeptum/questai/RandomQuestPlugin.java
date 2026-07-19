@@ -28,6 +28,7 @@ import static com.adeptum.questai.model.world.quest.QuestObjective.Type.TREASURE
 
 import com.adeptum.questai.dialogue.ConversationManager;
 import com.adeptum.questai.dialogue.DialogueGui;
+import com.adeptum.questai.dialogue.DialoguePrompts;
 import com.adeptum.questai.model.world.Npc;
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
@@ -41,6 +42,7 @@ import com.adeptum.questai.utility.AiChat;
 import com.adeptum.questai.utility.EnumUtil;
 import com.adeptum.questai.villager.AmbientGreetingTask;
 import com.adeptum.questai.villager.MemoryEvent;
+import com.adeptum.questai.villager.MemorySummarizer;
 import com.adeptum.questai.villager.VillagerPersona;
 import com.adeptum.questai.villager.VillagerProfileStore;
 import com.gmail.nossr50.api.ExperienceAPI;
@@ -218,6 +220,9 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		event.setCancelled(true);
 		final Player player = event.getPlayer();
+		if (tryDeliveryHandover(player, villager)) {
+			return;
+		}
 
 		final Villager.Profession profession = villager.getProfession();
 		final boolean tradeable = profession != Villager.Profession.NONE
@@ -238,6 +243,80 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		conversationManager.startConversation(player, villager.getUniqueId(),
 			uniqueName, profession.name(), questAvailable, tradeable);
+	}
+
+	/**
+	 * Completes an active delivery when the clicked villager is its
+	 * recipient and the player still carries the package.
+	 *
+	 * @return true when a delivery was completed
+	 */
+	private boolean tryDeliveryHandover(Player player, Villager villager) {
+		final QuestProgress delivery =
+			findDeliveryFor(player, villager.getUniqueId());
+		if (delivery == null) {
+			return false;
+		}
+
+		final Quest quest = delivery.getQuest();
+		final String recipientName = quest.getObjective().getTarget();
+		if (!DeliveryPackage.removeOne(player.getInventory(), recipientName)) {
+			player.sendMessage("§eYou seem to have misplaced the package for "
+				+ recipientName + ".");
+			return false;
+		}
+
+		// Capture the reaction context before the delivery is memorised
+		sendRecipientReaction(player, quest, recipientName);
+		completeAndReward(player, delivery,
+			"§aYou delivered the package to " + recipientName + ".");
+		recordParcelReceived(quest, player);
+		player.playSound(player.getLocation(),
+			org.bukkit.Sound.ENTITY_VILLAGER_YES, 1.0f, 1.0f);
+		player.playSound(player.getLocation(),
+			org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+		return true;
+	}
+
+	private QuestProgress findDeliveryFor(Player player, UUID recipientId) {
+		return questManager.getActiveQuests(player).stream()
+			.filter(p -> p.getQuest().getObjective().getType() == DELIVERY
+				&& recipientId.equals(p.getQuest().getRecipientUuid()))
+			.findFirst().orElse(null);
+	}
+
+	private void recordParcelReceived(Quest quest, Player player) {
+		final String giverName = profileStore.getName(quest.getVillagerUuid());
+		profileStore.recordEvent(quest.getRecipientUuid(), player.getUniqueId(),
+			MemoryEvent.Type.PARCEL_RECEIVED,
+			giverName == null ? "a villager" : giverName);
+	}
+
+	private void sendRecipientReaction(Player player, Quest quest,
+		String recipientName) {
+
+		final var recipient = profileStore.get(quest.getRecipientUuid());
+		if (recipient == null) {
+			return;
+		}
+		final String giverName = profileStore.getName(quest.getVillagerUuid());
+		final String prompt = DialoguePrompts.deliveryReaction(recipientName,
+			recipient.getProfession(),
+			giverName == null ? "a fellow villager" : giverName,
+			MemorySummarizer.context(recipient, player.getUniqueId()));
+
+		Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+			String reaction = "A parcel for me? Thank you kindly, traveler.";
+			try {
+				reaction = AiChat.ask(chatModel, prompt, reaction);
+			} catch (Exception e) {
+				plugin.getLogger().log(Level.WARNING,
+					"[sendRecipientReaction] Reaction call failed.", e);
+			}
+			final String line = "§a" + recipientName + "§7: §f" + reaction;
+			Bukkit.getScheduler().runTask(plugin,
+				() -> player.sendMessage(line));
+		});
 	}
 	@EventHandler
 	public void onInventoryClick(InventoryClickEvent event) {
@@ -494,11 +573,33 @@ public class RandomQuestPlugin implements SubPlugin {
 	@EventHandler
 	public void onEntityDeath(EntityDeathEvent event) {
 		final LivingEntity entity = event.getEntity();
+		if (entity instanceof Villager villager
+			&& profileStore.hasProfile(villager.getUniqueId())) {
+			cancelDeliveriesTo(villager.getUniqueId());
+			profileStore.clearLocation(villager.getUniqueId());
+		}
+
 		final Player killer = entity.getKiller();
 		if (killer == null) {
 			return;
 		}
 		handleCountProgress(killer, KILL, entity.getType().name(), 1, "killed");
+	}
+
+	private void cancelDeliveriesTo(UUID recipientId) {
+		for (final Player player : Bukkit.getOnlinePlayers()) {
+			final List<QuestProgress> quests = questManager.getActiveQuests(player);
+			for (int i = 0; i < quests.size(); i++) {
+				final Quest quest = quests.get(i).getQuest();
+				if (quest.getObjective().getType() == DELIVERY
+					&& recipientId.equals(quest.getRecipientUuid())) {
+					questManager.abandonQuest(player, i);
+					player.sendMessage(
+						"§cThe recipient of your delivery has died.");
+					break;
+				}
+			}
+		}
 	}
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
 	public void onPlayerPickupItem(PlayerPickupItemEvent event) {
@@ -545,7 +646,9 @@ public class RandomQuestPlugin implements SubPlugin {
 		}
 
 		final Quest quest = npc.getQuest();
-		if (!quest.getObjective().getType().needsDestination()) {
+		// Deliveries complete on the recipient, never at the destination
+		if (!quest.getObjective().getType().needsDestination()
+			|| quest.getObjective().getType() == DELIVERY) {
 			return;
 		}
 		if (quest.getDestination().distance(player.getLocation()) > 10) {

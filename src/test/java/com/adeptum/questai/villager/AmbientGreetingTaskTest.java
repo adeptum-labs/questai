@@ -41,6 +41,20 @@ class AmbientGreetingTaskTest {
 	}
 
 	@Test
+	void parcelHintUsesItsOwnShorterCooldown() {
+		final AmbientGreetingTask task = new AmbientGreetingTask(null, null);
+		final AmbientGreetingTask.PairKey key = new AmbientGreetingTask.PairKey(
+			UUID.randomUUID(), UUID.randomUUID());
+
+		assertTrue(task.shouldHint(key, 1000L));
+		assertFalse(task.shouldHint(key, 1000L + 29_000));
+		assertTrue(task.shouldHint(key, 1000L + 30_000));
+
+		// The greeting cooldown is tracked independently of the hint
+		assertTrue(task.shouldGreet(key, 1000L + 30_000));
+	}
+
+	@Test
 	void cooldownsAreIndependentPerPair() {
 		final AmbientGreetingTask task = new AmbientGreetingTask(null, null);
 		final UUID villager = UUID.randomUUID();

@@ -21,11 +21,12 @@
 package com.adeptum.questai.villager;
 
 /**
- * A single remembered interaction between a villager and a player.
+ * A single remembered interaction between a villager and a player. For
+ * PARCEL_RECEIVED the questTitle field carries the sender's name.
  */
 public record MemoryEvent(Type type, String questTitle, long at) {
 
 	public enum Type {
-		QUEST_ACCEPTED, QUEST_REJECTED, QUEST_COMPLETED
+		QUEST_ACCEPTED, QUEST_REJECTED, QUEST_COMPLETED, PARCEL_RECEIVED
 	}
 }

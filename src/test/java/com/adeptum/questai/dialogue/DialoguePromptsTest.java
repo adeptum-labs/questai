@@ -87,6 +87,18 @@ class DialoguePromptsTest {
 	}
 
 	@Test
+	void deliveryReactionMentionsSenderAndEmbedsContext() {
+		final String prompt = DialoguePrompts.deliveryReaction(
+			"Mira Bloom", "LIBRARIAN", "Edric Stone",
+			"Your personality: bookish.");
+
+		assertTrue(prompt.contains("Mira Bloom"));
+		assertTrue(prompt.contains("LIBRARIAN"));
+		assertTrue(prompt.contains("sent by Edric Stone"));
+		assertTrue(prompt.contains("Personality and shared history:"));
+	}
+
+	@Test
 	void casualChatContainsNpcName() {
 		final String prompt =
 			DialoguePrompts.casualChat("Mira Bloom", "LIBRARIAN", "");

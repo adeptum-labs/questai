@@ -21,6 +21,7 @@
 package com.adeptum.questai.villager;
 
 import com.adeptum.questai.dialogue.ConversationManager;
+import com.adeptum.questai.quest.DeliveryPackage;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -38,6 +39,7 @@ import org.bukkit.entity.Villager;
 public final class AmbientGreetingTask implements Runnable {
 
 	private static final long GREETING_COOLDOWN_MILLIS = 5 * 60 * 1000L;
+	private static final long HINT_COOLDOWN_MILLIS = 30 * 1000L;
 	private static final int PRUNE_THRESHOLD = 256;
 	private static final double RANGE_XZ = 6;
 	private static final double RANGE_Y = 4;
@@ -45,6 +47,7 @@ public final class AmbientGreetingTask implements Runnable {
 	private final VillagerProfileStore profileStore;
 	private final ConversationManager conversationManager;
 	private final Map<PairKey, Long> lastGreeted = new HashMap<>();
+	private final Map<PairKey, Long> lastHinted = new HashMap<>();
 
 	/* default */ record PairKey(UUID villager, UUID player) {
 	}
@@ -69,38 +72,70 @@ public final class AmbientGreetingTask implements Runnable {
 		for (final Entity entity
 			: player.getNearbyEntities(RANGE_XZ, RANGE_Y, RANGE_XZ)) {
 
-			if (!(entity instanceof Villager villager)) {
-				continue;
-			}
-			final VillagerProfile profile =
-				profileStore.get(villager.getUniqueId());
-			if (profile == null || profile.getGreeting() == null) {
-				continue;
-			}
-
-			final PairKey key = new PairKey(
-				villager.getUniqueId(), player.getUniqueId());
-			if (shouldGreet(key, System.currentTimeMillis())) {
-				player.sendActionBar(Component.text("§a" + profile.getName()
-					+ "§7: §f" + profile.getGreeting()));
+			if (entity instanceof Villager villager
+				&& notifyPlayer(player, villager)) {
 				return;
 			}
 		}
 	}
 
 	/**
-	 * Checks and records the greeting cooldown for a villager-player pair.
+	 * Shows at most one notification for this villager: a parcel hint when
+	 * the player is carrying a package for it, otherwise the cached
+	 * greeting line.
+	 *
+	 * @return true when a notification was shown
 	 */
-	/* default */ boolean shouldGreet(final PairKey key, final long now) {
-		final Long last = lastGreeted.get(key);
-		if (last != null && now - last < GREETING_COOLDOWN_MILLIS) {
+	private boolean notifyPlayer(final Player player, final Villager villager) {
+		final VillagerProfile profile = profileStore.get(villager.getUniqueId());
+		if (profile == null) {
 			return false;
 		}
-		if (lastGreeted.size() > PRUNE_THRESHOLD) {
-			lastGreeted.values().removeIf(
-				t -> now - t >= GREETING_COOLDOWN_MILLIS);
+
+		final PairKey key = new PairKey(
+			villager.getUniqueId(), player.getUniqueId());
+		final long now = System.currentTimeMillis();
+
+		if (DeliveryPackage.matches(
+			player.getInventory().getItemInMainHand(), profile.getName())) {
+			if (shouldHint(key, now)) {
+				player.sendActionBar(Component.text("§6" + profile.getName()
+					+ " is expecting a parcel."));
+				return true;
+			}
+			return false;
 		}
-		lastGreeted.put(key, now);
+
+		if (profile.getGreeting() != null && shouldGreet(key, now)) {
+			player.sendActionBar(Component.text("§a" + profile.getName()
+				+ "§7: §f" + profile.getGreeting()));
+			return true;
+		}
+		return false;
+	}
+
+	/* default */ boolean shouldGreet(final PairKey key, final long now) {
+		return shouldNotify(lastGreeted, key, now, GREETING_COOLDOWN_MILLIS);
+	}
+
+	/* default */ boolean shouldHint(final PairKey key, final long now) {
+		return shouldNotify(lastHinted, key, now, HINT_COOLDOWN_MILLIS);
+	}
+
+	/**
+	 * Checks and records a notification cooldown for a villager-player pair.
+	 */
+	private static boolean shouldNotify(final Map<PairKey, Long> lastShown,
+		final PairKey key, final long now, final long cooldownMillis) {
+
+		final Long last = lastShown.get(key);
+		if (last != null && now - last < cooldownMillis) {
+			return false;
+		}
+		if (lastShown.size() > PRUNE_THRESHOLD) {
+			lastShown.values().removeIf(t -> now - t >= cooldownMillis);
+		}
+		lastShown.put(key, now);
 		return true;
 	}
 }

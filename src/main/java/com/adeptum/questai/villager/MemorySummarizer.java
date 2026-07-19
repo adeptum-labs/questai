@@ -96,6 +96,9 @@ public final class MemorySummarizer {
 				"They refused your quest '" + event.questTitle() + "'.";
 			case QUEST_ACCEPTED ->
 				"They agreed to help with '" + event.questTitle() + "'.";
+			case PARCEL_RECEIVED ->
+				"They once delivered a parcel to you from "
+					+ event.questTitle() + ".";
 		};
 	}
 }

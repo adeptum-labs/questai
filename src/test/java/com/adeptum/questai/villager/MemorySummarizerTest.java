@@ -96,6 +96,20 @@ class MemorySummarizerTest {
 	}
 
 	@Test
+	void parcelReceivedNamesTheSender() {
+		final VillagerProfile profile =
+			VillagerProfile.builder().name("Mira Bloom").build();
+		final PlayerMemory memory = new PlayerMemory();
+		memory.getEvents().add(new MemoryEvent(
+			MemoryEvent.Type.PARCEL_RECEIVED, "Edric Stone", 1));
+		profile.getPlayers().put(PLAYER, memory);
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+		assertTrue(context.contains(
+			"delivered a parcel to you from Edric Stone"));
+	}
+
+	@Test
 	void overlongContextDropsOldestEventClauses() {
 		final VillagerProfile profile = VillagerProfile.builder()
 			.name("Edric Stone")
