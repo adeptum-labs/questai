@@ -128,6 +128,9 @@ public final class MemorySummarizer {
 			case QUEST_ACCEPTED -> "agreed to help " + event.sourceName() + ".";
 			case PARCEL_RECEIVED ->
 				"delivered a parcel for " + event.sourceName() + ".";
+			case DEFENDED_VILLAGE ->
+				"drove off " + event.questTitle() + " alongside "
+					+ event.sourceName() + ".";
 		};
 	}
 
@@ -142,6 +145,9 @@ public final class MemorySummarizer {
 			case PARCEL_RECEIVED ->
 				"They once delivered a parcel to you from "
 					+ event.questTitle() + ".";
+			case DEFENDED_VILLAGE ->
+				"They drove off " + event.questTitle()
+					+ " when the village was attacked.";
 		};
 	}
 }

@@ -185,6 +185,26 @@ class MemorySummarizerTest {
 	}
 
 	@Test
+	void defendedVillageIsRememberedAndGossiped() {
+		final VillagerProfile profile =
+			VillagerProfile.builder().name("Edric Stone").build();
+		final PlayerMemory memory = new PlayerMemory();
+		memory.getEvents().add(new MemoryEvent(
+			MemoryEvent.Type.DEFENDED_VILLAGE,
+			"a horde of 8 walking dead", 1));
+		memory.getHearsay().add(new HearsayEvent(
+			MemoryEvent.Type.DEFENDED_VILLAGE,
+			"a horde of 6 walking dead", "Mira Bloom", 2));
+		profile.getPlayers().put(PLAYER, memory);
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+		assertTrue(context.contains("They drove off a horde of 8 walking dead"
+			+ " when the village was attacked."));
+		assertTrue(context.contains("drove off a horde of 6 walking dead"
+			+ " alongside Mira Bloom."));
+	}
+
+	@Test
 	void pendingChainMentionsUnfinishedBusiness() {
 		final VillagerProfile profile =
 			VillagerProfile.builder().name("Edric Stone").build();
