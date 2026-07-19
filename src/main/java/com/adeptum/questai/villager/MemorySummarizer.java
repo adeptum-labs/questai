@@ -138,6 +138,8 @@ public final class MemorySummarizer {
 		return clauses;
 	}
 
+	// Grows one exhaustive case per memory type by design
+	@SuppressWarnings("checkstyle:CyclomaticComplexity")
 	private static String describeHearsay(final HearsayEvent event) {
 		return "Word in the village is that they " + switch (event.type()) {
 			case QUEST_COMPLETED -> "completed '" + event.questTitle()
@@ -150,9 +152,13 @@ public final class MemorySummarizer {
 			case DEFENDED_VILLAGE ->
 				"drove off " + event.questTitle() + " alongside "
 					+ event.sourceName() + ".";
+			case CLAIMED_STAR -> "sold " + event.sourceName() + " "
+				+ event.questTitle() + " from the night sky.";
 		};
 	}
 
+	// Grows one exhaustive case per memory type by design
+	@SuppressWarnings("checkstyle:CyclomaticComplexity")
 	private static String describe(final MemoryEvent event) {
 		return switch (event.type()) {
 			case QUEST_COMPLETED ->
@@ -167,6 +173,8 @@ public final class MemorySummarizer {
 			case DEFENDED_VILLAGE ->
 				"They drove off " + event.questTitle()
 					+ " when the village was attacked.";
+			case CLAIMED_STAR -> "They once sold you " + event.questTitle()
+				+ " that fell from the night sky.";
 		};
 	}
 }

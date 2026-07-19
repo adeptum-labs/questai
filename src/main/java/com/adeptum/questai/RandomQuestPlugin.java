@@ -41,6 +41,8 @@ import com.adeptum.questai.relic.RelicEffects;
 import com.adeptum.questai.relic.RelicItems;
 import com.adeptum.questai.relic.RelicRoll;
 import com.adeptum.questai.service.QuestGenerationService;
+import com.adeptum.questai.star.StarFragment;
+import com.adeptum.questai.star.Starfall;
 import com.adeptum.questai.utility.AiChat;
 import com.adeptum.questai.utility.EnumUtil;
 import com.adeptum.questai.villager.AmbientGreetingTask;
@@ -299,6 +301,9 @@ public class RandomQuestPlugin implements SubPlugin {
 		if (tryDeliveryHandover(player, villager)) {
 			return;
 		}
+		if (trySellFragment(player, villager)) {
+			return;
+		}
 
 		final Villager.Profession profession = villager.getProfession();
 		final boolean tradeable = profession != Villager.Profession.NONE
@@ -358,6 +363,35 @@ public class RandomQuestPlugin implements SubPlugin {
 			org.bukkit.Sound.ENTITY_VILLAGER_YES, 1.0f, 1.0f);
 		player.playSound(player.getLocation(),
 			org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+		return true;
+	}
+
+	/**
+	 * Buys a star fragment held in the player's main hand: consumes it,
+	 * pays a hefty reward, remembers the sale and rolls a boosted relic.
+	 *
+	 * @return true when a fragment was sold
+	 */
+	private boolean trySellFragment(Player player, Villager villager) {
+		final ItemStack hand = player.getInventory().getItemInMainHand();
+		if (!StarFragment.isFragment(hand)) {
+			return false;
+		}
+		hand.setAmount(hand.getAmount() - 1);
+
+		final String skill = EnumUtil.random(Starfall.SELL_SKILLS);
+		ExperienceAPI.addXP(player, skill, Starfall.SELL_XP, "COMMAND");
+		player.sendMessage("§b" + profileStore.getName(villager.getUniqueId())
+			+ " turns the fragment over in wonder — §a" + Starfall.SELL_XP
+			+ " MCMMO XP in " + skill + "!");
+		player.playSound(player.getLocation(),
+			org.bukkit.Sound.BLOCK_AMETHYST_BLOCK_CHIME, 1.0f, 1.2f);
+		player.playSound(player.getLocation(),
+			org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+
+		profileStore.recordEvent(villager.getUniqueId(), player.getUniqueId(),
+			MemoryEvent.Type.CLAIMED_STAR, "a fragment of a fallen star");
+		maybeAwardRelic(player, Starfall.SELL_RELIC_CHANCE);
 		return true;
 	}
 

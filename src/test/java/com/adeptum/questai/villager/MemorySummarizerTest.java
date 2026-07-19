@@ -240,6 +240,25 @@ class MemorySummarizerTest {
 	}
 
 	@Test
+	void claimedStarIsRememberedAndGossiped() {
+		final VillagerProfile profile =
+			VillagerProfile.builder().name("Edric Stone").build();
+		final PlayerMemory memory = new PlayerMemory();
+		memory.getEvents().add(new MemoryEvent(
+			MemoryEvent.Type.CLAIMED_STAR, "a fragment of a fallen star", 1));
+		memory.getHearsay().add(new HearsayEvent(
+			MemoryEvent.Type.CLAIMED_STAR, "a fragment of a fallen star",
+			"Mira Bloom", 2));
+		profile.getPlayers().put(PLAYER, memory);
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+		assertTrue(context.contains("They once sold you a fragment of a"
+			+ " fallen star that fell from the night sky."));
+		assertTrue(context.contains("sold Mira Bloom a fragment of a fallen"
+			+ " star from the night sky."));
+	}
+
+	@Test
 	void pendingChainMentionsUnfinishedBusiness() {
 		final VillagerProfile profile =
 			VillagerProfile.builder().name("Edric Stone").build();

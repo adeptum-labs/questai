@@ -630,7 +630,7 @@ final class TextureGenerator {
 		setPixel(img, 5, 12, STAR_DARK);
 		// Internal facet line running tip to base
 		for (int i = 0; i <= 8; i++) {
-			setPixel(img, 9 - (i * 5) / 8, 4 + i, STAR_DARK);
+			setPixel(img, 9 - i * 5 / 8, 4 + i, STAR_DARK);
 		}
 	}
 
