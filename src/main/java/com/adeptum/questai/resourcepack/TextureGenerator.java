@@ -60,6 +60,18 @@ final class TextureGenerator {
 	private static final Color ICON_WHITE = new Color(0xFFFFFF);
 	private static final Color ICON_SHADOW = new Color(0x00000040, true);
 
+	private static final Color GOLD_LIGHT = new Color(0xF2D57A);
+	private static final Color GOLD_MID = new Color(0xD4A017);
+	private static final Color GOLD_DARK = new Color(0x8B6914);
+
+	private static final Color BRASS_LIGHT = new Color(0xC9A86A);
+	private static final Color BRASS_MID = new Color(0xA07D46);
+	private static final Color BRASS_DARK = new Color(0x6E5426);
+
+	private static final Color LEATHER = new Color(0x7A5230);
+	private static final Color INK = new Color(0x202020);
+	private static final Color SKIN = new Color(0xC8A878);
+
 	private TextureGenerator() {
 	}
 
@@ -220,8 +232,8 @@ final class TextureGenerator {
 		fillRect(img, 9, 9, 2, 1, featherMid);
 		fillRect(img, 8, 10, 2, 1, featherLight);
 		// Nib + ink dot
-		setPixel(img, 10, 12, new Color(0x202020));
-		setPixel(img, 11, 11, new Color(0x202020));
+		setPixel(img, 10, 12, INK);
+		setPixel(img, 11, 11, INK);
 	}
 
 	private static void drawInkLines(final BufferedImage img, final int w) {
@@ -383,6 +395,210 @@ final class TextureGenerator {
 		fillRect(img, 6, 10, 4, 1, ICON_WHITE);
 		fillRect(img, 5, 11, 6, 1, ICON_WHITE);
 		fillRect(img, 4, 12, 8, 1, ICON_WHITE);
+	}
+
+	// Relic item textures — 16x16 pixel art on transparency
+
+	/** A golden quill resting on a parchment scrap. */
+	static byte[] relicQuill() {
+		final BufferedImage img = create();
+		drawParchmentScrap(img);
+		drawGoldenFeather(img);
+		return encode(img);
+	}
+
+	private static void drawParchmentScrap(final BufferedImage img) {
+		fillRect(img, 1, 10, 9, 5, PARCHMENT);
+		fillRect(img, 1, 10, 9, 1, PARCHMENT_EDGE);
+		fillRect(img, 1, 14, 9, 1, PARCHMENT_EDGE);
+		fillRect(img, 3, 12, 5, 1, PARCHMENT_DARK);
+	}
+
+	private static void drawGoldenFeather(final BufferedImage img) {
+		// Shaft running diagonally from tip (13,1) down to the nib (4,10)
+		for (int i = 0; i <= 9; i++) {
+			setPixel(img, 13 - i, 1 + i, GOLD_DARK);
+		}
+		// Barbs above-left of the shaft, alternating light and mid gold
+		fillRect(img, 11, 2, 2, 1, GOLD_LIGHT);
+		fillRect(img, 10, 3, 2, 1, GOLD_MID);
+		fillRect(img, 9, 4, 2, 1, GOLD_LIGHT);
+		fillRect(img, 8, 5, 2, 1, GOLD_MID);
+		fillRect(img, 7, 6, 2, 1, GOLD_LIGHT);
+		fillRect(img, 6, 7, 2, 1, GOLD_MID);
+		// Sparser barbs below-right
+		setPixel(img, 13, 3, GOLD_MID);
+		setPixel(img, 12, 4, GOLD_LIGHT);
+		setPixel(img, 11, 5, GOLD_MID);
+		setPixel(img, 10, 6, GOLD_LIGHT);
+		// Nib and an ink drop on the scrap
+		setPixel(img, 4, 10, INK);
+		setPixel(img, 3, 11, INK);
+		setPixel(img, 2, 12, INK);
+	}
+
+	/** A lucky gold nugget hanging from a leather cord. */
+	static byte[] relicCharm() {
+		final BufferedImage img = create();
+		drawCord(img);
+		drawNugget(img);
+		return encode(img);
+	}
+
+	private static void drawCord(final BufferedImage img) {
+		setPixel(img, 4, 3, LEATHER);
+		setPixel(img, 5, 2, LEATHER);
+		fillRect(img, 6, 1, 4, 1, LEATHER);
+		setPixel(img, 10, 2, LEATHER);
+		setPixel(img, 11, 3, LEATHER);
+		// Strands converging to the knot
+		setPixel(img, 5, 4, LEATHER);
+		setPixel(img, 10, 4, LEATHER);
+		setPixel(img, 6, 5, LEATHER);
+		setPixel(img, 9, 5, LEATHER);
+		fillRect(img, 7, 5, 2, 2, WOOD_DARK);
+	}
+
+	private static void drawNugget(final BufferedImage img) {
+		// Irregular blob
+		fillRect(img, 6, 7, 4, 1, GOLD_MID);
+		fillRect(img, 5, 8, 6, 4, GOLD_MID);
+		fillRect(img, 6, 12, 4, 1, GOLD_MID);
+		// Facets: highlight upper-left, shadow lower-right, one sparkle
+		fillRect(img, 6, 8, 2, 1, GOLD_LIGHT);
+		setPixel(img, 6, 9, GOLD_LIGHT);
+		fillRect(img, 9, 11, 2, 1, GOLD_DARK);
+		setPixel(img, 10, 10, GOLD_DARK);
+		setPixel(img, 11, 7, ICON_WHITE);
+	}
+
+	/** A brass compass whose needle seeks people, on a parchment corner. */
+	static byte[] relicCompass() {
+		final BufferedImage img = create();
+		// Parchment scrap peeking out bottom-right, drawn under the dial
+		fillRect(img, 9, 9, 6, 6, PARCHMENT);
+		drawRect(img, 9, 9, 6, 6, PARCHMENT_EDGE);
+		drawCompassRing(img);
+		drawCompassFace(img);
+		return encode(img);
+	}
+
+	private static void drawCompassRing(final BufferedImage img) {
+		fillRect(img, 4, 1, 6, 1, BRASS_MID);
+		fillRect(img, 2, 2, 2, 1, BRASS_MID);
+		fillRect(img, 10, 2, 2, 1, BRASS_MID);
+		fillRect(img, 1, 3, 1, 2, BRASS_MID);
+		fillRect(img, 12, 3, 1, 2, BRASS_MID);
+		fillRect(img, 1, 5, 1, 4, BRASS_MID);
+		fillRect(img, 12, 5, 1, 4, BRASS_MID);
+		fillRect(img, 1, 9, 1, 2, BRASS_MID);
+		fillRect(img, 12, 9, 1, 2, BRASS_MID);
+		fillRect(img, 2, 11, 2, 1, BRASS_MID);
+		fillRect(img, 10, 11, 2, 1, BRASS_MID);
+		fillRect(img, 4, 12, 6, 1, BRASS_MID);
+		// Light catches the upper-left arc, shadow on the lower-right
+		setPixel(img, 4, 1, BRASS_LIGHT);
+		setPixel(img, 2, 2, BRASS_LIGHT);
+		setPixel(img, 1, 3, BRASS_LIGHT);
+		setPixel(img, 12, 10, BRASS_DARK);
+		setPixel(img, 11, 11, BRASS_DARK);
+		setPixel(img, 9, 12, BRASS_DARK);
+	}
+
+	private static void drawCompassFace(final BufferedImage img) {
+		fillRect(img, 4, 2, 6, 1, PARCHMENT);
+		fillRect(img, 2, 3, 10, 2, PARCHMENT);
+		fillRect(img, 2, 5, 10, 4, PARCHMENT);
+		fillRect(img, 2, 9, 10, 2, PARCHMENT);
+		fillRect(img, 4, 11, 6, 1, PARCHMENT);
+		// Cardinal ticks
+		fillRect(img, 6, 2, 2, 1, PARCHMENT_DARK);
+		fillRect(img, 6, 11, 2, 1, PARCHMENT_DARK);
+		fillRect(img, 2, 6, 1, 2, PARCHMENT_DARK);
+		fillRect(img, 11, 6, 1, 2, PARCHMENT_DARK);
+		// Needle: dark hub, red arm pointing NNE, pale tail
+		setPixel(img, 7, 7, INK);
+		setPixel(img, 6, 7, INK);
+		setPixel(img, 8, 4, RED_BG);
+		setPixel(img, 8, 5, RED_BG);
+		setPixel(img, 7, 6, RED_HIGHLIGHT);
+		setPixel(img, 6, 8, ICON_WHITE);
+		setPixel(img, 5, 9, ICON_WHITE);
+	}
+
+	/** A golden locket holding a tiny villager portrait. */
+	static byte[] relicLocket() {
+		final BufferedImage img = create();
+		drawLocketFrame(img);
+		drawLocketFace(img);
+		return encode(img);
+	}
+
+	private static void drawLocketFrame(final BufferedImage img) {
+		// Bail and hinge
+		setPixel(img, 7, 0, GOLD_DARK);
+		setPixel(img, 8, 0, GOLD_DARK);
+		setPixel(img, 6, 1, GOLD_DARK);
+		setPixel(img, 9, 1, GOLD_DARK);
+		fillRect(img, 7, 2, 2, 1, GOLD_MID);
+		// Oval body
+		fillRect(img, 6, 3, 4, 1, GOLD_MID);
+		fillRect(img, 5, 4, 6, 1, GOLD_MID);
+		fillRect(img, 4, 5, 8, 7, GOLD_MID);
+		fillRect(img, 5, 12, 6, 1, GOLD_MID);
+		fillRect(img, 6, 13, 4, 1, GOLD_MID);
+		// Rim light and shadow
+		setPixel(img, 6, 3, GOLD_LIGHT);
+		setPixel(img, 5, 4, GOLD_LIGHT);
+		setPixel(img, 4, 5, GOLD_LIGHT);
+		setPixel(img, 4, 6, GOLD_LIGHT);
+		setPixel(img, 11, 10, GOLD_DARK);
+		setPixel(img, 10, 12, GOLD_DARK);
+		setPixel(img, 9, 13, GOLD_DARK);
+	}
+
+	private static void drawLocketFace(final BufferedImage img) {
+		fillRect(img, 5, 5, 6, 7, SKIN);
+		// Unibrow, eyes and the long villager nose
+		fillRect(img, 6, 6, 4, 1, WOOD_GRAIN);
+		setPixel(img, 6, 7, WOOD_DARK);
+		setPixel(img, 9, 7, WOOD_DARK);
+		fillRect(img, 7, 8, 2, 2, new Color(0xB09060));
+	}
+
+	/** A brass hand-bell with a wooden handle. */
+	static byte[] relicBell() {
+		final BufferedImage img = create();
+		drawBellHandle(img);
+		drawBellBody(img);
+		return encode(img);
+	}
+
+	private static void drawBellHandle(final BufferedImage img) {
+		fillRect(img, 6, 0, 4, 1, WOOD_DARK);
+		fillRect(img, 7, 1, 2, 3, WOOD_MID);
+		fillRect(img, 6, 1, 1, 3, WOOD_DARK);
+		fillRect(img, 9, 1, 1, 3, WOOD_DARK);
+		setPixel(img, 7, 2, WOOD_GRAIN);
+	}
+
+	private static void drawBellBody(final BufferedImage img) {
+		// Flaring brass body with skirt and darker rim
+		fillRect(img, 6, 4, 4, 2, BRASS_MID);
+		fillRect(img, 5, 6, 6, 2, BRASS_MID);
+		fillRect(img, 4, 8, 8, 2, BRASS_MID);
+		fillRect(img, 3, 10, 10, 1, BRASS_MID);
+		fillRect(img, 3, 11, 10, 1, BRASS_DARK);
+		// Shading and the clapper below the rim
+		fillRect(img, 6, 5, 1, 5, BRASS_LIGHT);
+		fillRect(img, 10, 8, 1, 2, BRASS_DARK);
+		setPixel(img, 9, 6, BRASS_DARK);
+		fillRect(img, 7, 12, 2, 2, INK);
+		// Motion strokes
+		setPixel(img, 1, 7, ICON_SHADOW);
+		setPixel(img, 2, 9, ICON_SHADOW);
+		setPixel(img, 14, 7, ICON_SHADOW);
+		setPixel(img, 13, 9, ICON_SHADOW);
 	}
 
 	// Drawing primitives

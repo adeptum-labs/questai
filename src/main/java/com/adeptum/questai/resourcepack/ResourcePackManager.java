@@ -20,6 +20,7 @@
 
 package com.adeptum.questai.resourcepack;
 
+import com.adeptum.questai.relic.QuestRelic;
 import com.sun.net.httpserver.HttpServer;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -31,6 +32,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -211,12 +213,33 @@ public class ResourcePackManager {
 		customItem(files, "filler_pane", TextureGenerator.fillerPane());
 		customItem(files, "dialogue_paper", TextureGenerator.dialoguePaper());
 
+		registerRelics(files);
+
 		// Custom font: maps the banner glyph to a scroll emblem shown at the
 		// start of the dialogue inventory title, overriding vanilla rendering.
 		registerDialogueFont(files);
 
 		logger.info("[ResourcePack] Built pack with " + files.size() + " entries.");
 		return zip(files);
+	}
+
+	private void registerRelics(final Map<String, byte[]> files) {
+		relicItem(files, QuestRelic.ELDERS_QUILL, TextureGenerator.relicQuill());
+		relicItem(files, QuestRelic.PROSPECTORS_CHARM, TextureGenerator.relicCharm());
+		relicItem(files, QuestRelic.WAYFARERS_COMPASS,
+			TextureGenerator.relicCompass());
+		relicItem(files, QuestRelic.WHISPERING_LOCKET,
+			TextureGenerator.relicLocket());
+		relicItem(files, QuestRelic.PEDDLERS_BELL, TextureGenerator.relicBell());
+	}
+
+	private void relicItem(final Map<String, byte[]> files, final QuestRelic relic,
+		final byte[] texture) {
+
+		final String itemName = relic.getMaterial().name().toLowerCase(Locale.ROOT);
+		vanillaOverride(files, itemName, "item/" + itemName,
+			relic.getCustomModelData(), "questai:item/relic_" + relic.getId());
+		customItem(files, "relic_" + relic.getId(), texture);
 	}
 
 	private void registerDialogueFont(final Map<String, byte[]> files) {
