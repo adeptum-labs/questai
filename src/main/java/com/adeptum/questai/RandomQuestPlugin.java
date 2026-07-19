@@ -83,6 +83,7 @@ import org.bukkit.scheduler.BukkitTask;
 public class RandomQuestPlugin implements SubPlugin {
 
 	private static final double QUEST_CHANCE = 0.3;
+	private static final long GOSSIP_INTERVAL_TICKS = 12_000L;
 
 	private final JavaPlugin plugin;
 	private final ConversationManager conversationManager;
@@ -93,6 +94,7 @@ public class RandomQuestPlugin implements SubPlugin {
 	private QuestManager questManager;
 	private PlacedEntityStore placedEntityStore;
 	private BukkitTask ambientGreetingTask;
+	private BukkitTask gossipTask;
 
 	public RandomQuestPlugin(JavaPlugin plugin, ConversationManager conversationManager,
 		QuestGenerationService questService, OpenAiChatModel chatModel,
@@ -125,11 +127,15 @@ public class RandomQuestPlugin implements SubPlugin {
 		assignUniqueNamesToAllVillagers();
 		this.ambientGreetingTask = Bukkit.getScheduler().runTaskTimer(plugin,
 			new AmbientGreetingTask(profileStore, conversationManager), 100L, 100L);
+		this.gossipTask = Bukkit.getScheduler().runTaskTimer(plugin,
+			profileStore::spreadGossip, GOSSIP_INTERVAL_TICKS,
+			GOSSIP_INTERVAL_TICKS);
 		logger.info("[RandomQuestPlugin] onEnable() end -> plugin fully enabled.");
 	}
 
 	@Override
 	public void onDisable() {
+		gossipTask.cancel();
 		ambientGreetingTask.cancel();
 		questManager.cleanupAllQuests();
 	}

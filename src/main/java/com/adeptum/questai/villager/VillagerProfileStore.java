@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
@@ -104,6 +105,45 @@ public final class VillagerProfileStore {
 			profile.setLocation(null);
 			save();
 		}
+	}
+
+	/**
+	 * Runs one gossip exchange over stored locations and saves once when
+	 * anything changed. Cheap enough for the main thread.
+	 */
+	public synchronized void spreadGossip() {
+		final List<GossipSpreader.Share> shares =
+			GossipSpreader.plan(snapshots(), new Random());
+
+		boolean changed = false;
+		for (final GossipSpreader.Share share : shares) {
+			changed |= addHearsay(share.receiverId(), share.playerId(),
+				share.hearsay());
+		}
+		if (changed) {
+			save();
+		}
+	}
+
+	private List<GossipSpreader.Snapshot> snapshots() {
+		final List<GossipSpreader.Snapshot> snapshots = new ArrayList<>();
+		for (final Map.Entry<UUID, VillagerProfile> entry : profiles.entrySet()) {
+			final VillagerProfile profile = entry.getValue();
+			if (profile.getLocation() == null) {
+				continue;
+			}
+			final Map<UUID, List<MemoryEvent>> events = new HashMap<>();
+			for (final Map.Entry<UUID, PlayerMemory> player
+				: profile.getPlayers().entrySet()) {
+				if (!player.getValue().getEvents().isEmpty()) {
+					events.put(player.getKey(),
+						List.copyOf(player.getValue().getEvents()));
+				}
+			}
+			snapshots.add(new GossipSpreader.Snapshot(entry.getKey(),
+				profile.getName(), profile.getLocation(), events));
+		}
+		return snapshots;
 	}
 
 	/**
