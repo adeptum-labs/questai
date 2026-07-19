@@ -26,10 +26,12 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
@@ -108,6 +110,60 @@ public final class VillagerProfileStore {
 		}
 	}
 
+	/**
+	 * Ties two villagers together symmetrically, re-validating profiles,
+	 * caps and existing ties under the lock. Does not save; callers batch.
+	 *
+	 * @return true when the tie was formed
+	 */
+	/* default */ synchronized boolean addTie(final UUID firstId,
+		final UUID secondId, final Relationship.Type type) {
+
+		final VillagerProfile first = profiles.get(firstId);
+		final VillagerProfile second = profiles.get(secondId);
+		if (first == null || second == null
+			|| first.getRelationships().size() >= Relationship.MAX_TIES
+			|| second.getRelationships().size() >= Relationship.MAX_TIES
+			|| tieBetween(firstId, secondId) != null
+			|| tieBetween(secondId, firstId) != null) {
+			return false;
+		}
+		first.getRelationships().add(
+			new Relationship(type, secondId, second.getName()));
+		second.getRelationships().add(
+			new Relationship(type, firstId, first.getName()));
+		return true;
+	}
+
+	/** The villagers this villager is tied to; empty when unknown. */
+	public synchronized Set<UUID> tieTargets(final UUID villagerId) {
+		final VillagerProfile profile = profiles.get(villagerId);
+		if (profile == null) {
+			return Set.of();
+		}
+		final Set<UUID> targets = new HashSet<>();
+		for (final Relationship tie : profile.getRelationships()) {
+			targets.add(tie.otherId());
+		}
+		return targets;
+	}
+
+	/** This villager's tie to a specific other villager, or null. */
+	public synchronized Relationship tieBetween(final UUID villagerId,
+		final UUID otherId) {
+
+		final VillagerProfile profile = profiles.get(villagerId);
+		if (profile == null) {
+			return null;
+		}
+		for (final Relationship tie : profile.getRelationships()) {
+			if (tie.otherId().equals(otherId)) {
+				return tie;
+			}
+		}
+		return null;
+	}
+
 	/** The player's pending quest chain with a villager, or null. */
 	public synchronized ChainState chainState(final UUID villagerId,
 		final UUID playerId) {
@@ -170,17 +226,34 @@ public final class VillagerProfileStore {
 	 * anything changed. Cheap enough for the main thread.
 	 */
 	public synchronized void spreadGossip() {
-		final List<GossipSpreader.Share> shares =
-			GossipSpreader.plan(snapshots(), new Random());
-
+		final Random random = new Random();
 		boolean changed = false;
-		for (final GossipSpreader.Share share : shares) {
+		for (final GossipSpreader.Share share
+			: GossipSpreader.plan(snapshots(), random)) {
 			changed |= addHearsay(share.receiverId(), share.playerId(),
 				share.hearsay());
+		}
+		for (final RelationshipFormer.Tie tie
+			: RelationshipFormer.plan(tieSnapshots(), random)) {
+			changed |= addTie(tie.firstId(), tie.secondId(), tie.type());
 		}
 		if (changed) {
 			save();
 		}
+	}
+
+	private List<RelationshipFormer.Snapshot> tieSnapshots() {
+		final List<RelationshipFormer.Snapshot> snapshots = new ArrayList<>();
+		for (final Map.Entry<UUID, VillagerProfile> entry : profiles.entrySet()) {
+			final VillagerProfile profile = entry.getValue();
+			if (profile.getLocation() != null) {
+				snapshots.add(new RelationshipFormer.Snapshot(entry.getKey(),
+					profile.getName(), profile.getLocation(),
+					profile.getRelationships().size(),
+					tieTargets(entry.getKey())));
+			}
+		}
+		return snapshots;
 	}
 
 	@SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
@@ -365,8 +438,28 @@ public final class VillagerProfileStore {
 			.greeting(sec.getString("greeting"))
 			.location(loadLocation(sec.getConfigurationSection("location")))
 			.build();
+		loadRelationships(sec.getMapList("relationships"), profile);
 		loadPlayers(sec.getConfigurationSection("players"), profile, cutoff);
 		profiles.put(villagerId, profile);
+	}
+
+	private void loadRelationships(final List<Map<?, ?>> rows,
+		final VillagerProfile profile) {
+
+		for (final Map<?, ?> row : rows) {
+			if (profile.getRelationships().size() >= Relationship.MAX_TIES) {
+				return;
+			}
+			try {
+				profile.getRelationships().add(new Relationship(
+					Relationship.Type.valueOf(String.valueOf(row.get("type"))),
+					UUID.fromString(String.valueOf(row.get("other"))),
+					String.valueOf(row.get("name"))));
+			} catch (RuntimeException e) {
+				plugin.getLogger().log(Level.WARNING,
+					"[VillagerProfileStore] Skipping malformed relationship", e);
+			}
+		}
 	}
 
 	private StoredLocation loadLocation(final ConfigurationSection sec) {
@@ -546,7 +639,24 @@ public final class VillagerProfileStore {
 			cfg.set(base + ".location.y", loc.y());
 			cfg.set(base + ".location.z", loc.z());
 		}
+		if (!profile.getRelationships().isEmpty()) {
+			cfg.set(base + ".relationships", serializeRelationships(profile));
+		}
 		savePlayers(cfg, base, profile);
+	}
+
+	private List<Map<String, Object>> serializeRelationships(
+		final VillagerProfile profile) {
+
+		final List<Map<String, Object>> rows = new ArrayList<>();
+		for (final Relationship tie : profile.getRelationships()) {
+			final Map<String, Object> row = new LinkedHashMap<>();
+			row.put("type", tie.type().name());
+			row.put("other", tie.otherId().toString());
+			row.put("name", tie.otherName());
+			rows.add(row);
+		}
+		return rows;
 	}
 
 	private void savePlayers(final YamlConfiguration cfg, final String base,

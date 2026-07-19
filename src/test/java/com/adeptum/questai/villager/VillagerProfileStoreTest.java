@@ -331,6 +331,87 @@ class VillagerProfileStoreTest {
 	}
 
 	@Test
+	void tiesAreSymmetricAndRoundTrip() {
+		final UUID firstId = UUID.randomUUID();
+		final UUID secondId = UUID.randomUUID();
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(firstId, persona("Edric Dusk"), "FARMER");
+		store.register(secondId, persona("Mira Dusk"), "LIBRARIAN");
+
+		assertTrue(store.addTie(firstId, secondId, Relationship.Type.KIN));
+		store.save();
+
+		final VillagerProfileStore reloaded = new VillagerProfileStore(plugin);
+		final Relationship forward = reloaded.tieBetween(firstId, secondId);
+		final Relationship backward = reloaded.tieBetween(secondId, firstId);
+		assertEquals(Relationship.Type.KIN, forward.type());
+		assertEquals("Mira Dusk", forward.otherName());
+		assertEquals("Edric Dusk", backward.otherName());
+		assertEquals(java.util.Set.of(secondId),
+			reloaded.tieTargets(firstId));
+	}
+
+	@Test
+	void tiesRespectCapAndDedupe() {
+		final UUID firstId = UUID.randomUUID();
+		final UUID secondId = UUID.randomUUID();
+		final UUID thirdId = UUID.randomUUID();
+		final UUID fourthId = UUID.randomUUID();
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(firstId, persona("Edric Dusk"), "FARMER");
+		store.register(secondId, persona("Mira Bloom"), "LIBRARIAN");
+		store.register(thirdId, persona("Goran Ashe"), "CLERIC");
+		store.register(fourthId, persona("Sela Reed"), "FISHERMAN");
+
+		assertTrue(store.addTie(firstId, secondId,
+			Relationship.Type.OLD_FRIEND));
+		assertFalse(store.addTie(secondId, firstId, Relationship.Type.RIVAL));
+		assertTrue(store.addTie(firstId, thirdId, Relationship.Type.RIVAL));
+		assertFalse(store.addTie(firstId, fourthId, Relationship.Type.KIN));
+		assertFalse(store.addTie(UUID.randomUUID(), secondId,
+			Relationship.Type.KIN));
+	}
+
+	@Test
+	void malformedRelationshipRowsAreSkipped() throws Exception {
+		final UUID villagerId = UUID.randomUUID();
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(villagerId, persona("Edric Dusk"), "FARMER");
+		store.save();
+
+		final File file = new File(dataFolder, "villager-profiles.yml");
+		final YamlConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+		cfg.set("villagers." + villagerId + ".relationships", java.util.List.of(
+			java.util.Map.of("type", "NOT_A_TYPE", "other", "x", "name", "y")));
+		cfg.save(file);
+
+		final VillagerProfileStore reloaded = new VillagerProfileStore(plugin);
+		assertTrue(reloaded.get(villagerId).getRelationships().isEmpty());
+	}
+
+	@Test
+	void gossipRoundFormsKinBetweenNearbyNamesakes() {
+		final UUID firstId = UUID.randomUUID();
+		final UUID secondId = UUID.randomUUID();
+		final org.bukkit.World world = mock(org.bukkit.World.class);
+		when(world.getUID()).thenReturn(UUID.randomUUID());
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(firstId, persona("Edric Dusk"), "FARMER");
+		store.register(secondId, persona("Mira Dusk"), "LIBRARIAN");
+		store.updateLocation(firstId, new org.bukkit.Location(world, 0, 64, 0));
+		store.updateLocation(secondId,
+			new org.bukkit.Location(world, 10, 64, 0));
+
+		// Only one pair exists and kinship needs no roll — deterministic
+		store.spreadGossip();
+
+		assertEquals(Relationship.Type.KIN,
+			store.tieBetween(firstId, secondId).type());
+		assertEquals(Relationship.Type.KIN,
+			store.tieBetween(secondId, firstId).type());
+	}
+
+	@Test
 	void openChainRoundTripsAcrossInstances() {
 		final UUID villagerId = UUID.randomUUID();
 		final UUID playerId = UUID.randomUUID();

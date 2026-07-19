@@ -20,6 +20,7 @@
 
 package com.adeptum.questai.villager;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +41,8 @@ public class VillagerProfile {
 	private List<String> traits = List.of();
 	private String greeting;
 	private StoredLocation location;
+	@Builder.Default
+	private List<Relationship> relationships = new ArrayList<>();
 	@Builder.Default
 	private Map<UUID, PlayerMemory> players = new HashMap<>();
 }
