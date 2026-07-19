@@ -41,17 +41,19 @@ class QuestObjectiveTest {
 	@Test
 	void typeAllEnumValuesExist() {
 		final QuestObjective.Type[] values = QuestObjective.Type.values();
-		assertEquals(4, values.length);
+		assertEquals(5, values.length);
 		assertNotNull(QuestObjective.Type.valueOf("TREASURE"));
 		assertNotNull(QuestObjective.Type.valueOf("FIND_NPC"));
 		assertNotNull(QuestObjective.Type.valueOf("KILL"));
 		assertNotNull(QuestObjective.Type.valueOf("COLLECT"));
+		assertNotNull(QuestObjective.Type.valueOf("DELIVERY"));
 	}
 
 	@Test
-	void needsDestinationOnlyForPlacedObjectives() {
+	void needsDestinationOnlyForDestinationObjectives() {
 		assertTrue(QuestObjective.Type.TREASURE.needsDestination());
 		assertTrue(QuestObjective.Type.FIND_NPC.needsDestination());
+		assertTrue(QuestObjective.Type.DELIVERY.needsDestination());
 		assertFalse(QuestObjective.Type.KILL.needsDestination());
 		assertFalse(QuestObjective.Type.COLLECT.needsDestination());
 	}
@@ -62,6 +64,17 @@ class QuestObjectiveTest {
 		assertTrue(QuestObjective.Type.COLLECT.isCountable());
 		assertFalse(QuestObjective.Type.TREASURE.isCountable());
 		assertFalse(QuestObjective.Type.FIND_NPC.isCountable());
+		assertFalse(QuestObjective.Type.DELIVERY.isCountable());
+	}
+
+	@Test
+	void describeNamesTheDeliveryRecipient() {
+		final QuestObjective objective = new QuestObjective();
+		objective.setType(QuestObjective.Type.DELIVERY);
+		objective.setTarget("Mira Bloom");
+		objective.setAmount(1);
+		assertEquals("Deliver a sealed package to Mira Bloom",
+			objective.describe());
 	}
 
 	@Test

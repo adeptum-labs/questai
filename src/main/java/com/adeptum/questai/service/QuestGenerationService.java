@@ -49,6 +49,12 @@ public class QuestGenerationService {
 	private static final String[] ITEMS = {"IRON_INGOT", "WHEAT", "CARROT", "BONE"};
 	private static final String[] SKILLS = {"MINING", "WOODCUTTING", "EXCAVATION", "FISHING"};
 
+	/** Types that can be generated without knowing a delivery recipient. */
+	private static final QuestObjective.Type[] CONTEXT_FREE_TYPES = {
+		QuestObjective.Type.TREASURE, QuestObjective.Type.FIND_NPC,
+		QuestObjective.Type.KILL, QuestObjective.Type.COLLECT
+	};
+
 	private final JavaPlugin plugin;
 	private final OpenAiChatModel chatModel;
 
@@ -59,7 +65,7 @@ public class QuestGenerationService {
 
 	public QuestObjective generateRandomObjective() {
 		final QuestObjective objective = new QuestObjective();
-		final QuestObjective.Type type = EnumUtil.random(QuestObjective.Type.class);
+		final QuestObjective.Type type = EnumUtil.random(CONTEXT_FREE_TYPES);
 		objective.setType(type);
 
 		if (type == KILL) {
@@ -88,7 +94,9 @@ public class QuestGenerationService {
 		quest.setRewardAmount(rewardXP);
 		quest.setVillagerUuid(npcUuid);
 
-		if (objective.getType().needsDestination()) {
+		// Delivery destinations are the recipient's location, set by the caller
+		if (objective.getType().needsDestination()
+			&& objective.getType() != QuestObjective.Type.DELIVERY) {
 			final Location loc = getLogarithmicLocation(world);
 			quest.setDestination(loc);
 		}

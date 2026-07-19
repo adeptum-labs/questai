@@ -64,6 +64,16 @@ class QuestTest {
 		assertTrue(prompt.contains("- Objective: Locate a missing person"));
 	}
 
+	@Test
+	void promptDeliveryQuestNamesRecipient() {
+		final Quest quest = createQuest(
+			QuestObjective.Type.DELIVERY, "Mira Bloom", 1);
+		final String prompt = quest.prompt();
+
+		assertTrue(prompt.contains(
+			"- Objective: Deliver a sealed package to Mira Bloom"));
+	}
+
 	private Quest createQuest(QuestObjective.Type type, String target, int amount) {
 		final QuestObjective objective = new QuestObjective();
 		objective.setType(type);

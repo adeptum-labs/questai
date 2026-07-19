@@ -33,6 +33,7 @@ public class Quest {
 	private int rewardAmount;
 	private Location destination;
 	private UUID villagerUuid;
+	private UUID recipientUuid;
 
 	public String prompt() {
 		final StringBuilder sb = new StringBuilder(320);

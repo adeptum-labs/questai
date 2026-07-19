@@ -134,6 +134,7 @@ public final class QuestLogGui {
 			case COLLECT -> Material.CHEST;
 			case TREASURE -> Material.FILLED_MAP;
 			case FIND_NPC -> Material.COMPASS;
+			case DELIVERY -> Material.BUNDLE;
 		};
 	}
 
