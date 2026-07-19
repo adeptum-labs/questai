@@ -212,6 +212,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		if (uniqueName == null) {
 			return;
 		}
+		profileStore.updateLocation(villager.getUniqueId(), villager.getLocation());
 
 		event.setCancelled(true);
 		final Player player = event.getPlayer();
@@ -351,6 +352,8 @@ public class RandomQuestPlugin implements SubPlugin {
 		} else {
 			villager.setCustomName("§a" + name);
 			villager.setCustomNameVisible(true);
+			profileStore.updateLocation(villager.getUniqueId(),
+				villager.getLocation());
 		}
 	}
 

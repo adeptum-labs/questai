@@ -39,6 +39,7 @@ public class VillagerProfile {
 	@Builder.Default
 	private List<String> traits = List.of();
 	private String greeting;
+	private StoredLocation location;
 	@Builder.Default
 	private Map<UUID, PlayerMemory> players = new HashMap<>();
 }

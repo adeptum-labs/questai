@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
+import org.bukkit.Location;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -67,6 +68,40 @@ public final class VillagerProfileStore {
 
 	public synchronized boolean hasProfile(final UUID villagerId) {
 		return profiles.containsKey(villagerId);
+	}
+
+	/**
+	 * Remembers where a profiled villager was last seen. The in-memory value
+	 * always updates, but the file is only rewritten when the villager is
+	 * new to a world or has moved more than 32 blocks, to bound save churn
+	 * from chunk loads.
+	 */
+	public synchronized void updateLocation(final UUID villagerId,
+		final Location location) {
+
+		final VillagerProfile profile = profiles.get(villagerId);
+		if (profile == null) {
+			return;
+		}
+		final StoredLocation previous = profile.getLocation();
+		final StoredLocation current = StoredLocation.from(location);
+		profile.setLocation(current);
+
+		final boolean movedFar = previous == null
+			|| !previous.worldId().equals(current.worldId())
+			|| previous.distanceSquaredXz(current.x(), current.z()) > 32 * 32;
+		if (movedFar) {
+			save();
+		}
+	}
+
+	/** Forgets a villager's position, e.g. when the villager dies. */
+	public synchronized void clearLocation(final UUID villagerId) {
+		final VillagerProfile profile = profiles.get(villagerId);
+		if (profile != null && profile.getLocation() != null) {
+			profile.setLocation(null);
+			save();
+		}
 	}
 
 	/**
@@ -173,9 +208,25 @@ public final class VillagerProfileStore {
 			.profession(sec.getString("profession"))
 			.traits(List.copyOf(sec.getStringList("traits")))
 			.greeting(sec.getString("greeting"))
+			.location(loadLocation(sec.getConfigurationSection("location")))
 			.build();
 		loadPlayers(sec.getConfigurationSection("players"), profile, cutoff);
 		profiles.put(villagerId, profile);
+	}
+
+	private StoredLocation loadLocation(final ConfigurationSection sec) {
+		if (sec == null) {
+			return null;
+		}
+		try {
+			return new StoredLocation(
+				UUID.fromString(String.valueOf(sec.getString("world"))),
+				sec.getDouble("x"), sec.getDouble("y"), sec.getDouble("z"));
+		} catch (IllegalArgumentException e) {
+			plugin.getLogger().log(Level.WARNING,
+				"[VillagerProfileStore] Skipping malformed location", e);
+			return null;
+		}
 	}
 
 	private void loadPlayers(final ConfigurationSection playersSec,
@@ -284,6 +335,13 @@ public final class VillagerProfileStore {
 		}
 		if (profile.getGreeting() != null) {
 			cfg.set(base + ".greeting", profile.getGreeting());
+		}
+		if (profile.getLocation() != null) {
+			final StoredLocation loc = profile.getLocation();
+			cfg.set(base + ".location.world", loc.worldId().toString());
+			cfg.set(base + ".location.x", loc.x());
+			cfg.set(base + ".location.y", loc.y());
+			cfg.set(base + ".location.z", loc.z());
 		}
 
 		for (final Map.Entry<UUID, PlayerMemory> entry

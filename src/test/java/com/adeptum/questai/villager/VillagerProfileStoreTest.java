@@ -183,6 +183,52 @@ class VillagerProfileStoreTest {
 	}
 
 	@Test
+	void locationRoundTripsAcrossInstances() {
+		final UUID villagerId = UUID.randomUUID();
+		final UUID worldId = UUID.randomUUID();
+		final org.bukkit.World world = mock(org.bukkit.World.class);
+		when(world.getUID()).thenReturn(worldId);
+
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(villagerId, persona("Mira Bloom"), "LIBRARIAN");
+		store.updateLocation(villagerId,
+			new org.bukkit.Location(world, 100.5, 70, -200.5));
+
+		final VillagerProfileStore reloaded = new VillagerProfileStore(plugin);
+		final StoredLocation location = reloaded.get(villagerId).getLocation();
+		assertNotNull(location);
+		assertEquals(worldId, location.worldId());
+		assertEquals(100.5, location.x());
+		assertEquals(-200.5, location.z());
+	}
+
+	@Test
+	void clearLocationForgetsThePosition() {
+		final UUID villagerId = UUID.randomUUID();
+		final org.bukkit.World world = mock(org.bukkit.World.class);
+		when(world.getUID()).thenReturn(UUID.randomUUID());
+
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(villagerId, persona("Mira Bloom"), "LIBRARIAN");
+		store.updateLocation(villagerId,
+			new org.bukkit.Location(world, 1, 2, 3));
+		store.clearLocation(villagerId);
+
+		final VillagerProfileStore reloaded = new VillagerProfileStore(plugin);
+		assertNull(reloaded.get(villagerId).getLocation());
+	}
+
+	@Test
+	void profilesWithoutLocationLoadAsNull() {
+		final UUID villagerId = UUID.randomUUID();
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(villagerId, persona("Mira Bloom"), "LIBRARIAN");
+
+		final VillagerProfileStore reloaded = new VillagerProfileStore(plugin);
+		assertNull(reloaded.get(villagerId).getLocation());
+	}
+
+	@Test
 	void oldPlayerMemoryIsPrunedOnLoad() {
 		final UUID villagerId = UUID.randomUUID();
 		final UUID playerId = UUID.randomUUID();
