@@ -271,16 +271,14 @@ public class QuestManager {
 		final List<QuestProgress> expired = new ArrayList<>();
 
 		for (final QuestProgress progress : quests) {
-			final long elapsed = System.currentTimeMillis() - progress.getStartTime();
-			final long sixHoursMillis = 6L * 60 * 60 * 1000;
-			final long remaining = sixHoursMillis - elapsed;
+			final long remaining = progress.getRemainingMillis();
 
 			if (remaining <= 0) {
 				expired.add(progress);
 				continue;
 			}
 
-			updateTimerBar(progress, remaining, sixHoursMillis);
+			updateTimerBar(progress, remaining);
 
 			final Quest quest = progress.getQuest();
 			if (quest.getObjective().getType().needsDestination()) {
@@ -311,10 +309,9 @@ public class QuestManager {
 		}
 	}
 
-	private void updateTimerBar(final QuestProgress progress,
-		final long remaining, final long sixHoursMillis) {
-
-		final double timerProgress = Math.max(remaining / (double) sixHoursMillis, 0);
+	private void updateTimerBar(final QuestProgress progress, final long remaining) {
+		final double timerProgress =
+			Math.max(remaining / (double) QuestProgress.DURATION_MILLIS, 0);
 		Bukkit.getScheduler().runTask(plugin, () -> {
 			final BossBar bar = progress.getTimerBossBar();
 			if (bar != null) {

@@ -71,4 +71,22 @@ class QuestProgressTest {
 		progress.setMaxDistance(1500.0);
 		assertEquals(1500.0, progress.getMaxDistance());
 	}
+
+	@Test
+	void remainingMillisStartsNearFullDuration() {
+		final QuestProgress progress = new QuestProgress(new Quest());
+		final long remaining = progress.getRemainingMillis();
+
+		assertTrue(remaining <= QuestProgress.DURATION_MILLIS);
+		assertTrue(remaining > QuestProgress.DURATION_MILLIS - 1000);
+	}
+
+	@Test
+	void remainingMillisNeverNegative() {
+		final QuestProgress progress = new QuestProgress(new Quest());
+		progress.setStartTime(
+			System.currentTimeMillis() - QuestProgress.DURATION_MILLIS - 5000);
+
+		assertEquals(0, progress.getRemainingMillis());
+	}
 }

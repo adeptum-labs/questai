@@ -26,6 +26,10 @@ import org.bukkit.boss.BossBar;
 
 @Data
 public class QuestProgress {
+
+	/** Total lifetime of a quest before it expires. */
+	public static final long DURATION_MILLIS = 6L * 60 * 60 * 1000;
+
 	private Quest quest;
 	private int current;
 	private long startTime;
@@ -37,5 +41,10 @@ public class QuestProgress {
 		this.quest = quest;
 		this.current = 0;
 		this.startTime = System.currentTimeMillis();
+	}
+
+	/** Milliseconds until this quest expires, never negative. */
+	public long getRemainingMillis() {
+		return Math.max(DURATION_MILLIS - (System.currentTimeMillis() - startTime), 0);
 	}
 }

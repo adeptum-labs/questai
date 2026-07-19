@@ -147,11 +147,7 @@ public final class QuestLogGui {
 	}
 
 	private static String formatTimeRemaining(final QuestProgress progress) {
-		final long elapsed = System.currentTimeMillis() - progress.getStartTime();
-		final long sixHours = 6L * 60 * 60 * 1000;
-		final long remaining = Math.max(sixHours - elapsed, 0);
-
-		final long seconds = remaining / 1000;
+		final long seconds = progress.getRemainingMillis() / 1000;
 		final long hours = seconds / 3600;
 		final long minutes = seconds % 3600 / 60;
 		return "Time remaining: %02dh %02dm".formatted(hours, minutes);
