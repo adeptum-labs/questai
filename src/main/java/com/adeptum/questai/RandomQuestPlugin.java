@@ -20,11 +20,7 @@
 
 package com.adeptum.questai;
 
-import static com.adeptum.questai.model.world.quest.QuestObjective.Type.COLLECT;
-import static com.adeptum.questai.model.world.quest.QuestObjective.Type.DELIVERY;
-import static com.adeptum.questai.model.world.quest.QuestObjective.Type.FIND_NPC;
-import static com.adeptum.questai.model.world.quest.QuestObjective.Type.KILL;
-import static com.adeptum.questai.model.world.quest.QuestObjective.Type.TREASURE;
+import static com.adeptum.questai.model.world.quest.QuestObjective.Type.*;
 
 import com.adeptum.questai.dialogue.ConversationManager;
 import com.adeptum.questai.dialogue.DialogueGui;
@@ -44,6 +40,7 @@ import com.adeptum.questai.villager.AmbientGreetingTask;
 import com.adeptum.questai.villager.MemoryEvent;
 import com.adeptum.questai.villager.MemorySummarizer;
 import com.adeptum.questai.villager.VillagerPersona;
+import com.adeptum.questai.villager.VillagerProfile;
 import com.adeptum.questai.villager.VillagerProfileStore;
 import com.gmail.nossr50.api.ExperienceAPI;
 import dev.langchain4j.model.openai.OpenAiChatModel;
@@ -228,21 +225,20 @@ public class RandomQuestPlugin implements SubPlugin {
 		final boolean tradeable = profession != Villager.Profession.NONE
 			&& profession != Villager.Profession.NITWIT;
 
+		conversationManager.startConversation(player, villager.getUniqueId(),
+			uniqueName, profession.name(), isQuestAvailable(villager), tradeable);
+	}
+
+	private boolean isQuestAvailable(final Villager villager) {
 		final Npc npc = questManager.getVillagerData(villager.getUniqueId());
-		final long currentTime = System.currentTimeMillis();
 		final long twoHoursMillis = 2L * 60 * 60 * 1000;
 
-		boolean questAvailable = false;
-
-		if (npc != null && currentTime - npc.getTimestamp() <= twoHoursMillis) {
-			questAvailable = npc.isQuest();
-		} else {
-			questManager.setVillagerData(villager.getUniqueId(), null);
-			questAvailable = Math.random() <= QUEST_CHANCE;
+		if (npc != null
+			&& System.currentTimeMillis() - npc.getTimestamp() <= twoHoursMillis) {
+			return npc.isQuest();
 		}
-
-		conversationManager.startConversation(player, villager.getUniqueId(),
-			uniqueName, profession.name(), questAvailable, tradeable);
+		questManager.setVillagerData(villager.getUniqueId(), null);
+		return Math.random() <= QUEST_CHANCE;
 	}
 
 	/**
@@ -295,7 +291,7 @@ public class RandomQuestPlugin implements SubPlugin {
 	private void sendRecipientReaction(Player player, Quest quest,
 		String recipientName) {
 
-		final var recipient = profileStore.get(quest.getRecipientUuid());
+		final VillagerProfile recipient = profileStore.get(quest.getRecipientUuid());
 		if (recipient == null) {
 			return;
 		}
@@ -646,12 +642,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		}
 
 		final Quest quest = npc.getQuest();
-		// Deliveries complete on the recipient, never at the destination
-		if (!quest.getObjective().getType().needsDestination()
-			|| quest.getObjective().getType() == DELIVERY) {
-			return;
-		}
-		if (quest.getDestination().distance(player.getLocation()) > 10) {
+		if (!completableAtDestination(quest, player)) {
 			return;
 		}
 
@@ -675,6 +666,18 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		player.playSound(
 			player.getLocation(), org.bukkit.Sound.ENTITY_PLAYER_LEVELUP, 1.0f, 1.0f);
+	}
+
+	/**
+	 * True for quests completed by returning to the quest giver near the
+	 * destination. Deliveries complete on the recipient instead.
+	 */
+	private static boolean completableAtDestination(final Quest quest,
+		final Player player) {
+
+		final QuestObjective.Type type = quest.getObjective().getType();
+		return type.needsDestination() && type != DELIVERY
+			&& quest.getDestination().distance(player.getLocation()) <= 10;
 	}
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
 	public void onChunkLoad(ChunkLoadEvent event) {
