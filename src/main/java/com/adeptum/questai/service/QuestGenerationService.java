@@ -24,6 +24,7 @@ import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
 import com.adeptum.questai.utility.AiChat;
 import com.adeptum.questai.utility.EnumUtil;
+import com.adeptum.questai.villager.VillagerProfileStore;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -38,6 +39,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static com.adeptum.questai.model.world.quest.QuestObjective.Type.COLLECT;
+import static com.adeptum.questai.model.world.quest.QuestObjective.Type.DELIVERY;
 import static com.adeptum.questai.model.world.quest.QuestObjective.Type.KILL;
 
 /**
@@ -57,10 +59,62 @@ public class QuestGenerationService {
 
 	private final JavaPlugin plugin;
 	private final OpenAiChatModel chatModel;
+	private final VillagerProfileStore profileStore;
 
 	public QuestGenerationService(final JavaPlugin plugin, final OpenAiChatModel chatModel) {
+		this(plugin, chatModel, null);
+	}
+
+	public QuestGenerationService(final JavaPlugin plugin,
+		final OpenAiChatModel chatModel, final VillagerProfileStore profileStore) {
+
 		this.plugin = plugin;
 		this.chatModel = chatModel;
+		this.profileStore = profileStore;
+	}
+
+	/**
+	 * Generates a quest for the given villager. Delivery quests are only
+	 * rolled when another known villager qualifies as recipient; otherwise
+	 * this falls back to a context-free objective.
+	 */
+	public Quest generateQuest(final UUID giverUuid, final World world,
+		final Location origin) {
+
+		if (profileStore != null
+			&& EnumUtil.random(QuestObjective.Type.class) == DELIVERY) {
+			final Quest delivery = tryDeliveryQuest(giverUuid, world, origin);
+			if (delivery != null) {
+				return delivery;
+			}
+		}
+		return buildQuest(generateRandomObjective(), giverUuid, world);
+	}
+
+	private Quest tryDeliveryQuest(final UUID giverUuid, final World world,
+		final Location origin) {
+
+		final DeliveryRecipientPicker.Candidate recipient =
+			DeliveryRecipientPicker.pick(
+				profileStore.deliveryCandidates(giverUuid, world.getUID()),
+				origin.getX(), origin.getZ());
+		if (recipient == null) {
+			return null;
+		}
+		final Location destination = recipient.location().toLocation();
+		if (destination == null) {
+			return null;
+		}
+
+		final QuestObjective objective = new QuestObjective();
+		objective.setType(DELIVERY);
+		objective.setTarget(recipient.name());
+		objective.setAmount(1);
+
+		final Quest quest = buildQuest(objective, giverUuid, world);
+		quest.setDestination(destination);
+		quest.setRecipientUuid(recipient.uuid());
+		return quest;
 	}
 
 	public QuestObjective generateRandomObjective() {

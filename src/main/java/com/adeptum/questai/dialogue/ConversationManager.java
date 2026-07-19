@@ -22,6 +22,7 @@ package com.adeptum.questai.dialogue;
 
 import com.adeptum.questai.model.world.Npc;
 import com.adeptum.questai.model.world.quest.Quest;
+import com.adeptum.questai.model.world.quest.QuestObjective;
 import com.adeptum.questai.quest.QuestManager;
 import com.adeptum.questai.service.QuestGenerationService;
 import com.adeptum.questai.utility.AiChat;
@@ -256,11 +257,10 @@ public class ConversationManager {
 		state.setPhase(ConversationPhase.THINKING);
 		player.openInventory(DialogueGui.createThinking(npcName, profession));
 
-		final Quest quest = questService.buildQuest(
-			questService.generateRandomObjective(),
-			state.getNpcUuid(),
-			player.getWorld());
-		final String context = contextFor(state.getNpcUuid(), player);
+		final Quest quest = questService.generateQuest(
+			state.getNpcUuid(), player.getWorld(), player.getLocation());
+		final String context = deliveryContext(quest,
+			contextFor(state.getNpcUuid(), player));
 
 		questService.generateQuestDescription(quest, () -> {
 			final String narrativePrompt =
@@ -348,6 +348,24 @@ public class ConversationManager {
 
 	private String callAi(final String prompt) {
 		return AiChat.ask(chatModel, prompt, "...");
+	}
+
+	/**
+	 * Adds the delivery recipient to the narrative context so the giver
+	 * talks about who the package is for, without any extra model call.
+	 */
+	private String deliveryContext(final Quest quest, final String context) {
+		if (quest.getObjective().getType() != QuestObjective.Type.DELIVERY
+			|| profileStore == null) {
+			return context;
+		}
+		final VillagerProfile recipient = profileStore.get(quest.getRecipientUuid());
+		if (recipient == null) {
+			return context;
+		}
+		return context + " You are sending a sealed package to "
+			+ recipient.getName() + ", the village "
+			+ recipient.getProfession() + ".";
 	}
 
 	private String contextFor(final UUID npcUuid, final Player player) {

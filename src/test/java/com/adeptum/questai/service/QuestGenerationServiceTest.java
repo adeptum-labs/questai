@@ -94,6 +94,76 @@ class QuestGenerationServiceTest {
 	}
 
 	@Test
+	void generateQuestNeverRollsDeliveryWithoutCandidates() {
+		final com.adeptum.questai.villager.VillagerProfileStore store =
+			mock(com.adeptum.questai.villager.VillagerProfileStore.class);
+		when(store.deliveryCandidates(any(), any()))
+			.thenReturn(java.util.List.of());
+		final QuestGenerationService withStore =
+			new QuestGenerationService(plugin, chatModel, store);
+
+		final UUID worldId = UUID.randomUUID();
+		when(world.getUID()).thenReturn(worldId);
+		final Location spawn = mock(Location.class);
+		when(world.getSpawnLocation()).thenReturn(spawn);
+		when(world.getChunkAt(anyInt(), anyInt()))
+			.thenReturn(mock(org.bukkit.Chunk.class));
+		when(world.getHighestBlockYAt(anyInt(), anyInt())).thenReturn(64);
+		final Location origin = mock(Location.class);
+
+		for (int i = 0; i < 100; i++) {
+			final Quest quest =
+				withStore.generateQuest(UUID.randomUUID(), world, origin);
+			assertNotEquals(DELIVERY, quest.getObjective().getType());
+			assertNull(quest.getRecipientUuid());
+		}
+	}
+
+	@Test
+	void generateQuestBuildsDeliveryFromPickedRecipient() {
+		final UUID worldId = UUID.randomUUID();
+		final UUID recipientId = UUID.randomUUID();
+		final var candidate = new DeliveryRecipientPicker.Candidate(
+			recipientId, "Mira Bloom", "LIBRARIAN",
+			new com.adeptum.questai.villager.StoredLocation(
+				worldId, 1000.5, 70, -2000.5));
+
+		final com.adeptum.questai.villager.VillagerProfileStore store =
+			mock(com.adeptum.questai.villager.VillagerProfileStore.class);
+		when(store.deliveryCandidates(any(), any()))
+			.thenReturn(java.util.List.of(candidate));
+		final QuestGenerationService withStore =
+			new QuestGenerationService(plugin, chatModel, store);
+
+		when(world.getUID()).thenReturn(worldId);
+		final Location origin = mock(Location.class);
+		when(origin.getX()).thenReturn(0.0);
+		when(origin.getZ()).thenReturn(0.0);
+
+		try (var bukkit = mockStatic(org.bukkit.Bukkit.class)) {
+			bukkit.when(() -> org.bukkit.Bukkit.getWorld(worldId))
+				.thenReturn(world);
+
+			// Roll until the delivery branch is taken (1 in 5 per call)
+			Quest delivery = null;
+			for (int i = 0; i < 500 && delivery == null; i++) {
+				final Quest quest = withStore.generateQuest(
+					UUID.randomUUID(), world, origin);
+				if (quest.getObjective().getType() == DELIVERY) {
+					delivery = quest;
+				}
+			}
+
+			assertNotNull(delivery);
+			assertEquals("Mira Bloom", delivery.getObjective().getTarget());
+			assertEquals(1, delivery.getObjective().getAmount());
+			assertEquals(recipientId, delivery.getRecipientUuid());
+			assertEquals(1000.5, delivery.getDestination().getX());
+			assertEquals(-2000.5, delivery.getDestination().getZ());
+		}
+	}
+
+	@Test
 	void buildQuestSetsDestinationForTreasureQuest() {
 		final QuestObjective obj = new QuestObjective();
 		obj.setType(TREASURE);

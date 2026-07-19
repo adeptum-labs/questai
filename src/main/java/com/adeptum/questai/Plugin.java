@@ -60,9 +60,9 @@ public class Plugin extends JavaPlugin implements Listener {
 			.modelName("gpt-5.4-nano")
 			.build();
 
-		final QuestGenerationService questService =
-			new QuestGenerationService(this, chatModel);
 		final VillagerProfileStore profileStore = new VillagerProfileStore(this);
+		final QuestGenerationService questService =
+			new QuestGenerationService(this, chatModel, profileStore);
 		final ConversationManager conversationManager =
 			new ConversationManager(this, chatModel, profileStore);
 		conversationManager.setQuestService(questService);

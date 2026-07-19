@@ -20,6 +20,7 @@
 
 package com.adeptum.questai.villager;
 
+import com.adeptum.questai.service.DeliveryRecipientPicker;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -102,6 +103,27 @@ public final class VillagerProfileStore {
 			profile.setLocation(null);
 			save();
 		}
+	}
+
+	/**
+	 * Returns all villagers in the given world with a known location that
+	 * could receive a delivery, excluding the quest giver.
+	 */
+	public synchronized List<DeliveryRecipientPicker.Candidate> deliveryCandidates(
+		final UUID excludeVillagerId, final UUID worldId) {
+
+		final List<DeliveryRecipientPicker.Candidate> candidates = new ArrayList<>();
+		for (final Map.Entry<UUID, VillagerProfile> entry : profiles.entrySet()) {
+			final VillagerProfile profile = entry.getValue();
+			if (!entry.getKey().equals(excludeVillagerId)
+				&& profile.getLocation() != null
+				&& profile.getLocation().worldId().equals(worldId)) {
+				candidates.add(new DeliveryRecipientPicker.Candidate(
+					entry.getKey(), profile.getName(),
+					profile.getProfession(), profile.getLocation()));
+			}
+		}
+		return candidates;
 	}
 
 	/**
