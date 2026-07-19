@@ -6,21 +6,57 @@
 
 [![License: LGPL v3](https://img.shields.io/badge/License-LGPL_v3-blue.svg)](https://www.gnu.org/licenses/lgpl-3.0)
 
-QuestAI is a Paper Minecraft server plugin that turns villagers and wandering peasants into AI-driven quest givers.
-It scans nearby villages, keeps them populated, names every villager with AI-generated names, lets players discover
-quests through natural conversation, tracks multiple quest progress simultaneously, and rewards players with mcMMO XP.
+QuestAI is a Paper Minecraft server plugin that turns villagers and wandering peasants into AI-driven quest givers
+with persistent personalities. It scans nearby villages and keeps them populated, gives every villager an
+AI-generated name and personality, and lets players discover quests through natural conversation. Villagers
+remember what each player has done for them, gossip about it to their neighbours, form kinships and rivalries
+with each other, defend their homes during night raids, and pay out mcMMO XP, rare relics and other treasures.
 
 ## Features
 
-- Repopulates villages around online players when there are fewer villagers than detected beds.
-- Assigns AI-generated names to villagers and persists the UUID-to-name mapping in `config.yml`.
-- Conversational dialogue system with AI-driven NPC greetings, casual chat, and quest narratives.
-- Quest discovery through organic NPC conversation — NPCs hint they need help rather than showing explicit quest buttons.
-- Supports multiple concurrent quests per player with `KILL`, `COLLECT`, `TREASURE`, and `FIND_NPC` objectives.
+### Living villagers
+
+- Assigns every villager an AI-generated name and personality in a single model call, persisted with the rest of
+  the villager's profile in `villager-profiles.yml` (legacy name mappings in `config.yml` are migrated
+  automatically).
+- Per-player memory: villagers remember quests you completed, refused or accepted for them, parcels you carried
+  and raids you helped break — and their dialogue reflects it.
+- Gossip: villagers near each other exchange memories as hearsay, so a villager you have never met may already
+  know your deeds. News travels even through unloaded chunks via stored villager locations.
+- Relationships: villagers sharing a surname become kin automatically, and others bond as old friends or rivals
+  over time. Ties colour dialogue and steer delivery quests toward family.
+- Ambient life: cached greeting call-outs on the action bar as you pass, curious glances from villagers who only
+  know you by rumour, and parcel hints when you approach a delivery recipient.
+- Repopulates villages around online players based on detected doors and workstations.
+
+### Quests
+
+- Quest discovery through organic NPC conversation — NPCs hint they need help rather than showing explicit quest
+  buttons, and their narratives are coloured by personality, shared history and village gossip.
+- Five objective types: `KILL`, `COLLECT`, `TREASURE`, `FIND_NPC` and `DELIVERY` — deliveries carry a sealed
+  package to another named villager, preferring the giver's kin and friends, with an in-character reaction on
+  handover.
+- Quest chains: completing a quest can open a short storyline of follow-ups from the same villager, with scaled
+  rewards and a boosted relic chance on the finale.
+- Supports multiple concurrent quests per player, tracked with boss bars, quest maps and a six-hour lifetime.
 - Interactive quest log book — right-click to view all active quests, drop to abandon all quests.
+- Rewards completed quests through the mcMMO `ExperienceAPI`, with festival and relic bonuses applied.
+
+### Relics, events, mobs and the fallen star
+
+- Five rare quest-exclusive relics with hand-drawn pixel-art sprites and light effects — bonus quest XP, better
+  treasure, more quest offers, a villager-seeking compass and a peasant-summoning bell. Earned through a rare
+  roll on quest completion or a treasure chest jackpot.
+- Village events: night raids where named raider zombies converge on a village — break the raid and every
+  villager present remembers and gossips about it — and rare daytime festivals granting a temporary quest-XP
+  bonus.
+- Custom mob variants forged from rare natural spawns: the towering **Gravehulk**, swarming knee-high
+  **Gravelings** and the blaze-touched **Cinderling**, each with a tiny chance of dropping enchanted gear.
+- Starfall: a very rare, visible night event — a star streaks across the sky and blasts a crater into natural
+  terrain, guarded by Cinderlings and holding a glowing Star Fragment that villagers pay handsomely for.
 - Wandering peasant NPCs that roam the world and offer quests to players they encounter.
-- Tracks quest progress with boss bars and event handlers.
-- Rewards completed quests through the mcMMO `ExperienceAPI`.
+- A themed resource pack is built at runtime and served over HTTP: scroll-banner dialogue GUI, custom buttons,
+  relic and Star Fragment sprites — all generated pixel art, no bundled assets.
 
 ## Architecture
 
@@ -30,13 +66,40 @@ flowchart TD
 	Root --> AutoVillager[AutoVillagerPlugin]
 	Root --> RandomQuest[RandomQuestPlugin]
 	Root --> WanderingPeasant[WanderingPeasantPlugin]
-	Root --> QuestLogListener[QuestLogListener]
+	Root --> FlyingPig[FlyingPigPlugin]
+	Root --> RelicListener[relic.RelicListener]
+	Root --> MobForge[mob.MobForge]
+	Root --> StarfallMgr[star.StarfallManager]
+	Root --> EventMgr[event.VillageEventManager]
+	Root --> QuestLogListener[quest.QuestLogListener]
+	Root --> RPM[resourcepack.ResourcePackManager]
+
+	AutoVillager -- village scan callback --> EventMgr
+	StarfallMgr --> MobForge
+	RPM --> TexGen[resourcepack.TextureGenerator]
+
 	RandomQuest --> QM[quest.QuestManager]
 	RandomQuest --> ConvMgr[dialogue.ConversationManager]
+	RandomQuest --> PES[quest.PlacedEntityStore]
+	RandomQuest --> Ambient[villager.AmbientGreetingTask]
+	RandomQuest --> McMMO[mcMMO ExperienceAPI]
 	WanderingPeasant --> ConvMgr
+	RelicListener --> WanderingPeasant
+
+	ConvMgr --> QGS[service.QuestGenerationService]
 	ConvMgr --> DialogueGui[dialogue.DialogueGui]
 	ConvMgr --> DialoguePrompts[dialogue.DialoguePrompts]
 	ConvMgr --> OpenAI[OpenAiChatModel]
+
+	ProfileStore[villager.VillagerProfileStore] --> Gossip[villager.GossipSpreader]
+	ProfileStore --> Former[villager.RelationshipFormer]
+	ProfileStore --> Summarizer[villager.MemorySummarizer]
+	RandomQuest --> ProfileStore
+	ConvMgr --> ProfileStore
+	RelicListener --> ProfileStore
+	EventMgr --> ProfileStore
+	QGS --> Picker[service.DeliveryRecipientPicker]
+
 	QM --> QP[quest.QuestProgress]
 	QM --> QLB[quest.QuestLogBook]
 	QM --> Npc[Npc cache]
@@ -44,7 +107,6 @@ flowchart TD
 	Quest --> Objective[QuestObjective]
 	QuestLogListener --> QM
 	QuestLogListener --> QLG[quest.QuestLogGui]
-	RandomQuest --> McMMO[mcMMO ExperienceAPI]
 	RandomQuest --> DMR[quest.DestinationMarkerRenderer]
 	AutoVillager --> VillageInfo[model.VillageInfo]
 ```
@@ -53,15 +115,24 @@ flowchart TD
 
 | Area | Main files | Responsibility |
 | --- | --- | --- |
-| Plugin entry point | `Plugin`, `plugin.yml` | Starts and stops the subplugins, registers the quest log listener. |
-| Village maintenance | `AutoVillagerPlugin`, `VillageInfo` | Detects nearby village blocks and spawns villagers based on door count. |
-| Dialogue system | `ConversationManager`, `ConversationState`, `ConversationPhase`, `DialogueGui`, `DialoguePrompts` | Manages NPC conversation flow, AI-driven dialogue, and inventory GUI screens. |
-| Quest system | `RandomQuestPlugin`, `QuestManager`, `QuestProgress`, `Quest`, `QuestObjective`, `Npc` | Generates quests, tracks progress, handles completion, and grants rewards. |
+| Plugin entry point | `Plugin`, `plugin.yml` | Wires the stores and subplugins, starts and stops them, registers listeners. |
+| Village maintenance | `AutoVillagerPlugin`, `VillageInfo` | Detects villages by doors and workstations, spawns villagers, and feeds the village event system. |
+| Villager profiles | `VillagerProfileStore`, `VillagerProfile`, `VillagerPersona`, `PlayerMemory`, `MemoryEvent`, `HearsayEvent`, `Relationship`, `ChainState`, `StoredLocation` | Persists names, personalities, locations, per-player memory, hearsay, ties and chain state in `villager-profiles.yml`. |
+| Social simulation | `GossipSpreader`, `RelationshipFormer`, `MemorySummarizer`, `AmbientGreetingTask` | Spreads memories as hearsay, forms kinships and rivalries, condenses history into dialogue context, and shows ambient greetings. |
+| Dialogue system | `ConversationManager`, `ConversationState`, `ConversationPhase`, `DialogueGui`, `DialoguePrompts` | Manages NPC conversation flow, AI-driven dialogue with injected memory context, and inventory GUI screens. |
+| Quest system | `RandomQuestPlugin`, `QuestManager`, `QuestProgress`, `Quest`, `QuestObjective`, `QuestChains`, `Npc` | Generates quests, tracks progress, advances chains, handles completion, and grants rewards. |
+| Quest generation | `QuestGenerationService`, `DeliveryRecipientPicker` | Builds quests with random objectives, picks delivery recipients (preferring ties), and generates AI descriptions. |
+| Deliveries | `DeliveryPackage` | The sealed package item carried between villagers. |
 | Quest log | `QuestLogBook`, `QuestLogGui`, `QuestLogListener` | Interactive quest log book item and GUI for viewing and abandoning quests. |
+| Relics | `QuestRelic`, `RelicItems`, `RelicRoll`, `RelicEffects`, `RelicCooldowns`, `RelicCompass`, `RelicListener` | The rare relic set: identity, award rolls, passive boosts and right-click actives. |
+| Village events | `VillageEventManager`, `VillageEvents`, `VillageKey`, `RaidState`, `FestivalState`, `VillageCheckListener` | Night raids and festivals triggered from the village scan. |
+| Custom mobs | `MobForge`, `MobVariant`, `MobRoll`, `MobTags`, `MobDrops`, `GearItem`, `GearEnchant` | Forges Gravehulks, Graveling swarms and Cinderlings from natural spawns, with enchanted gear drops. |
+| Starfall | `StarfallManager`, `Starfall`, `StarFragment` | The rare falling star: streak, crater, guarded fragment and the villager sell flow. |
+| Resource pack | `ResourcePackManager`, `TextureGenerator` | Builds the themed pack at runtime (GUI sprites, relic and fragment art) and serves it over HTTP. |
 | Wandering peasants | `WanderingPeasantPlugin` | Spawns roaming quest NPCs using Wandering Trader entities. |
-| Map rendering | `DestinationMarkerRenderer` | Draws destination markers on quest maps for `TREASURE` and `FIND_NPC` quests. |
-| Quest generation | `QuestGenerationService` | Builds quests with random objectives and generates AI descriptions. |
-| Utility | `EnumUtil` | Random enum value selection. |
+| Map rendering | `DestinationMarkerRenderer` | Draws destination markers on quest maps for destination-based quests. |
+| Placed entity safety | `PlacedEntityStore` | Persists quest-placed chests and hidden NPCs so orphans are swept after a crash. |
+| Utility | `EnumUtil`, `AiChat`, `GuiItems` | Random picks, one-shot chat model calls, and GUI ItemStack building. |
 
 ## Quest Flow
 
@@ -70,6 +141,7 @@ sequenceDiagram
 	actor Player
 	participant NPC as Villager / Wandering Peasant
 	participant ConvMgr as ConversationManager
+	participant Profiles as VillagerProfileStore
 	participant OpenAI as OpenAI chat model
 	participant QuestManager
 	participant Bukkit
@@ -77,7 +149,8 @@ sequenceDiagram
 
 	Player->>NPC: Right-click
 	NPC->>ConvMgr: Start conversation
-	ConvMgr->>OpenAI: Generate greeting
+	ConvMgr->>Profiles: Fetch personality, memory, gossip, ties
+	ConvMgr->>OpenAI: Generate greeting with history context
 	OpenAI-->>ConvMgr: Greeting text
 	ConvMgr->>Player: Show greeting GUI
 	Player->>ConvMgr: Chat with NPC
@@ -85,15 +158,16 @@ sequenceDiagram
 	OpenAI-->>ConvMgr: Chat text hinting at trouble
 	ConvMgr->>Player: Show chat with "Offer to help" button
 	Player->>ConvMgr: Offer to help
-	ConvMgr->>OpenAI: Generate quest narrative
+	ConvMgr->>OpenAI: Generate quest narrative (chain and delivery aware)
 	OpenAI-->>ConvMgr: Quest story
 	ConvMgr->>Player: Show quest offer and accept/reject
 	Player->>ConvMgr: Accept quest
 	ConvMgr->>QuestManager: Assign quest + give quest log book
 	QuestManager->>Bukkit: Create boss bars and progress task
-	Player->>Bukkit: Kill, collect, or reach destination
+	Player->>Bukkit: Kill, collect, deliver, or reach destination
 	Bukkit->>QuestManager: Increment or complete quest
-	QuestManager->>McMMO: Award raw XP
+	QuestManager->>McMMO: Award XP (relic and festival bonuses)
+	QuestManager->>Profiles: Record the deed; gossip spreads it
 ```
 
 ## Quest Log
@@ -113,10 +187,20 @@ flowchart LR
 	Location --> Blocks[Count doors and workstations]
 	Blocks --> EnoughBlocks{Village blocks found?}
 	EnoughBlocks -- no --> Stop[Do nothing]
-	EnoughBlocks -- yes --> Spawn{Villagers below door-based target?}
+	EnoughBlocks -- yes --> Events[Notify village event system]
+	Events --> Spawn{Villagers below door-based target?}
 	Spawn -- no --> Stop
 	Spawn -- yes --> Create[Spawn persistent villagers near player]
 ```
+
+## Persistence
+
+| File | Contents |
+| --- | --- |
+| `config.yml` | OpenAI API key and resource pack settings. |
+| `villager-profiles.yml` | Villager names, personalities, locations, per-player memory, hearsay, relationships and chain state. |
+| `placed-entities.yml` | Quest-placed chests and hidden NPCs, swept on startup after a crash. |
+| `questai-pack.zip` | The generated resource pack, saved for debugging and manual hosting. |
 
 ## Configuration
 
@@ -124,6 +208,15 @@ The plugin expects an OpenAI API key in the server-side plugin config:
 
 ```yaml
 openai.api-key: "your-api-key"
+```
+
+Optional resource pack settings (defaults shown):
+
+```yaml
+resourcepack:
+  enabled: true
+  port: 8163
+  hostname: ""   # public IP or DNS name; auto-detected when empty
 ```
 
 `src/main/resources/config.yml` is ignored by Git in this repository. Keep real secrets out of commits and deployment
@@ -136,7 +229,9 @@ because the POM lists it as a resource.
 mvn test
 ```
 
-Tests use JUnit 5 with Mockito to mock Bukkit server types. No live Minecraft server is needed.
+Tests use JUnit 5 with Mockito to mock Bukkit server types. No live Minecraft server is needed. Registry-backed
+Bukkit types (sounds, attributes, enchantments) cannot initialize off-server, so game logic is kept in pure,
+fully-tested classes and only thin glue classes touch those registries.
 
 ## Build And Checks
 
