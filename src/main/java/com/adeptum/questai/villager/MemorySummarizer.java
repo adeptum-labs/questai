@@ -33,6 +33,7 @@ public final class MemorySummarizer {
 
 	private static final int MAX_EVENT_CLAUSES = 4;
 	private static final int MAX_HEARSAY_CLAUSES = 2;
+	private static final int MAX_TIE_CLAUSES = 2;
 	private static final int MAX_LENGTH = 400;
 
 	private MemorySummarizer() {
@@ -53,6 +54,7 @@ public final class MemorySummarizer {
 			parts.add("Your personality: "
 				+ String.join("; ", profile.getTraits()) + ".");
 		}
+		addTieParts(parts, profile);
 
 		final PlayerMemory memory = profile.getPlayers().get(playerId);
 		addRelationshipParts(parts, memory);
@@ -74,6 +76,22 @@ public final class MemorySummarizer {
 			parts.remove(parts.size() - 1);
 		}
 		return String.join(" ", parts);
+	}
+
+	/**
+	 * Ties to other villagers are identity like traits, so they sit ahead
+	 * of the length cap's reach.
+	 */
+	private static void addTieParts(final List<String> parts,
+		final VillagerProfile profile) {
+
+		int added = 0;
+		for (final Relationship tie : profile.getRelationships()) {
+			if (added++ >= MAX_TIE_CLAUSES) {
+				return;
+			}
+			parts.add(tie.otherName() + " is your " + tie.type().noun() + ".");
+		}
 	}
 
 	private static void addRelationshipParts(final List<String> parts,

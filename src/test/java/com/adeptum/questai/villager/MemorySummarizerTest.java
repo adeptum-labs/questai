@@ -185,6 +185,41 @@ class MemorySummarizerTest {
 	}
 
 	@Test
+	void tiesAreVoicedAsIdentity() {
+		final VillagerProfile profile = VillagerProfile.builder()
+			.name("Edric Dusk")
+			.traits(List.of("gruff"))
+			.build();
+		profile.getRelationships().add(new Relationship(
+			Relationship.Type.KIN, UUID.randomUUID(), "Mira Dusk"));
+		profile.getRelationships().add(new Relationship(
+			Relationship.Type.RIVAL, UUID.randomUUID(), "Goran Ashe"));
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+		assertTrue(context.contains("Mira Dusk is your kin."));
+		assertTrue(context.contains("Goran Ashe is your rival."));
+		assertTrue(context.indexOf("personality") < context.indexOf("kin"));
+	}
+
+	@Test
+	void tieClausesSurviveTheLengthCap() {
+		final VillagerProfile profile =
+			VillagerProfile.builder().name("Edric Dusk").build();
+		profile.getRelationships().add(new Relationship(
+			Relationship.Type.OLD_FRIEND, UUID.randomUUID(), "Mira Bloom"));
+		final PlayerMemory memory = new PlayerMemory();
+		final String longTitle = "T".repeat(150);
+		for (int i = 0; i < 4; i++) {
+			memory.getEvents().add(new MemoryEvent(
+				MemoryEvent.Type.QUEST_COMPLETED, longTitle + i, i));
+		}
+		profile.getPlayers().put(PLAYER, memory);
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+		assertTrue(context.contains("Mira Bloom is your old friend."));
+	}
+
+	@Test
 	void defendedVillageIsRememberedAndGossiped() {
 		final VillagerProfile profile =
 			VillagerProfile.builder().name("Edric Stone").build();
