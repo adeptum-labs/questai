@@ -331,6 +331,91 @@ class VillagerProfileStoreTest {
 	}
 
 	@Test
+	void openChainRoundTripsAcrossInstances() {
+		final UUID villagerId = UUID.randomUUID();
+		final UUID playerId = UUID.randomUUID();
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(villagerId, persona("Edric Stone"), "FARMER");
+		store.recordConversation(villagerId, playerId);
+
+		assertTrue(store.openChain(villagerId, playerId, 3, "The Lost Ledger"));
+
+		final VillagerProfileStore reloaded = new VillagerProfileStore(plugin);
+		final ChainState chain = reloaded.chainState(villagerId, playerId);
+		assertNotNull(chain);
+		assertEquals(2, chain.step());
+		assertEquals(3, chain.length());
+		assertEquals("The Lost Ledger", chain.lastTitle());
+	}
+
+	@Test
+	void openChainRefusedWhilePendingOrUnknown() {
+		final UUID villagerId = UUID.randomUUID();
+		final UUID playerId = UUID.randomUUID();
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(villagerId, persona("Edric Stone"), "FARMER");
+
+		assertFalse(store.openChain(UUID.randomUUID(), playerId, 2, "X"));
+		assertTrue(store.openChain(villagerId, playerId, 2, "First"));
+		assertFalse(store.openChain(villagerId, playerId, 3, "Second"));
+		assertEquals("First",
+			store.chainState(villagerId, playerId).lastTitle());
+	}
+
+	@Test
+	void advanceChainBumpsStepAndTitle() {
+		final UUID villagerId = UUID.randomUUID();
+		final UUID playerId = UUID.randomUUID();
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(villagerId, persona("Edric Stone"), "FARMER");
+		store.recordConversation(villagerId, playerId);
+		store.openChain(villagerId, playerId, 3, "Step One");
+
+		store.advanceChain(villagerId, playerId, "Step Two");
+
+		final VillagerProfileStore reloaded = new VillagerProfileStore(plugin);
+		final ChainState chain = reloaded.chainState(villagerId, playerId);
+		assertEquals(3, chain.step());
+		assertEquals("Step Two", chain.lastTitle());
+	}
+
+	@Test
+	void clearChainForgetsTheChain() {
+		final UUID villagerId = UUID.randomUUID();
+		final UUID playerId = UUID.randomUUID();
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(villagerId, persona("Edric Stone"), "FARMER");
+		store.recordConversation(villagerId, playerId);
+		store.openChain(villagerId, playerId, 2, "Step One");
+
+		store.clearChain(villagerId, playerId);
+
+		final VillagerProfileStore reloaded = new VillagerProfileStore(plugin);
+		assertNull(reloaded.chainState(villagerId, playerId));
+	}
+
+	@Test
+	void malformedChainStateIsSkippedOnLoad() throws Exception {
+		final UUID villagerId = UUID.randomUUID();
+		final UUID playerId = UUID.randomUUID();
+		final VillagerProfileStore store = new VillagerProfileStore(plugin);
+		store.register(villagerId, persona("Edric Stone"), "FARMER");
+		store.recordConversation(villagerId, playerId);
+		store.save();
+
+		final File file = new File(dataFolder, "villager-profiles.yml");
+		final YamlConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+		final String base = "villagers." + villagerId + ".players." + playerId;
+		cfg.set(base + ".chain.step", 9);
+		cfg.set(base + ".chain.length", 2);
+		cfg.set(base + ".chain.lastTitle", "Broken");
+		cfg.save(file);
+
+		final VillagerProfileStore reloaded = new VillagerProfileStore(plugin);
+		assertNull(reloaded.chainState(villagerId, playerId));
+	}
+
+	@Test
 	void oldPlayerMemoryIsPrunedOnLoad() {
 		final UUID villagerId = UUID.randomUUID();
 		final UUID playerId = UUID.randomUUID();

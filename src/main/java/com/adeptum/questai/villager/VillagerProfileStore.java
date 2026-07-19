@@ -20,6 +20,7 @@
 
 package com.adeptum.questai.villager;
 
+import com.adeptum.questai.quest.QuestChains;
 import com.adeptum.questai.service.DeliveryRecipientPicker;
 import java.io.File;
 import java.io.IOException;
@@ -103,6 +104,63 @@ public final class VillagerProfileStore {
 		final VillagerProfile profile = profiles.get(villagerId);
 		if (profile != null && profile.getLocation() != null) {
 			profile.setLocation(null);
+			save();
+		}
+	}
+
+	/** The player's pending quest chain with a villager, or null. */
+	public synchronized ChainState chainState(final UUID villagerId,
+		final UUID playerId) {
+
+		final VillagerProfile profile = profiles.get(villagerId);
+		if (profile == null) {
+			return null;
+		}
+		final PlayerMemory memory = profile.getPlayers().get(playerId);
+		return memory == null ? null : memory.getChain();
+	}
+
+	/**
+	 * Opens a quest chain unless one is already pending with this
+	 * villager. Silently ignored for villagers without a profile.
+	 *
+	 * @return true when the chain was opened
+	 */
+	public synchronized boolean openChain(final UUID villagerId,
+		final UUID playerId, final int length, final String lastTitle) {
+
+		final VillagerProfile profile = profiles.get(villagerId);
+		if (profile == null) {
+			return false;
+		}
+		final PlayerMemory memory = profile.getPlayers()
+			.computeIfAbsent(playerId, k -> new PlayerMemory());
+		if (memory.getChain() != null) {
+			return false;
+		}
+		memory.setChain(new ChainState(2, length, lastTitle));
+		save();
+		return true;
+	}
+
+	/** Moves a pending chain to its next step after a completed quest. */
+	public synchronized void advanceChain(final UUID villagerId,
+		final UUID playerId, final String completedTitle) {
+
+		final ChainState chain = chainState(villagerId, playerId);
+		if (chain != null) {
+			profiles.get(villagerId).getPlayers().get(playerId).setChain(
+				new ChainState(chain.step() + 1, chain.length(), completedTitle));
+			save();
+		}
+	}
+
+	/** Forgets a pending chain, e.g. when a step is rejected or abandoned. */
+	public synchronized void clearChain(final UUID villagerId,
+		final UUID playerId) {
+
+		if (chainState(villagerId, playerId) != null) {
+			profiles.get(villagerId).getPlayers().get(playerId).setChain(null);
 			save();
 		}
 	}
@@ -354,12 +412,29 @@ public final class VillagerProfileStore {
 			memory.setConversations(sec.getInt("conversations"));
 			memory.setLastSeen(lastSeen);
 			loadEvents(sec.getMapList("events"), memory);
+			memory.setChain(loadChain(sec.getConfigurationSection("chain")));
 		}
 		loadHearsay(sec.getMapList("hearsay"), memory, cutoff);
 
 		if (memory.getLastSeen() >= cutoff || !memory.getHearsay().isEmpty()) {
 			profile.getPlayers().put(UUID.fromString(key), memory);
 		}
+	}
+
+	private ChainState loadChain(final ConfigurationSection sec) {
+		if (sec == null) {
+			return null;
+		}
+		final int step = sec.getInt("step");
+		final int length = sec.getInt("length");
+		final String lastTitle = sec.getString("lastTitle");
+		if (step < 2 || step > length || length > QuestChains.MAX_LENGTH
+			|| lastTitle == null) {
+			plugin.getLogger().warning(
+				"[VillagerProfileStore] Skipping malformed chain state");
+			return null;
+		}
+		return new ChainState(step, length, lastTitle);
 	}
 
 	private void loadHearsay(final List<Map<?, ?>> rows,
@@ -489,6 +564,12 @@ public final class VillagerProfileStore {
 			}
 			if (!memory.getHearsay().isEmpty()) {
 				cfg.set(playerBase + ".hearsay", serializeHearsay(memory));
+			}
+			if (memory.getChain() != null) {
+				cfg.set(playerBase + ".chain.step", memory.getChain().step());
+				cfg.set(playerBase + ".chain.length", memory.getChain().length());
+				cfg.set(playerBase + ".chain.lastTitle",
+					memory.getChain().lastTitle());
 			}
 		}
 	}

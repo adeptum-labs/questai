@@ -32,6 +32,7 @@ import lombok.Data;
 public class PlayerMemory {
 	private int conversations;
 	private long lastSeen;
+	private ChainState chain;
 	private final List<MemoryEvent> events = new ArrayList<>();
 	private final List<HearsayEvent> hearsay = new ArrayList<>();
 }
