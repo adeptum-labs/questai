@@ -25,6 +25,9 @@ import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.quest.QuestManager;
 import com.adeptum.questai.service.QuestGenerationService;
 import com.adeptum.questai.utility.AiChat;
+import com.adeptum.questai.villager.MemoryEvent;
+import com.adeptum.questai.villager.MemorySummarizer;
+import com.adeptum.questai.villager.VillagerProfile;
 import com.adeptum.questai.villager.VillagerProfileStore;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import java.util.Map;
@@ -94,7 +97,12 @@ public class ConversationManager {
 		conversations.put(player.getUniqueId(), state);
 		player.openInventory(DialogueGui.createThinking(npcName, profession));
 
-		final String prompt = DialoguePrompts.greeting(npcName, profession);
+		final String context = contextFor(npcUuid, player);
+		if (profileStore != null) {
+			profileStore.recordConversation(npcUuid, player.getUniqueId());
+		}
+
+		final String prompt = DialoguePrompts.greeting(npcName, profession, context);
 		Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
 			try {
 				final String response = callAi(prompt);
@@ -200,6 +208,8 @@ public class ConversationManager {
 					.quest(quest)
 					.timestamp(System.currentTimeMillis())
 					.build());
+			recordQuestEvent(state.getNpcUuid(), player,
+				MemoryEvent.Type.QUEST_ACCEPTED, quest);
 
 			if (questAcceptHandler != null) {
 				questAcceptHandler.accept(player, quest);
@@ -212,6 +222,8 @@ public class ConversationManager {
 
 		} else if (slot == DialogueGui.OPTION_4_SLOT) {
 			questManager.setVillagerData(state.getNpcUuid(), null);
+			recordQuestEvent(state.getNpcUuid(), player,
+				MemoryEvent.Type.QUEST_REJECTED, quest);
 			player.sendMessage("\u00a7cYou have rejected the quest: "
 				+ quest.getShortTitle());
 			player.playSound(player.getLocation(),
@@ -246,10 +258,11 @@ public class ConversationManager {
 			questService.generateRandomObjective(),
 			state.getNpcUuid(),
 			player.getWorld());
+		final String context = contextFor(state.getNpcUuid(), player);
 
 		questService.generateQuestDescription(quest, () -> {
 			final String narrativePrompt =
-				DialoguePrompts.questNarrative(npcName, profession, quest);
+				DialoguePrompts.questNarrative(npcName, profession, quest, context);
 
 			Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
 				try {
@@ -298,9 +311,10 @@ public class ConversationManager {
 		player.openInventory(DialogueGui.createThinking(npcName, profession));
 
 		final boolean canOfferHelp = state.isQuestAvailable();
+		final String context = contextFor(state.getNpcUuid(), player);
 		final String prompt = canOfferHelp
-			? DialoguePrompts.casualChatWithQuestHint(npcName, profession)
-			: DialoguePrompts.casualChat(npcName, profession);
+			? DialoguePrompts.casualChatWithQuestHint(npcName, profession, context)
+			: DialoguePrompts.casualChat(npcName, profession, context);
 
 		Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
 			try {
@@ -332,6 +346,24 @@ public class ConversationManager {
 
 	private String callAi(final String prompt) {
 		return AiChat.ask(chatModel, prompt, "...");
+	}
+
+	private String contextFor(final UUID npcUuid, final Player player) {
+		if (profileStore == null) {
+			return "";
+		}
+		final VillagerProfile profile = profileStore.get(npcUuid);
+		return profile == null ? ""
+			: MemorySummarizer.context(profile, player.getUniqueId());
+	}
+
+	private void recordQuestEvent(final UUID npcUuid, final Player player,
+		final MemoryEvent.Type type, final Quest quest) {
+
+		if (profileStore != null) {
+			profileStore.recordEvent(npcUuid, player.getUniqueId(),
+				type, quest.getShortTitle());
+		}
 	}
 
 	private void openVillagerTrade(final Player player, final UUID npcUuid) {

@@ -1,0 +1,96 @@
+/*
+ * Copyright (C) 2026 Adeptum AB, org nr. 559494-1824
+ *
+ * This file is part of QuestAI.
+ *
+ * QuestAI is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * QuestAI is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with QuestAI. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+package com.adeptum.questai.villager;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * Builds the compact personality-and-history context that is appended to
+ * dialogue prompts. Bounded in both event count and total length so prompt
+ * token usage stays flat.
+ */
+public final class MemorySummarizer {
+
+	private static final int MAX_EVENT_CLAUSES = 4;
+	private static final int MAX_LENGTH = 400;
+
+	private MemorySummarizer() {
+	}
+
+	/**
+	 * Returns a short prompt fragment describing the villager's personality
+	 * and what it remembers about the given player, or an empty string when
+	 * there is nothing to tell.
+	 */
+	public static String context(final VillagerProfile profile, final UUID playerId) {
+		if (profile == null) {
+			return "";
+		}
+
+		final List<String> parts = new ArrayList<>();
+		if (!profile.getTraits().isEmpty()) {
+			parts.add("Your personality: "
+				+ String.join("; ", profile.getTraits()) + ".");
+		}
+
+		final PlayerMemory memory = profile.getPlayers().get(playerId);
+		if (memory != null && memory.getConversations() > 0) {
+			parts.add("You have talked with this player "
+				+ memory.getConversations() + " time(s) before.");
+		}
+
+		final int baseParts = parts.size();
+		parts.addAll(eventClauses(memory));
+
+		// Enforce the length cap by dropping the oldest event clauses first
+		while (parts.size() > baseParts
+			&& String.join(" ", parts).length() > MAX_LENGTH) {
+			parts.remove(parts.size() - 1);
+		}
+		return String.join(" ", parts);
+	}
+
+	private static List<String> eventClauses(final PlayerMemory memory) {
+		if (memory == null) {
+			return List.of();
+		}
+		final List<String> clauses = new ArrayList<>();
+		final List<MemoryEvent> events = memory.getEvents();
+		for (int i = events.size() - 1;
+			i >= 0 && clauses.size() < MAX_EVENT_CLAUSES; i--) {
+			clauses.add(describe(events.get(i)));
+		}
+		return clauses;
+	}
+
+	private static String describe(final MemoryEvent event) {
+		return switch (event.type()) {
+			case QUEST_COMPLETED ->
+				"They completed your quest '" + event.questTitle() + "'.";
+			case QUEST_REJECTED ->
+				"They refused your quest '" + event.questTitle() + "'.";
+			case QUEST_ACCEPTED ->
+				"They agreed to help with '" + event.questTitle() + "'.";
+		};
+	}
+}

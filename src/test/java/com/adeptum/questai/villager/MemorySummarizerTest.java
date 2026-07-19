@@ -1,0 +1,117 @@
+/*
+ * Copyright (C) 2026 Adeptum AB, org nr. 559494-1824
+ *
+ * This file is part of QuestAI.
+ *
+ * QuestAI is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * QuestAI is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with QuestAI. If not, see
+ * <https://www.gnu.org/licenses/>.
+ */
+
+package com.adeptum.questai.villager;
+
+import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class MemorySummarizerTest {
+
+	private static final UUID PLAYER = UUID.randomUUID();
+
+	@Test
+	void nullProfileYieldsEmptyContext() {
+		assertEquals("", MemorySummarizer.context(null, PLAYER));
+	}
+
+	@Test
+	void profileWithoutTraitsOrMemoryYieldsEmptyContext() {
+		final VillagerProfile profile =
+			VillagerProfile.builder().name("Edric Stone").build();
+
+		assertEquals("", MemorySummarizer.context(profile, PLAYER));
+	}
+
+	@Test
+	void traitsAndConversationsAreDescribed() {
+		final VillagerProfile profile = VillagerProfile.builder()
+			.name("Edric Stone")
+			.traits(List.of("gruff", "kind"))
+			.build();
+		final PlayerMemory memory = new PlayerMemory();
+		memory.setConversations(3);
+		profile.getPlayers().put(PLAYER, memory);
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+		assertTrue(context.contains("Your personality: gruff; kind."));
+		assertTrue(context.contains("talked with this player 3 time(s)"));
+	}
+
+	@Test
+	void eventsAreNewestFirstAndCappedAtFour() {
+		final VillagerProfile profile =
+			VillagerProfile.builder().name("Edric Stone").build();
+		final PlayerMemory memory = new PlayerMemory();
+		for (int i = 0; i < 6; i++) {
+			memory.getEvents().add(new MemoryEvent(
+				MemoryEvent.Type.QUEST_COMPLETED, "Quest " + i, i));
+		}
+		profile.getPlayers().put(PLAYER, memory);
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+		assertTrue(context.indexOf("Quest 5") < context.indexOf("Quest 2"));
+		assertTrue(context.contains("Quest 2"));
+		assertFalse(context.contains("Quest 1"));
+		assertFalse(context.contains("Quest 0"));
+	}
+
+	@Test
+	void eventTypesUseDistinctPhrasing() {
+		final VillagerProfile profile =
+			VillagerProfile.builder().name("Edric Stone").build();
+		final PlayerMemory memory = new PlayerMemory();
+		memory.getEvents().add(new MemoryEvent(
+			MemoryEvent.Type.QUEST_ACCEPTED, "Hunt", 1));
+		memory.getEvents().add(new MemoryEvent(
+			MemoryEvent.Type.QUEST_REJECTED, "Chores", 2));
+		memory.getEvents().add(new MemoryEvent(
+			MemoryEvent.Type.QUEST_COMPLETED, "Harvest", 3));
+		profile.getPlayers().put(PLAYER, memory);
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+		assertTrue(context.contains("agreed to help with 'Hunt'"));
+		assertTrue(context.contains("refused your quest 'Chores'"));
+		assertTrue(context.contains("completed your quest 'Harvest'"));
+	}
+
+	@Test
+	void overlongContextDropsOldestEventClauses() {
+		final VillagerProfile profile = VillagerProfile.builder()
+			.name("Edric Stone")
+			.traits(List.of("gruff"))
+			.build();
+		final PlayerMemory memory = new PlayerMemory();
+		final String longTitle = "T".repeat(150);
+		for (int i = 0; i < 4; i++) {
+			memory.getEvents().add(new MemoryEvent(
+				MemoryEvent.Type.QUEST_COMPLETED, longTitle + i, i));
+		}
+		profile.getPlayers().put(PLAYER, memory);
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+		assertTrue(context.length() <= 400 + 20);
+		assertTrue(context.contains("Your personality: gruff."));
+		assertTrue(context.contains(longTitle + "3"));
+	}
+}

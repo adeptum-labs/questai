@@ -30,15 +30,17 @@ public final class DialoguePrompts {
 	private DialoguePrompts() {
 	}
 
-	public static String greeting(final String npcName, final String profession) {
+	public static String greeting(final String npcName, final String profession,
+		final String context) {
+
 		return ("You are %s, a %s in a Minecraft village. A player has approached you. "
 			+ "Give a brief, in-character greeting (1-2 sentences). Be warm but match "
 			+ "your profession's personality. Output ONLY the greeting text, no quotes.")
-				.formatted(npcName, profession);
+				.formatted(npcName, profession) + contextSuffix(context, true);
 	}
 
 	public static String questNarrative(final String npcName, final String profession,
-		final Quest quest) {
+		final Quest quest, final String context) {
 
 		final String described = quest.getObjective().describe();
 		final String objectiveDesc =
@@ -49,19 +51,22 @@ public final class DialoguePrompts {
 			+ "2-3 sentences as if asking for help. Stay in character. "
 			+ "Output ONLY the dialogue text, no quotes.")
 				.formatted(npcName, profession, objectiveDesc,
-					quest.getRewardAmount(), quest.getRewardTarget());
+					quest.getRewardAmount(), quest.getRewardTarget())
+			+ contextSuffix(context, false);
 	}
 
-	public static String casualChat(final String npcName, final String profession) {
+	public static String casualChat(final String npcName, final String profession,
+		final String context) {
+
 		return ("You are %s, a %s in a Minecraft village. The player wants to chat. "
 			+ "Share something interesting, funny, or mysterious about your life or "
 			+ "the village. 1-2 sentences. Stay in character. "
 			+ "Output ONLY the dialogue text, no quotes.")
-				.formatted(npcName, profession);
+				.formatted(npcName, profession) + contextSuffix(context, false);
 	}
 
 	public static String casualChatWithQuestHint(final String npcName,
-		final String profession) {
+		final String profession, final String context) {
 
 		return ("You are %s, a %s in a Minecraft village. The player wants to chat. "
 			+ "Share something interesting about your life, but subtly hint that you "
@@ -69,6 +74,18 @@ public final class DialoguePrompts {
 			+ "in detail — just hint that something is troubling you or that you need "
 			+ "assistance. 1-2 sentences. Stay in character. "
 			+ "Output ONLY the dialogue text, no quotes.")
-				.formatted(npcName, profession);
+				.formatted(npcName, profession) + contextSuffix(context, false);
+	}
+
+	private static String contextSuffix(final String context,
+		final boolean acknowledge) {
+
+		if (context == null || context.isBlank()) {
+			return "";
+		}
+		return " Personality and shared history: " + context
+			+ (acknowledge
+				? " If you have met this player before, acknowledge it naturally."
+				: "");
 	}
 }

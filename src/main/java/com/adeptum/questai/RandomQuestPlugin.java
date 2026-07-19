@@ -37,6 +37,7 @@ import com.adeptum.questai.quest.QuestProgress;
 import com.adeptum.questai.service.QuestGenerationService;
 import com.adeptum.questai.utility.AiChat;
 import com.adeptum.questai.utility.EnumUtil;
+import com.adeptum.questai.villager.MemoryEvent;
 import com.adeptum.questai.villager.VillagerPersona;
 import com.adeptum.questai.villager.VillagerProfileStore;
 import com.gmail.nossr50.api.ExperienceAPI;
@@ -168,7 +169,18 @@ public class RandomQuestPlugin implements SubPlugin {
 		}
 		questManager.setVillagerData(quest.getVillagerUuid(), null);
 		removeQuestIndicator(quest.getVillagerUuid());
-		player.sendMessage(message);
+
+		String completionMessage = message;
+		if (quest.getVillagerUuid() != null) {
+			profileStore.recordEvent(quest.getVillagerUuid(), player.getUniqueId(),
+				MemoryEvent.Type.QUEST_COMPLETED, quest.getShortTitle());
+			final String giverName = profileStore.getName(quest.getVillagerUuid());
+			if (giverName != null) {
+				completionMessage = message + " §7— §a" + giverName
+					+ "§7 is grateful.";
+			}
+		}
+		player.sendMessage(completionMessage);
 		rewardPlayer(player, quest);
 		return true;
 	}

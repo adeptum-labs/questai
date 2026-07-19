@@ -30,11 +30,23 @@ class DialoguePromptsTest {
 
 	@Test
 	void greetingContainsNpcNameAndProfession() {
-		final String prompt = DialoguePrompts.greeting("Edric Stone", "FARMER");
+		final String prompt = DialoguePrompts.greeting("Edric Stone", "FARMER", "");
 
 		assertTrue(prompt.contains("Edric Stone"));
 		assertTrue(prompt.contains("FARMER"));
 		assertTrue(prompt.contains("greeting"));
+		assertFalse(prompt.contains("shared history"));
+	}
+
+	@Test
+	void greetingEmbedsContextWhenPresent() {
+		final String prompt = DialoguePrompts.greeting("Edric Stone", "FARMER",
+			"Your personality: gruff. They completed your quest 'Turnips'.");
+
+		assertTrue(prompt.contains("Personality and shared history:"));
+		assertTrue(prompt.contains("gruff"));
+		assertTrue(prompt.contains("Turnips"));
+		assertTrue(prompt.contains("acknowledge it naturally"));
 	}
 
 	@Test
@@ -49,7 +61,7 @@ class DialoguePromptsTest {
 		quest.setRewardAmount(150);
 
 		final String prompt = DialoguePrompts.questNarrative(
-			"Edric Stone", "FARMER", quest);
+			"Edric Stone", "FARMER", quest, "");
 
 		assertTrue(prompt.contains("Edric Stone"));
 		assertTrue(prompt.contains("ZOMBIE"));
@@ -57,8 +69,27 @@ class DialoguePromptsTest {
 	}
 
 	@Test
+	void questNarrativeEmbedsContextWithoutAcknowledgeHint() {
+		final Quest quest = new Quest();
+		final QuestObjective obj = new QuestObjective();
+		obj.setType(QuestObjective.Type.KILL);
+		obj.setTarget("ZOMBIE");
+		obj.setAmount(10);
+		quest.setObjective(obj);
+		quest.setRewardTarget("MINING");
+		quest.setRewardAmount(150);
+
+		final String prompt = DialoguePrompts.questNarrative(
+			"Edric Stone", "FARMER", quest, "Your personality: gruff.");
+
+		assertTrue(prompt.contains("Personality and shared history:"));
+		assertFalse(prompt.contains("acknowledge it naturally"));
+	}
+
+	@Test
 	void casualChatContainsNpcName() {
-		final String prompt = DialoguePrompts.casualChat("Mira Bloom", "LIBRARIAN");
+		final String prompt =
+			DialoguePrompts.casualChat("Mira Bloom", "LIBRARIAN", "");
 
 		assertTrue(prompt.contains("Mira Bloom"));
 		assertTrue(prompt.contains("LIBRARIAN"));
@@ -67,7 +98,7 @@ class DialoguePromptsTest {
 	@Test
 	void casualChatWithQuestHintContainsHelpInstruction() {
 		final String prompt =
-			DialoguePrompts.casualChatWithQuestHint("Mira Bloom", "LIBRARIAN");
+			DialoguePrompts.casualChatWithQuestHint("Mira Bloom", "LIBRARIAN", "");
 
 		assertTrue(prompt.contains("Mira Bloom"));
 		assertTrue(prompt.contains("LIBRARIAN"));
