@@ -125,6 +125,7 @@ public final class VillagerProfileStore {
 		}
 	}
 
+	@SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
 	private List<GossipSpreader.Snapshot> snapshots() {
 		final List<GossipSpreader.Snapshot> snapshots = new ArrayList<>();
 		for (final Map.Entry<UUID, VillagerProfile> entry : profiles.entrySet()) {
@@ -462,6 +463,11 @@ public final class VillagerProfileStore {
 			cfg.set(base + ".location.y", loc.y());
 			cfg.set(base + ".location.z", loc.z());
 		}
+		savePlayers(cfg, base, profile);
+	}
+
+	private void savePlayers(final YamlConfiguration cfg, final String base,
+		final VillagerProfile profile) {
 
 		for (final Map.Entry<UUID, PlayerMemory> entry
 			: profile.getPlayers().entrySet()) {
