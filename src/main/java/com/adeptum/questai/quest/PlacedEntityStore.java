@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -46,7 +45,7 @@ public final class PlacedEntityStore {
 
 	private final JavaPlugin plugin;
 	private final File file;
-	private final List<Entry> entries = new CopyOnWriteArrayList<>();
+	private final List<Entry> entries = new ArrayList<>();
 
 	public enum Kind { CHEST, HIDDEN_NPC }
 

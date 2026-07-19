@@ -38,6 +38,15 @@ class EnumUtilTest {
 	}
 
 	@Test
+	void randomArrayReturnsContainedElement() {
+		final String[] values = {"A", "B", "C"};
+		for (int i = 0; i < 100; i++) {
+			final String result = EnumUtil.random(values);
+			assertTrue(result.equals("A") || result.equals("B") || result.equals("C"));
+		}
+	}
+
+	@Test
 	void randomCoversAllValues() {
 		final EnumSet<QuestObjective.Type> seen =
 			EnumSet.noneOf(QuestObjective.Type.class);

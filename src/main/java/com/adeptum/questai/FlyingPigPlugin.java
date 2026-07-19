@@ -37,8 +37,9 @@ import org.bukkit.entity.Pig;
 import org.bukkit.plugin.java.JavaPlugin;
 
 @Slf4j
-public class FlyingPigPlugin implements SubPlugin { // Implement Listener interface
+public class FlyingPigPlugin implements SubPlugin {
 	private static final Vector UPWARD_VELOCITY = new Vector(0, 0.5, 0);
+	private static final Component FLYING_PIG_NAME = Component.text("Flying Pig");
 
 	private final Random random = new Random();
 	private final JavaPlugin plugin;
@@ -102,7 +103,7 @@ public class FlyingPigPlugin implements SubPlugin { // Implement Listener interf
 
 	private void spawnFlyingPig(World world, Location location) {
 		Pig pig = (Pig) world.spawnEntity(location, EntityType.PIG);
-		pig.customName(Component.text("Flying Pig"));
+		pig.customName(FLYING_PIG_NAME);
 		pig.setCustomNameVisible(true);
 		pig.setGravity(false);
 		pig.setVelocity(UPWARD_VELOCITY);
@@ -119,15 +120,15 @@ public class FlyingPigPlugin implements SubPlugin { // Implement Listener interf
 		@Override
 		public void run() {
 			for (World world : Bukkit.getWorlds()) {
-				world.getEntitiesByClass(Pig.class).stream().filter(pig -> {
-					return Component.text("Flying Pig").equals(pig.customName());
-				}).forEach(pig -> {
-					if (pig.getLocation().getY() < 80) {
-						pig.setVelocity(UPWARD_VELOCITY);
-					} else {
-						pig.setVelocity(createRandomHorizontalVelocity());
-					}
-				});
+				world.getEntitiesByClass(Pig.class).stream()
+					.filter(pig -> FLYING_PIG_NAME.equals(pig.customName()))
+					.forEach(pig -> {
+						if (pig.getLocation().getY() < 80) {
+							pig.setVelocity(UPWARD_VELOCITY);
+						} else {
+							pig.setVelocity(createRandomHorizontalVelocity());
+						}
+					});
 			}
 		}
 	}

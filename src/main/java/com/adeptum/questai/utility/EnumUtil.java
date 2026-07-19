@@ -29,7 +29,10 @@ public final class EnumUtil {
 	}
 
 	public static <T extends Enum<?>> T random(Class<T> clazz) {
-		int x = SECURE_RANDOM.nextInt(clazz.getEnumConstants().length);
-		return clazz.getEnumConstants()[x];
+		return random(clazz.getEnumConstants());
+	}
+
+	public static <T> T random(T[] values) {
+		return values[SECURE_RANDOM.nextInt(values.length)];
 	}
 }

@@ -36,6 +36,7 @@ import com.adeptum.questai.quest.QuestManager;
 import com.adeptum.questai.quest.QuestProgress;
 import com.adeptum.questai.service.QuestGenerationService;
 import com.adeptum.questai.utility.AiChat;
+import com.adeptum.questai.utility.EnumUtil;
 import com.gmail.nossr50.api.ExperienceAPI;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import java.io.File;
@@ -486,13 +487,13 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		// Always give 2-3 common drops, 1-2 uncommon, and a 15% rare
 		for (int i = 0; i < 2 + rng.nextInt(2); i++) {
-			inv.addItem(common[rng.nextInt(common.length)].clone());
+			inv.addItem(EnumUtil.random(common).clone());
 		}
 		for (int i = 0; i < 1 + rng.nextInt(2); i++) {
-			inv.addItem(uncommon[rng.nextInt(uncommon.length)].clone());
+			inv.addItem(EnumUtil.random(uncommon).clone());
 		}
 		if (rng.nextDouble() < 0.15) {
-			inv.addItem(rare[rng.nextInt(rare.length)].clone());
+			inv.addItem(EnumUtil.random(rare).clone());
 		}
 	}
 

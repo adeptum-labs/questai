@@ -177,12 +177,22 @@ public class QuestManager {
 		logger.info("[QuestManager] abandonQuest() -> Player "
 			+ player.getName() + " abandoned quest: " + quest.getShortTitle());
 
+		removePlayerIfEmpty(player, quests);
+		return quest;
+	}
+
+	/**
+	 * Drops all per-player quest bookkeeping once the player's quest list
+	 * is empty: the quest map entry, the update task and the log book.
+	 */
+	private void removePlayerIfEmpty(final Player player,
+		final List<QuestProgress> quests) {
+
 		if (quests.isEmpty()) {
 			playerQuests.remove(player.getUniqueId());
 			cancelQuestTask(player);
 			questLogBook.remove(player);
 		}
-		return quest;
 	}
 
 	/**
@@ -232,11 +242,7 @@ public class QuestManager {
 		logger.info("[QuestManager] completeQuest() -> Player "
 			+ player.getName() + " completed quest: " + quest.getShortTitle());
 
-		if (quests.isEmpty()) {
-			playerQuests.remove(player.getUniqueId());
-			cancelQuestTask(player);
-			questLogBook.remove(player);
-		}
+		removePlayerIfEmpty(player, quests);
 		return true;
 	}
 
@@ -278,14 +284,7 @@ public class QuestManager {
 				continue;
 			}
 
-			updateTimerBar(progress, remaining);
-
-			final Quest quest = progress.getQuest();
-			if (quest.getObjective().getType().needsDestination()) {
-				updateDistanceProgress(player, progress, quest);
-			} else if (quest.getObjective().getType().isCountable()) {
-				updateCountProgress(progress);
-			}
+			updateBars(player, progress, remaining);
 		}
 
 		if (!expired.isEmpty()) {
@@ -300,59 +299,55 @@ public class QuestManager {
 					}
 					quests.remove(progress);
 				}
-				if (quests.isEmpty()) {
-					playerQuests.remove(player.getUniqueId());
-					cancelQuestTask(player);
-					questLogBook.remove(player);
-				}
+				removePlayerIfEmpty(player, quests);
 			});
 		}
 	}
 
-	private void updateTimerBar(final QuestProgress progress, final long remaining) {
-		final double timerProgress =
+	/**
+	 * Computes both boss bar states for a quest and applies them with a
+	 * single scheduled main-thread task.
+	 */
+	private void updateBars(final Player player, final QuestProgress progress,
+		final long remaining) {
+
+		final double timerPercent =
 			Math.max(remaining / (double) QuestProgress.DURATION_MILLIS, 0);
+		final String timerTitle = "Time Remaining: " + formatTime(remaining);
+
+		final Quest quest = progress.getQuest();
+		final double objectivePercent;
+		final String objectiveTitle;
+
+		if (quest.getObjective().getType().needsDestination()) {
+			final Location dest = quest.getDestination();
+			final double distance = player.getLocation().distance(dest);
+			objectivePercent = clamp(1.0 - distance / progress.getMaxDistance());
+			objectiveTitle = "Distance to Destination: "
+				+ String.format("%.2f", distance) + " blocks";
+		} else {
+			final int current = progress.getCurrent();
+			final int required = quest.getObjective().getAmount();
+			objectivePercent = clamp((double) current / required);
+			objectiveTitle = "Objective Progress: " + current + "/" + required;
+		}
+
 		Bukkit.getScheduler().runTask(plugin, () -> {
-			final BossBar bar = progress.getTimerBossBar();
-			if (bar != null) {
-				bar.setProgress(timerProgress);
-				bar.setTitle("Time Remaining: " + formatTime(remaining));
+			final BossBar timerBar = progress.getTimerBossBar();
+			if (timerBar != null) {
+				timerBar.setProgress(timerPercent);
+				timerBar.setTitle(timerTitle);
+			}
+			final BossBar objectiveBar = progress.getObjectiveBossBar();
+			if (objectiveBar != null) {
+				objectiveBar.setProgress(objectivePercent);
+				objectiveBar.setTitle(objectiveTitle);
 			}
 		});
 	}
 
-	private void updateDistanceProgress(final Player player,
-		final QuestProgress progress, final Quest quest) {
-
-		final Location dest = quest.getDestination();
-		final Location playerLoc = player.getLocation();
-		final double distance = playerLoc.distance(dest);
-		final double progressPercent = Math.min(
-			Math.max(1.0 - (distance / progress.getMaxDistance()), 0.0), 1.0);
-
-		Bukkit.getScheduler().runTask(plugin, () -> {
-			final BossBar bar = progress.getObjectiveBossBar();
-			if (bar != null) {
-				bar.setProgress(progressPercent);
-				bar.setTitle("Distance to Destination: "
-					+ String.format("%.2f", distance) + " blocks");
-			}
-		});
-	}
-
-	private void updateCountProgress(final QuestProgress progress) {
-		final int current = progress.getCurrent();
-		final int required = progress.getQuest().getObjective().getAmount();
-		final double progressPercent = Math.min(
-			Math.max((double) current / required, 0.0), 1.0);
-
-		Bukkit.getScheduler().runTask(plugin, () -> {
-			final BossBar bar = progress.getObjectiveBossBar();
-			if (bar != null) {
-				bar.setProgress(progressPercent);
-				bar.setTitle("Objective Progress: " + current + "/" + required);
-			}
-		});
+	private static double clamp(final double value) {
+		return Math.min(Math.max(value, 0.0), 1.0);
 	}
 
 	private String formatTime(final long millis) {

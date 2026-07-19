@@ -21,6 +21,7 @@
 package com.adeptum.questai;
 
 import com.adeptum.questai.model.VillageInfo;
+import com.adeptum.questai.utility.EnumUtil;
 import java.util.Set;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -158,10 +159,8 @@ public class AutoVillagerPlugin implements SubPlugin {
 
 			Villager villager = (Villager) world.spawnEntity(spawnLoc, EntityType.VILLAGER);
 
-			// Random mood
-			String mood = MOODS[ThreadLocalRandom.current().nextInt(MOODS.length)];
-			// Random profession
-			Villager.Profession prof = PROFESSIONS[ThreadLocalRandom.current().nextInt(PROFESSIONS.length)];
+			String mood = EnumUtil.random(MOODS);
+			Villager.Profession prof = EnumUtil.random(PROFESSIONS);
 
 			villager.setPersistent(true);
 			villager.setProfession(prof);

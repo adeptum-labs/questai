@@ -63,10 +63,10 @@ public class QuestGenerationService {
 		objective.setType(type);
 
 		if (type == KILL) {
-			objective.setTarget(MOBS[ThreadLocalRandom.current().nextInt(MOBS.length)]);
+			objective.setTarget(EnumUtil.random(MOBS));
 			objective.setAmount(ThreadLocalRandom.current().nextInt(3, 51));
 		} else if (type == COLLECT) {
-			objective.setTarget(ITEMS[ThreadLocalRandom.current().nextInt(ITEMS.length)]);
+			objective.setTarget(EnumUtil.random(ITEMS));
 			objective.setAmount(ThreadLocalRandom.current().nextInt(3, 51));
 		} else {
 			objective.setTarget("NONE");
@@ -79,8 +79,7 @@ public class QuestGenerationService {
 	public Quest buildQuest(final QuestObjective objective, final UUID npcUuid,
 		final World world) {
 
-		final String rewardSkill =
-			SKILLS[ThreadLocalRandom.current().nextInt(SKILLS.length)];
+		final String rewardSkill = EnumUtil.random(SKILLS);
 		final int rewardXP = ThreadLocalRandom.current().nextInt(50, 201);
 
 		final Quest quest = new Quest();
