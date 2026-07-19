@@ -61,8 +61,13 @@ public final class MemorySummarizer {
 
 		final int baseParts = parts.size();
 		parts.addAll(eventClauses(memory));
+		return capLength(parts, baseParts);
+	}
 
-		// Enforce the length cap by dropping the oldest event clauses first
+	/**
+	 * Enforces the length cap by dropping the oldest event clauses first.
+	 */
+	private static String capLength(final List<String> parts, final int baseParts) {
 		while (parts.size() > baseParts
 			&& String.join(" ", parts).length() > MAX_LENGTH) {
 			parts.remove(parts.size() - 1);

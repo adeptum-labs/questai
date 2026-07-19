@@ -65,11 +65,16 @@ public record VillagerPersona(String name, List<String> traits, String greeting)
 		final String name = lines.isEmpty() ? "Villager" : lines.get(0);
 		final List<String> traits =
 			lines.size() > 1 ? parseTraits(lines.get(1)) : List.of();
-		String greeting = lines.size() > 2 ? lines.get(2) : null;
-		if (greeting != null && greeting.length() > MAX_GREETING_LENGTH) {
-			greeting = greeting.substring(0, MAX_GREETING_LENGTH);
+		return new VillagerPersona(name, traits, parseGreeting(lines));
+	}
+
+	private static String parseGreeting(final List<String> lines) {
+		if (lines.size() <= 2) {
+			return null;
 		}
-		return new VillagerPersona(name, traits, greeting);
+		final String greeting = lines.get(2);
+		return greeting.length() > MAX_GREETING_LENGTH
+			? greeting.substring(0, MAX_GREETING_LENGTH) : greeting;
 	}
 
 	private static String clean(final String raw) {

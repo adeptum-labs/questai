@@ -32,7 +32,8 @@ public final class EnumUtil {
 		return random(clazz.getEnumConstants());
 	}
 
-	public static <T> T random(T[] values) {
+	@SafeVarargs
+	public static <T> T random(T... values) {
 		return values[SECURE_RANDOM.nextInt(values.length)];
 	}
 }

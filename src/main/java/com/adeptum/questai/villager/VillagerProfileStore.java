@@ -230,19 +230,7 @@ public final class VillagerProfileStore {
 
 		int migrated = 0;
 		for (final String key : legacy.getKeys(false)) {
-			try {
-				final UUID villagerId = UUID.fromString(key);
-				final String name = legacy.getString(key);
-				if (name != null && !profiles.containsKey(villagerId)) {
-					profiles.put(villagerId,
-						VillagerProfile.builder().name(name).build());
-					migrated++;
-				}
-			} catch (IllegalArgumentException e) {
-				plugin.getLogger().log(Level.WARNING,
-					"[VillagerProfileStore] Skipping malformed legacy name "
-						+ key, e);
-			}
+			migrated += migrateLegacyName(key, legacy.getString(key));
 		}
 
 		save();
@@ -255,6 +243,21 @@ public final class VillagerProfileStore {
 		}
 		plugin.getLogger().info("[VillagerProfileStore] Migrated " + migrated
 			+ " legacy villager name(s).");
+	}
+
+	private int migrateLegacyName(final String key, final String name) {
+		try {
+			final UUID villagerId = UUID.fromString(key);
+			if (name != null && !profiles.containsKey(villagerId)) {
+				profiles.put(villagerId,
+					VillagerProfile.builder().name(name).build());
+				return 1;
+			}
+		} catch (IllegalArgumentException e) {
+			plugin.getLogger().log(Level.WARNING,
+				"[VillagerProfileStore] Skipping malformed legacy name " + key, e);
+		}
+		return 0;
 	}
 
 	public synchronized void save() {

@@ -23,7 +23,6 @@ package com.adeptum.questai.service;
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
 import dev.langchain4j.model.openai.OpenAiChatModel;
-import java.util.EnumSet;
 import java.util.UUID;
 import org.bukkit.Location;
 import org.bukkit.World;

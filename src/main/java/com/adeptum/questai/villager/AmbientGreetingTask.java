@@ -46,7 +46,7 @@ public final class AmbientGreetingTask implements Runnable {
 	private final ConversationManager conversationManager;
 	private final Map<PairKey, Long> lastGreeted = new HashMap<>();
 
-	record PairKey(UUID villager, UUID player) {
+	/* default */ record PairKey(UUID villager, UUID player) {
 	}
 
 	public AmbientGreetingTask(final VillagerProfileStore profileStore,
@@ -91,7 +91,7 @@ public final class AmbientGreetingTask implements Runnable {
 	/**
 	 * Checks and records the greeting cooldown for a villager-player pair.
 	 */
-	boolean shouldGreet(final PairKey key, final long now) {
+	/* default */ boolean shouldGreet(final PairKey key, final long now) {
 		final Long last = lastGreeted.get(key);
 		if (last != null && now - last < GREETING_COOLDOWN_MILLIS) {
 			return false;
