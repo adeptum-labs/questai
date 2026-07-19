@@ -173,6 +173,12 @@ public class ResourcePackManager {
 	}
 
 	private byte[] buildPack(final Logger logger) {
+		final Map<String, byte[]> files = packEntries();
+		logger.info("[ResourcePack] Built pack with " + files.size() + " entries.");
+		return zip(files);
+	}
+
+	/* default */ static Map<String, byte[]> packEntries() {
 		final Map<String, byte[]> files = new LinkedHashMap<>();
 
 		files.put("pack.mcmeta", utf8(
@@ -224,11 +230,10 @@ public class ResourcePackManager {
 		// start of the dialogue inventory title, overriding vanilla rendering.
 		registerDialogueFont(files);
 
-		logger.info("[ResourcePack] Built pack with " + files.size() + " entries.");
-		return zip(files);
+		return files;
 	}
 
-	private void registerRelics(final Map<String, byte[]> files) {
+	private static void registerRelics(final Map<String, byte[]> files) {
 		relicItem(files, QuestRelic.ELDERS_QUILL, TextureGenerator.relicQuill());
 		relicItem(files, QuestRelic.PROSPECTORS_CHARM, TextureGenerator.relicCharm());
 		relicItem(files, QuestRelic.WAYFARERS_COMPASS,
@@ -238,8 +243,8 @@ public class ResourcePackManager {
 		relicItem(files, QuestRelic.PEDDLERS_BELL, TextureGenerator.relicBell());
 	}
 
-	private void relicItem(final Map<String, byte[]> files, final QuestRelic relic,
-		final byte[] texture) {
+	private static void relicItem(final Map<String, byte[]> files,
+		final QuestRelic relic, final byte[] texture) {
 
 		final String itemName = relic.getMaterial().name().toLowerCase(Locale.ROOT);
 		vanillaOverride(files, itemName, "item/" + itemName,
@@ -247,7 +252,7 @@ public class ResourcePackManager {
 		customItem(files, "relic_" + relic.getId(), texture);
 	}
 
-	private void registerDialogueFont(final Map<String, byte[]> files) {
+	private static void registerDialogueFont(final Map<String, byte[]> files) {
 		files.put("assets/questai/textures/font/dialogue_banner.png",
 			TextureGenerator.dialogueBanner());
 
@@ -263,7 +268,7 @@ public class ResourcePackManager {
 		files.put("assets/questai/font/dialogue.json", utf8(provider));
 	}
 
-	private void vanillaOverride(final Map<String, byte[]> files,
+	private static void vanillaOverride(final Map<String, byte[]> files,
 		final String itemName, final String vanillaTexture,
 		final Object... cmdModelPairs) {
 
@@ -288,7 +293,7 @@ public class ResourcePackManager {
 			utf8(sb.toString()));
 	}
 
-	private void customItem(final Map<String, byte[]> files,
+	private static void customItem(final Map<String, byte[]> files,
 		final String name, final byte[] texture) {
 
 		final String model = "{\"parent\":\"minecraft:item/generated\","
