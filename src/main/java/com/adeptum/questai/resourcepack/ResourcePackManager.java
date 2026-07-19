@@ -21,6 +21,7 @@
 package com.adeptum.questai.resourcepack;
 
 import com.adeptum.questai.relic.QuestRelic;
+import com.adeptum.questai.star.StarFragment;
 import com.sun.net.httpserver.HttpServer;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -214,6 +215,10 @@ public class ResourcePackManager {
 		customItem(files, "dialogue_paper", TextureGenerator.dialoguePaper());
 
 		registerRelics(files);
+
+		vanillaOverride(files, "echo_shard", "item/echo_shard",
+			StarFragment.CMD, "questai:item/star_fragment");
+		customItem(files, "star_fragment", TextureGenerator.starFragment());
 
 		// Custom font: maps the banner glyph to a scroll emblem shown at the
 		// start of the dialogue inventory title, overriding vanilla rendering.

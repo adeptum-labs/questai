@@ -72,6 +72,10 @@ final class TextureGenerator {
 	private static final Color INK = new Color(0x202020);
 	private static final Color SKIN = new Color(0xC8A878);
 
+	private static final Color STAR_LIGHT = new Color(0xCFF6FF);
+	private static final Color STAR_MID = new Color(0x7FD6E8);
+	private static final Color STAR_DARK = new Color(0x3A8FA8);
+
 	private TextureGenerator() {
 	}
 
@@ -599,6 +603,47 @@ final class TextureGenerator {
 		setPixel(img, 2, 9, ICON_SHADOW);
 		setPixel(img, 14, 7, ICON_SHADOW);
 		setPixel(img, 13, 9, ICON_SHADOW);
+	}
+
+	/** The fallen star's prize: a pale glowing crystal shard. */
+	/* default */ static byte[] starFragment() {
+		final BufferedImage img = create();
+		drawShardBody(img);
+		drawShardSparkles(img);
+		return encode(img);
+	}
+
+	private static void drawShardBody(final BufferedImage img) {
+		// Faceted shard leaning from upper-right tip to lower-left base
+		setPixel(img, 10, 2, STAR_LIGHT);
+		fillRect(img, 9, 3, 2, 1, STAR_MID);
+		fillRect(img, 8, 4, 3, 1, STAR_MID);
+		fillRect(img, 6, 5, 5, 3, STAR_MID);
+		fillRect(img, 5, 8, 5, 2, STAR_MID);
+		fillRect(img, 4, 10, 4, 2, STAR_MID);
+		fillRect(img, 4, 12, 2, 1, STAR_MID);
+		// Highlight along the upper-left edge, shade lower-right
+		fillRect(img, 6, 5, 1, 3, STAR_LIGHT);
+		fillRect(img, 5, 8, 1, 2, STAR_LIGHT);
+		fillRect(img, 9, 9, 1, 1, STAR_DARK);
+		fillRect(img, 7, 11, 1, 1, STAR_DARK);
+		setPixel(img, 5, 12, STAR_DARK);
+		// Internal facet line running tip to base
+		for (int i = 0; i <= 8; i++) {
+			setPixel(img, 9 - (i * 5) / 8, 4 + i, STAR_DARK);
+		}
+	}
+
+	private static void drawShardSparkles(final BufferedImage img) {
+		setPixel(img, 13, 4, ICON_WHITE);
+		setPixel(img, 2, 6, ICON_WHITE);
+		setPixel(img, 12, 11, ICON_WHITE);
+		setPixel(img, 7, 1, ICON_WHITE);
+		// A soft glint beside each sparkle
+		setPixel(img, 14, 5, STAR_LIGHT);
+		setPixel(img, 3, 7, STAR_LIGHT);
+		setPixel(img, 13, 12, STAR_LIGHT);
+		setPixel(img, 8, 0, STAR_LIGHT);
 	}
 
 	// Drawing primitives

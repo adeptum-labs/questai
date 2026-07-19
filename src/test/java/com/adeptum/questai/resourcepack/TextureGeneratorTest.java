@@ -36,7 +36,8 @@ class TextureGeneratorTest {
 		TextureGenerator::relicCharm,
 		TextureGenerator::relicCompass,
 		TextureGenerator::relicLocket,
-		TextureGenerator::relicBell);
+		TextureGenerator::relicBell,
+		TextureGenerator::starFragment);
 
 	@Test
 	void relicTexturesDecodeAsSixteenPixelSprites() throws Exception {
