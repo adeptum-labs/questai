@@ -21,6 +21,7 @@
 package com.adeptum.questai;
 
 import static com.adeptum.questai.model.world.quest.QuestObjective.Type.COLLECT;
+import static com.adeptum.questai.model.world.quest.QuestObjective.Type.DELIVERY;
 import static com.adeptum.questai.model.world.quest.QuestObjective.Type.FIND_NPC;
 import static com.adeptum.questai.model.world.quest.QuestObjective.Type.KILL;
 import static com.adeptum.questai.model.world.quest.QuestObjective.Type.TREASURE;
@@ -30,6 +31,7 @@ import com.adeptum.questai.dialogue.DialogueGui;
 import com.adeptum.questai.model.world.Npc;
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
+import com.adeptum.questai.quest.DeliveryPackage;
 import com.adeptum.questai.quest.DestinationMarkerRenderer;
 import com.adeptum.questai.quest.PlacedEntityStore;
 import com.adeptum.questai.quest.QuestManager;
@@ -288,6 +290,10 @@ public class RandomQuestPlugin implements SubPlugin {
 			spawnHiddenVillager(quest.getDestination(), "Hidden NPC");
 			player.getInventory().addItem(
 				createMapItem(quest.getDestination(), "Find NPC"));
+		} else if (type == DELIVERY) {
+			player.getInventory().addItem(
+				createMapItem(quest.getDestination(), "Delivery"),
+				DeliveryPackage.create(quest.getObjective().getTarget()));
 		}
 	}
 	/**
@@ -306,6 +312,11 @@ public class RandomQuestPlugin implements SubPlugin {
 		if (type == FIND_NPC && dest != null) {
 			PlacedEntityStore.removeHiddenNpcsNear(dest);
 			placedEntityStore.forget(PlacedEntityStore.Kind.HIDDEN_NPC, dest);
+		}
+
+		if (type == DELIVERY) {
+			DeliveryPackage.removeOne(player.getInventory(),
+				quest.getObjective().getTarget());
 		}
 
 		// Remove quest maps from player inventory

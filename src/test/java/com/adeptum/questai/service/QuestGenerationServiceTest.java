@@ -140,6 +140,13 @@ class QuestGenerationServiceTest {
 		when(origin.getX()).thenReturn(0.0);
 		when(origin.getZ()).thenReturn(0.0);
 
+		// Fallback rolls before the delivery branch hit the random
+		// destination path, which needs a spawn location
+		when(world.getSpawnLocation()).thenReturn(mock(Location.class));
+		when(world.getChunkAt(anyInt(), anyInt()))
+			.thenReturn(mock(org.bukkit.Chunk.class));
+		when(world.getHighestBlockYAt(anyInt(), anyInt())).thenReturn(64);
+
 		try (var bukkit = mockStatic(org.bukkit.Bukkit.class)) {
 			bukkit.when(() -> org.bukkit.Bukkit.getWorld(worldId))
 				.thenReturn(world);
