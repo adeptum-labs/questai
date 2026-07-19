@@ -20,33 +20,17 @@
 
 package com.adeptum.questai.event;
 
-import com.adeptum.questai.villager.StoredLocation;
-import java.util.UUID;
-import org.junit.jupiter.api.Test;
+import com.adeptum.questai.model.VillageInfo;
+import org.bukkit.Location;
+import org.bukkit.entity.Player;
 
-import static org.junit.jupiter.api.Assertions.*;
+/**
+ * Receives the result of the periodic village scan so other systems can
+ * piggyback on it instead of scanning again. Called only when a village
+ * was actually detected around the player.
+ */
+@FunctionalInterface
+public interface VillageCheckListener {
 
-class FestivalStateTest {
-
-	private static final UUID WORLD = UUID.randomUUID();
-
-	private static FestivalState festival() {
-		return new FestivalState(VillageKey.from(WORLD, 0, 0),
-			new StoredLocation(WORLD, 0, 64, 0), 10_000L);
-	}
-
-	@Test
-	void activeUntilTheWindowEnds() {
-		assertTrue(festival().active(9_999L));
-		assertFalse(festival().active(10_000L));
-	}
-
-	@Test
-	void coversOnlyTheEventRadiusInTheSameWorld() {
-		final FestivalState festival = festival();
-
-		assertTrue(festival.covers(WORLD, 48, 0));
-		assertFalse(festival.covers(WORLD, 49, 0));
-		assertFalse(festival.covers(UUID.randomUUID(), 0, 0));
-	}
+	void onVillageCheck(Player player, Location location, VillageInfo info);
 }

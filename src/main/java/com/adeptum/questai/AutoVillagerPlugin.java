@@ -20,6 +20,7 @@
 
 package com.adeptum.questai;
 
+import com.adeptum.questai.event.VillageCheckListener;
 import com.adeptum.questai.model.VillageInfo;
 import com.adeptum.questai.utility.EnumUtil;
 import java.util.Set;
@@ -77,10 +78,14 @@ public class AutoVillagerPlugin implements SubPlugin {
 	);
 
 	private final JavaPlugin plugin;
+	private final VillageCheckListener villageCheckListener;
 
-	public AutoVillagerPlugin(JavaPlugin plugin) {
+	public AutoVillagerPlugin(JavaPlugin plugin,
+		VillageCheckListener villageCheckListener) {
+
 		super();
 		this.plugin = plugin;
+		this.villageCheckListener = villageCheckListener;
 	}
 
 	@Override
@@ -125,6 +130,7 @@ public class AutoVillagerPlugin implements SubPlugin {
 			// Not within a village; no action needed
 			return;
 		}
+		villageCheckListener.onVillageCheck(player, playerLoc, villageInfo);
 
 		int doorCount = villageInfo.doorCount();
 		int currentVillagerCount = villageInfo.villagerCount();

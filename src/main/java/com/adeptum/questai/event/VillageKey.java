@@ -33,7 +33,7 @@ public record VillageKey(UUID worldId, int cellX, int cellZ) {
 
 	private static final int CELL_SIZE = 64;
 
-	public static VillageKey of(final UUID worldId, final int blockX,
+	public static VillageKey from(final UUID worldId, final int blockX,
 		final int blockZ) {
 
 		return new VillageKey(worldId,

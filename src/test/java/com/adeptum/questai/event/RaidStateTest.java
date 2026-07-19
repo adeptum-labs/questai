@@ -32,7 +32,7 @@ class RaidStateTest {
 	private static final long DEADLINE = 10_000L;
 
 	private static RaidState raid(final Set<UUID> raiders) {
-		return new RaidState(VillageKey.of(UUID.randomUUID(), 0, 0),
+		return new RaidState(VillageKey.from(UUID.randomUUID(), 0, 0),
 			new StoredLocation(UUID.randomUUID(), 0, 64, 0), DEADLINE, raiders);
 	}
 

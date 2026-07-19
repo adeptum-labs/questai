@@ -81,7 +81,7 @@ public final class RaidState {
 		villagerLost = true;
 	}
 
-	public Set<UUID> raidersAlive() {
+	public Set<UUID> aliveRaiders() {
 		return Set.copyOf(raidersAlive);
 	}
 

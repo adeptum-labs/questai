@@ -33,29 +33,29 @@ class VillageKeyTest {
 
 	@Test
 	void nearbyLocationsShareACell() {
-		assertEquals(VillageKey.of(WORLD, 10, 10),
-			VillageKey.of(WORLD, 63, 63));
-		assertNotEquals(VillageKey.of(WORLD, 10, 10),
-			VillageKey.of(WORLD, 64, 10));
+		assertEquals(VillageKey.from(WORLD, 10, 10),
+			VillageKey.from(WORLD, 63, 63));
+		assertNotEquals(VillageKey.from(WORLD, 10, 10),
+			VillageKey.from(WORLD, 64, 10));
 	}
 
 	@Test
 	void negativeCoordinatesBucketConsistently() {
-		assertEquals(VillageKey.of(WORLD, -1, -1),
-			VillageKey.of(WORLD, -64, -64));
-		assertNotEquals(VillageKey.of(WORLD, -1, -1),
-			VillageKey.of(WORLD, 0, 0));
+		assertEquals(VillageKey.from(WORLD, -1, -1),
+			VillageKey.from(WORLD, -64, -64));
+		assertNotEquals(VillageKey.from(WORLD, -1, -1),
+			VillageKey.from(WORLD, 0, 0));
 	}
 
 	@Test
 	void differentWorldsNeverMatch() {
-		assertNotEquals(VillageKey.of(WORLD, 10, 10),
-			VillageKey.of(UUID.randomUUID(), 10, 10));
+		assertNotEquals(VillageKey.from(WORLD, 10, 10),
+			VillageKey.from(UUID.randomUUID(), 10, 10));
 	}
 
 	@Test
 	void neighborhoodContainsNineDistinctCellsIncludingSelf() {
-		final VillageKey key = VillageKey.of(WORLD, 100, 100);
+		final VillageKey key = VillageKey.from(WORLD, 100, 100);
 		final List<VillageKey> neighborhood = key.neighborhood();
 
 		assertEquals(9, neighborhood.size());
