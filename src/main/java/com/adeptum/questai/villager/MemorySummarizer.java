@@ -59,6 +59,11 @@ public final class MemorySummarizer {
 			parts.add("You have talked with this player "
 				+ memory.getConversations() + " time(s) before.");
 		}
+		if (memory != null && memory.getChain() != null) {
+			parts.add("You have unfinished business with this player: after '"
+				+ memory.getChain().lastTitle()
+				+ "' you promised them more work.");
+		}
 
 		final int baseParts = parts.size();
 		parts.addAll(eventClauses(memory));

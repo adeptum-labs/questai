@@ -148,6 +148,57 @@ class ConversationManagerTest {
 			"Phase should advance to OPTIONS after clicking Continue");
 	}
 
+	@Test
+	void rejectingChainStepClearsTheChain() {
+		final com.adeptum.questai.villager.VillagerProfileStore store =
+			mock(com.adeptum.questai.villager.VillagerProfileStore.class);
+		final com.adeptum.questai.quest.QuestManager questManager =
+			mock(com.adeptum.questai.quest.QuestManager.class);
+		conversationManager = new ConversationManager(null, null, store);
+		conversationManager.setQuestManager(questManager);
+
+		final UUID playerId = player.getUniqueId();
+		rejectQuest(2, 3);
+		verify(store).clearChain(any(), eq(playerId));
+	}
+
+	@Test
+	void rejectingPlainQuestLeavesChainsAlone() {
+		final com.adeptum.questai.villager.VillagerProfileStore store =
+			mock(com.adeptum.questai.villager.VillagerProfileStore.class);
+		final com.adeptum.questai.quest.QuestManager questManager =
+			mock(com.adeptum.questai.quest.QuestManager.class);
+		conversationManager = new ConversationManager(null, null, store);
+		conversationManager.setQuestManager(questManager);
+
+		rejectQuest(0, 0);
+		verify(store, never()).clearChain(any(), any());
+	}
+
+	private void rejectQuest(final int chainStep, final int chainLength) {
+		final var quest = new com.adeptum.questai.model.world.quest.Quest();
+		quest.setShortTitle("Test Quest");
+		quest.setChainStep(chainStep);
+		quest.setChainLength(chainLength);
+
+		final ConversationState state = ConversationState.builder()
+			.phase(ConversationPhase.QUEST_ACCEPT_REJECT)
+			.npcUuid(UUID.randomUUID())
+			.npcName("Edric Stone")
+			.npcProfession("FARMER")
+			.pendingQuest(quest)
+			.build();
+		injectConversation(player, state);
+
+		// The chain handling under test runs before the sound plays, and
+		// the Sound registry is unavailable without a server
+		try {
+			conversationManager.handleClick(player, DialogueGui.OPTION_4_SLOT);
+		} catch (final Throwable ignored) {
+			// Expected off-server
+		}
+	}
+
 	private void injectConversation(final Player player,
 		final ConversationState state) {
 

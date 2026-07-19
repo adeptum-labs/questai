@@ -34,6 +34,8 @@ public class Quest {
 	private Location destination;
 	private UUID villagerUuid;
 	private UUID recipientUuid;
+	private int chainStep;
+	private int chainLength;
 
 	public String prompt() {
 		final StringBuilder sb = new StringBuilder(320);

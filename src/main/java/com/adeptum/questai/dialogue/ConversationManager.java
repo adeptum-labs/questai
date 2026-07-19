@@ -23,9 +23,11 @@ package com.adeptum.questai.dialogue;
 import com.adeptum.questai.model.world.Npc;
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
+import com.adeptum.questai.quest.QuestChains;
 import com.adeptum.questai.quest.QuestManager;
 import com.adeptum.questai.service.QuestGenerationService;
 import com.adeptum.questai.utility.AiChat;
+import com.adeptum.questai.villager.ChainState;
 import com.adeptum.questai.villager.MemoryEvent;
 import com.adeptum.questai.villager.MemorySummarizer;
 import com.adeptum.questai.villager.VillagerProfile;
@@ -227,6 +229,9 @@ public class ConversationManager {
 			questManager.setVillagerData(state.getNpcUuid(), null);
 			recordQuestEvent(state.getNpcUuid(), player,
 				MemoryEvent.Type.QUEST_REJECTED, quest);
+			if (quest.getChainStep() > 0 && profileStore != null) {
+				profileStore.clearChain(state.getNpcUuid(), player.getUniqueId());
+			}
 			player.sendMessage("\u00a7cYou have rejected the quest: "
 				+ quest.getShortTitle());
 			player.playSound(player.getLocation(),
@@ -259,8 +264,11 @@ public class ConversationManager {
 
 		final Quest quest = questService.generateQuest(
 			state.getNpcUuid(), player.getWorld(), player.getLocation());
-		final String context = deliveryContext(quest,
-			contextFor(state.getNpcUuid(), player));
+		final ChainState chain = profileStore == null ? null
+			: profileStore.chainState(state.getNpcUuid(), player.getUniqueId());
+		applyChain(quest, chain);
+		final String context = chainContext(chain, deliveryContext(quest,
+			contextFor(state.getNpcUuid(), player)));
 
 		questService.generateQuestDescription(quest, () -> {
 			final String narrativePrompt =
@@ -348,6 +356,24 @@ public class ConversationManager {
 
 	private String callAi(final String prompt) {
 		return AiChat.ask(chatModel, prompt, "...");
+	}
+
+	/**
+	 * Tags a quest as its chain step and scales the reward, before the
+	 * async description call so the prompt and GUI both see final values.
+	 */
+	private void applyChain(final Quest quest, final ChainState chain) {
+		if (chain != null) {
+			quest.setChainStep(chain.step());
+			quest.setChainLength(chain.length());
+			quest.setRewardAmount(
+				QuestChains.scaledReward(quest.getRewardAmount(), chain.step()));
+		}
+	}
+
+	private String chainContext(final ChainState chain, final String context) {
+		return chain == null ? context
+			: context + " " + QuestChains.context(chain);
 	}
 
 	/**

@@ -258,6 +258,12 @@ public class RandomQuestPlugin implements SubPlugin {
 	}
 
 	private boolean isQuestAvailable(final Villager villager, final Player player) {
+		// A pending chain means the giver always has the next step ready
+		if (profileStore.chainState(villager.getUniqueId(),
+			player.getUniqueId()) != null) {
+			return true;
+		}
+
 		final Npc npc = questManager.getVillagerData(villager.getUniqueId());
 		final long twoHoursMillis = 2L * 60 * 60 * 1000;
 

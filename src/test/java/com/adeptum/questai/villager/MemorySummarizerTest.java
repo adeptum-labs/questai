@@ -185,6 +185,37 @@ class MemorySummarizerTest {
 	}
 
 	@Test
+	void pendingChainMentionsUnfinishedBusiness() {
+		final VillagerProfile profile =
+			VillagerProfile.builder().name("Edric Stone").build();
+		final PlayerMemory memory = new PlayerMemory();
+		memory.setConversations(1);
+		memory.setChain(new ChainState(2, 3, "The Lost Ledger"));
+		profile.getPlayers().put(PLAYER, memory);
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+		assertTrue(context.contains("unfinished business"));
+		assertTrue(context.contains("The Lost Ledger"));
+	}
+
+	@Test
+	void chainClauseSurvivesTheLengthCap() {
+		final VillagerProfile profile =
+			VillagerProfile.builder().name("Edric Stone").build();
+		final PlayerMemory memory = new PlayerMemory();
+		memory.setChain(new ChainState(2, 2, "The Lost Ledger"));
+		final String longTitle = "T".repeat(150);
+		for (int i = 0; i < 4; i++) {
+			memory.getEvents().add(new MemoryEvent(
+				MemoryEvent.Type.QUEST_COMPLETED, longTitle + i, i));
+		}
+		profile.getPlayers().put(PLAYER, memory);
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+		assertTrue(context.contains("unfinished business"));
+	}
+
+	@Test
 	void overlongContextDropsOldestEventClauses() {
 		final VillagerProfile profile = VillagerProfile.builder()
 			.name("Edric Stone")

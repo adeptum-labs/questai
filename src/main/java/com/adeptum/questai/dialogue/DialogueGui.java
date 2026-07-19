@@ -157,10 +157,14 @@ public final class DialogueGui {
 	public static Inventory createQuestAcceptReject(final String npcName,
 		final Quest quest) {
 
-		final String dialogueText = "\u00a77Objective: \u00a7f"
+		String dialogueText = "\u00a77Objective: \u00a7f"
 			+ quest.getObjective().describe()
 			+ "\n\u00a77Reward: \u00a7a" + quest.getRewardAmount()
 			+ " MCMMO XP in " + quest.getRewardTarget();
+		if (quest.getChainStep() > 0) {
+			dialogueText += "\n\u00a76Part " + quest.getChainStep() + " of "
+				+ quest.getChainLength() + " \u00a77(continued)";
+		}
 
 		final Inventory inv = createBase(npcName, "", dialogueText);
 		inv.setItem(OPTION_1_SLOT,
