@@ -167,6 +167,7 @@ class QuestGenerationServiceTest {
 			assertEquals(recipientId, delivery.getRecipientUuid());
 			assertEquals(1000.5, delivery.getDestination().getX());
 			assertEquals(-2000.5, delivery.getDestination().getZ());
+			verify(store, atLeastOnce()).tieTargets(any());
 		}
 	}
 

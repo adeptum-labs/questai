@@ -23,6 +23,8 @@ package com.adeptum.questai.service;
 import com.adeptum.questai.villager.StoredLocation;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -34,6 +36,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class DeliveryRecipientPicker {
 
 	private static final double MIN_DISTANCE_SQUARED = 50.0 * 50.0;
+	private static final int TIE_PREFERENCE_IN = 4;
 
 	public record Candidate(UUID uuid, String name, String profession,
 		StoredLocation location) {
@@ -49,6 +52,24 @@ public final class DeliveryRecipientPicker {
 	public static Candidate pick(final List<Candidate> candidates,
 		final double originX, final double originZ) {
 
+		return pick(candidates, Set.of(), originX, originZ);
+	}
+
+	/**
+	 * Picks a recipient, usually preferring villagers tied to the giver
+	 * when any qualify; the distance floor applies to them as well.
+	 */
+	public static Candidate pick(final List<Candidate> candidates,
+		final Set<UUID> tiedIds, final double originX, final double originZ) {
+
+		return pick(candidates, tiedIds, originX, originZ,
+			ThreadLocalRandom.current());
+	}
+
+	/* default */ static Candidate pick(final List<Candidate> candidates,
+		final Set<UUID> tiedIds, final double originX, final double originZ,
+		final Random random) {
+
 		final List<Candidate> eligible = candidates.stream()
 			.filter(c -> c.location().distanceSquaredXz(originX, originZ)
 				> MIN_DISTANCE_SQUARED)
@@ -59,7 +80,15 @@ public final class DeliveryRecipientPicker {
 		if (eligible.isEmpty()) {
 			return null;
 		}
+
+		final List<Candidate> tied = eligible.stream()
+			.filter(c -> tiedIds.contains(c.uuid()))
+			.toList();
+		if (!tied.isEmpty() && random.nextInt(TIE_PREFERENCE_IN) != 0) {
+			return tied.get(random.nextInt(tied.size()));
+		}
+
 		final int farHalf = (eligible.size() + 1) / 2;
-		return eligible.get(ThreadLocalRandom.current().nextInt(farHalf));
+		return eligible.get(random.nextInt(farHalf));
 	}
 }

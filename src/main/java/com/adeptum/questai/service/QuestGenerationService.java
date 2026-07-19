@@ -97,6 +97,7 @@ public class QuestGenerationService {
 		final DeliveryRecipientPicker.Candidate recipient =
 			DeliveryRecipientPicker.pick(
 				profileStore.deliveryCandidates(giverUuid, world.getUID()),
+				profileStore.tieTargets(giverUuid),
 				origin.getX(), origin.getZ());
 		if (recipient == null) {
 			return null;

@@ -87,10 +87,11 @@ public final class MemorySummarizer {
 
 		int added = 0;
 		for (final Relationship tie : profile.getRelationships()) {
-			if (added++ >= MAX_TIE_CLAUSES) {
+			if (added >= MAX_TIE_CLAUSES) {
 				return;
 			}
 			parts.add(tie.otherName() + " is your " + tie.type().noun() + ".");
+			added++;
 		}
 	}
 

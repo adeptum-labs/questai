@@ -46,6 +46,7 @@ import com.adeptum.questai.utility.EnumUtil;
 import com.adeptum.questai.villager.AmbientGreetingTask;
 import com.adeptum.questai.villager.MemoryEvent;
 import com.adeptum.questai.villager.MemorySummarizer;
+import com.adeptum.questai.villager.Relationship;
 import com.adeptum.questai.villager.VillagerPersona;
 import com.adeptum.questai.villager.VillagerProfile;
 import com.adeptum.questai.villager.VillagerProfileStore;
@@ -367,6 +368,21 @@ public class RandomQuestPlugin implements SubPlugin {
 			.findFirst().orElse(null);
 	}
 
+	/**
+	 * Names the delivery giver from the recipient's point of view,
+	 * including their tie when the two villagers know each other.
+	 */
+	private String describeGiver(final Quest quest) {
+		final String giverName = profileStore.getName(quest.getVillagerUuid());
+		if (giverName == null) {
+			return "a fellow villager";
+		}
+		final Relationship tie = profileStore.tieBetween(
+			quest.getRecipientUuid(), quest.getVillagerUuid());
+		return tie == null ? giverName
+			: "your " + tie.type().noun() + " " + giverName;
+	}
+
 	private void recordParcelReceived(Quest quest, Player player) {
 		final String giverName = profileStore.getName(quest.getVillagerUuid());
 		profileStore.recordEvent(quest.getRecipientUuid(), player.getUniqueId(),
@@ -381,10 +397,8 @@ public class RandomQuestPlugin implements SubPlugin {
 		if (recipient == null) {
 			return;
 		}
-		final String giverName = profileStore.getName(quest.getVillagerUuid());
 		final String prompt = DialoguePrompts.deliveryReaction(recipientName,
-			recipient.getProfession(),
-			giverName == null ? "a fellow villager" : giverName,
+			recipient.getProfession(), describeGiver(quest),
 			MemorySummarizer.context(recipient, player.getUniqueId()));
 
 		Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {

@@ -28,6 +28,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 class DeliveryRecipientPickerTest {
 
@@ -58,6 +59,43 @@ class DeliveryRecipientPickerTest {
 			List.of(candidate("Close", 10, 0), distant);
 
 		assertSame(distant, DeliveryRecipientPicker.pick(candidates, 0, 0));
+	}
+
+	@Test
+	void tiedRecipientsArePreferredWhenTheRollPasses() {
+		final Candidate tied = candidate("Tied Friend", 200, 0);
+		final Candidate stranger = candidate("Stranger", 5000, 0);
+		final java.util.Random random = mock(java.util.Random.class);
+		when(random.nextInt(4)).thenReturn(1);
+		when(random.nextInt(1)).thenReturn(0);
+
+		assertSame(tied, DeliveryRecipientPicker.pick(
+			List.of(stranger, tied), Set.of(tied.uuid()), 0, 0, random));
+	}
+
+	@Test
+	void failedPreferenceRollFallsBackToTheFarHalf() {
+		final Candidate tied = candidate("Tied Friend", 200, 0);
+		final Candidate stranger = candidate("Stranger", 5000, 0);
+		final java.util.Random random = mock(java.util.Random.class);
+		when(random.nextInt(4)).thenReturn(0);
+		when(random.nextInt(1)).thenReturn(0);
+
+		assertSame(stranger, DeliveryRecipientPicker.pick(
+			List.of(stranger, tied), Set.of(tied.uuid()), 0, 0, random));
+	}
+
+	@Test
+	void nearbyTiedVillagersStayIneligible() {
+		final Candidate nearTied = candidate("Near Kin", 10, 0);
+		final Candidate stranger = candidate("Stranger", 5000, 0);
+		final java.util.Random random = mock(java.util.Random.class);
+		when(random.nextInt(4)).thenReturn(1);
+		when(random.nextInt(1)).thenReturn(0);
+
+		assertSame(stranger, DeliveryRecipientPicker.pick(
+			List.of(nearTied, stranger), Set.of(nearTied.uuid()),
+			0, 0, random));
 	}
 
 	@Test

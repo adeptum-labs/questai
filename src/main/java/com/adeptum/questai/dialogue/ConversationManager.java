@@ -29,6 +29,7 @@ import com.adeptum.questai.service.QuestGenerationService;
 import com.adeptum.questai.utility.AiChat;
 import com.adeptum.questai.villager.ChainState;
 import com.adeptum.questai.villager.MemoryEvent;
+import com.adeptum.questai.villager.Relationship;
 import com.adeptum.questai.villager.MemorySummarizer;
 import com.adeptum.questai.villager.VillagerProfile;
 import com.adeptum.questai.villager.VillagerProfileStore;
@@ -389,7 +390,10 @@ public class ConversationManager {
 		if (recipient == null) {
 			return context;
 		}
+		final Relationship tie = profileStore.tieBetween(
+			quest.getVillagerUuid(), quest.getRecipientUuid());
 		return context + " You are sending a sealed package to "
+			+ (tie == null ? "" : "your " + tie.type().noun() + " ")
 			+ recipient.getName() + ", the village "
 			+ recipient.getProfession() + ".";
 	}

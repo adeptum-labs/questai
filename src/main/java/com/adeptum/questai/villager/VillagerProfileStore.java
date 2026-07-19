@@ -121,11 +121,7 @@ public final class VillagerProfileStore {
 
 		final VillagerProfile first = profiles.get(firstId);
 		final VillagerProfile second = profiles.get(secondId);
-		if (first == null || second == null
-			|| first.getRelationships().size() >= Relationship.MAX_TIES
-			|| second.getRelationships().size() >= Relationship.MAX_TIES
-			|| tieBetween(firstId, secondId) != null
-			|| tieBetween(secondId, firstId) != null) {
+		if (!tieAllowed(first, second, firstId, secondId)) {
 			return false;
 		}
 		first.getRelationships().add(
@@ -133,6 +129,16 @@ public final class VillagerProfileStore {
 		second.getRelationships().add(
 			new Relationship(type, firstId, first.getName()));
 		return true;
+	}
+
+	private boolean tieAllowed(final VillagerProfile first,
+		final VillagerProfile second, final UUID firstId, final UUID secondId) {
+
+		return first != null && second != null
+			&& first.getRelationships().size() < Relationship.MAX_TIES
+			&& second.getRelationships().size() < Relationship.MAX_TIES
+			&& tieBetween(firstId, secondId) == null
+			&& tieBetween(secondId, firstId) == null;
 	}
 
 	/** The villagers this villager is tied to; empty when unknown. */
@@ -645,6 +651,7 @@ public final class VillagerProfileStore {
 		savePlayers(cfg, base, profile);
 	}
 
+	@SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
 	private List<Map<String, Object>> serializeRelationships(
 		final VillagerProfile profile) {
 
