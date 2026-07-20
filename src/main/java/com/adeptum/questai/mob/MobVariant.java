@@ -59,7 +59,22 @@ public enum MobVariant {
 
 	/** A small blaze-touched spider that sets its prey alight. */
 	CINDERLING("cinderling", "\u00a76Cinderling", 0.05, 8,
-		new Combat(0.7, 12.0, 0.38, 2.0, 0.0), null);
+		new Combat(0.7, 12.0, 0.38, 2.0, 0.0), null),
+
+	/**
+	 * A harmless scurrier built on a hidden silverfish. Zero attack damage
+	 * as a second line of defence: even if a target ever slips past the
+	 * cancel handler, the bite would do nothing.
+	 */
+	RAT("rat", "\u00a77Rat", 0.0, 1,
+		new Combat(0.7, 4.0, 0.3, 0.0, 0.0),
+		new Voice(
+			List.of(new Layer("entity.bat.ambient", 0.5f, 1.9f),
+				new Layer("entity.silverfish.ambient", 0.3f, 2.0f)),
+			List.of(new Layer("entity.bat.hurt", 0.6f, 1.9f)),
+			List.of(new Layer("entity.bat.death", 0.6f, 1.8f),
+				new Layer("entity.silverfish.death", 0.3f, 2.0f)),
+			null));
 
 	private final String id;
 	private final String displayName;

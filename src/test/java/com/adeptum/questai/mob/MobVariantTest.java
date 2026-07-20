@@ -43,13 +43,14 @@ class MobVariantTest {
 		for (final MobVariant variant : MobVariant.values()) {
 			final MobVariant.Combat combat = variant.getCombat();
 			assertTrue(variant.getDisplayName().startsWith("\u00a7"));
-			assertTrue(variant.getDropChance() > 0
+			// Zero is legal: a passive variant drops no gear and cannot bite
+			assertTrue(variant.getDropChance() >= 0
 				&& variant.getDropChance() < 1);
 			assertTrue(variant.getBonusXp() >= 0);
 			assertTrue(combat.scale() > 0);
 			assertTrue(combat.maxHealth() > 0);
 			assertTrue(combat.movementSpeed() > 0);
-			assertTrue(combat.attackDamage() > 0);
+			assertTrue(combat.attackDamage() >= 0);
 			assertTrue(combat.knockbackResistance() >= 0
 				&& combat.knockbackResistance() <= 1);
 		}
@@ -60,5 +61,16 @@ class MobVariantTest {
 		assertEquals(2.0, MobVariant.GRAVEHULK.getCombat().scale());
 		assertTrue(MobVariant.GRAVELING.getCombat().scale() < 1.0);
 		assertTrue(MobVariant.CINDERLING.getCombat().scale() < 1.0);
+	}
+
+	@Test
+	void theRatIsGenuinelyHarmless() {
+		final MobVariant.Combat combat = MobVariant.RAT.getCombat();
+
+		// The target-cancel handler is the first line of defence; a bite
+		// that does nothing is the second. Both must hold.
+		assertEquals(0.0, combat.attackDamage());
+		assertEquals(0.0, MobVariant.RAT.getDropChance(),
+			"a rat must never drop combat gear");
 	}
 }
