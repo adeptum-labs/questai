@@ -191,11 +191,33 @@ flowchart LR
 	Location --> Blocks[Count doors and workstations]
 	Blocks --> EnoughBlocks{Village blocks found?}
 	EnoughBlocks -- no --> Stop[Do nothing]
-	EnoughBlocks -- yes --> Events[Notify village event system]
+	EnoughBlocks -- yes --> Events[Notify village event and nameplate systems]
 	Events --> Spawn{Villagers below door-based target?}
 	Spawn -- no --> Stop
 	Spawn -- yes --> Create[Spawn persistent villagers near player]
 ```
+
+## Village Names
+
+Every village earns a name the first time someone walks into it, and a boss
+bar carries that name for as long as the player stays inside. Step outside and
+the bar goes away; a title could not do this, because a title fades on its own
+timer rather than tracking where the player is.
+
+The two halves run at very different speeds. Naming a village means surveying
+tens of thousands of blocks, so it rides the existing five-minute sweep plus a
+tightly throttled on-demand probe for villages nobody has visited yet. Deciding
+whether a player is *inside* an already-named village is only a distance check
+against a cached centre, so it runs every second and reads nothing.
+
+Names come from the language model, seasoned with the biome and the size of the
+settlement, and are kept forever once assigned. If the model cannot be reached
+the village still gets a name derived from its own coordinates, so it is never
+left anonymous and never retried in a loop.
+
+Villages are matched by distance from a stored centre rather than by map cell.
+A large village straddling a cell boundary would otherwise answer to two
+different names depending on which half you were standing in.
 
 ## Persistence
 
@@ -203,6 +225,7 @@ flowchart LR
 | --- | --- |
 | `config.yml` | OpenAI API key and resource pack settings. |
 | `villager-profiles.yml` | Villager names, personalities, locations, per-player memory, hearsay, relationships and chain state. |
+| `village-names.yml` | The generated name and centre of every village discovered so far. |
 | `placed-entities.yml` | Quest-placed chests and hidden NPCs, swept on startup after a crash. |
 | `questai-pack.zip` | The generated resource pack, saved for debugging and manual hosting. |
 
@@ -221,6 +244,15 @@ resourcepack:
   enabled: true
   port: 8163
   hostname: ""   # public IP or DNS name; auto-detected when empty
+```
+
+Optional village nameplate settings (defaults shown):
+
+```yaml
+villages:
+  nameplate:
+    enabled: true
+    radius: 48.0   # how far from a village centre the name still shows
 ```
 
 `src/main/resources/config.yml` is ignored by Git in this repository. Keep real secrets out of commits and deployment

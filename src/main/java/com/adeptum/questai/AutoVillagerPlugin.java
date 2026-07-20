@@ -22,7 +22,9 @@ package com.adeptum.questai;
 
 import com.adeptum.questai.event.VillageCheckListener;
 import com.adeptum.questai.model.VillageInfo;
+import com.adeptum.questai.village.VillageScanner;
 import com.adeptum.questai.utility.EnumUtil;
+import java.util.List;
 import java.util.Set;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -45,7 +47,7 @@ import net.kyori.adventure.text.Component;
 /**
  * Enhanced AutoVillagerPlugin that spawns villagers only within actual villages.
  */
-public class AutoVillagerPlugin implements SubPlugin {
+public class AutoVillagerPlugin implements SubPlugin, VillageScanner {
 	private static final int MIN_DOORS = 4;
 	private static final int MIN_WORKSTATIONS = 3;
 	private static final int MIN_SPAWN_VILLAGERS = 3;
@@ -78,14 +80,14 @@ public class AutoVillagerPlugin implements SubPlugin {
 	);
 
 	private final JavaPlugin plugin;
-	private final VillageCheckListener villageCheckListener;
+	private final List<VillageCheckListener> villageCheckListeners;
 
 	public AutoVillagerPlugin(JavaPlugin plugin,
-		VillageCheckListener villageCheckListener) {
+		List<VillageCheckListener> villageCheckListeners) {
 
 		super();
 		this.plugin = plugin;
-		this.villageCheckListener = villageCheckListener;
+		this.villageCheckListeners = List.copyOf(villageCheckListeners);
 	}
 
 	@Override
@@ -130,7 +132,9 @@ public class AutoVillagerPlugin implements SubPlugin {
 			// Not within a village; no action needed
 			return;
 		}
-		villageCheckListener.onVillageCheck(player, playerLoc, villageInfo);
+		for (final VillageCheckListener listener : villageCheckListeners) {
+			listener.onVillageCheck(player, playerLoc, villageInfo);
+		}
 
 		int doorCount = villageInfo.doorCount();
 		int currentVillagerCount = villageInfo.villagerCount();
@@ -253,6 +257,23 @@ public class AutoVillagerPlugin implements SubPlugin {
 	private boolean isNearSurface(World world, Location location) {
 		final int surfaceY = world.getHighestBlockYAt(location);
 		return location.getBlockY() >= surfaceY - MAX_DEPTH_BELOW_SURFACE;
+	}
+
+	@Override
+	public boolean isNearSurface(final Location location) {
+		final World world = location.getWorld();
+		return world != null && isNearSurface(world, location);
+	}
+
+	@Override
+	public boolean hasVillagersNearby(final Location location) {
+		final World world = location.getWorld();
+		return world != null && countNearbyVillagers(world, location) > 0;
+	}
+
+	@Override
+	public VillageInfo scan(final Location location) {
+		return getVillageInfo(location.getWorld(), location);
 	}
 
 	private int countNearbyVillagers(World world, Location location) {

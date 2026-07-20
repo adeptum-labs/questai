@@ -73,17 +73,22 @@ public class VillageRegistry {
 		NamedVillage best = null;
 		double bestDistance = Double.MAX_VALUE;
 		for (final NamedVillage village : villages.values()) {
-			if (!village.centre().worldId().equals(worldId)) {
-				continue;
-			}
-			final double distance = village.centre()
-				.distanceSquaredXz(location.getX(), location.getZ());
+			final double distance = distanceTo(village, worldId, location);
 			if (distance <= limit && distance < bestDistance) {
 				best = village;
 				bestDistance = distance;
 			}
 		}
 		return best;
+	}
+
+	/** Squared distance, or unreachable when the village is in another world. */
+	private static double distanceTo(final NamedVillage village,
+		final UUID worldId, final Location location) {
+
+		return village.centre().worldId().equals(worldId)
+			? village.centre().distanceSquaredXz(location.getX(), location.getZ())
+			: Double.MAX_VALUE;
 	}
 
 	/** Records a newly discovered village and writes it through to disk. */

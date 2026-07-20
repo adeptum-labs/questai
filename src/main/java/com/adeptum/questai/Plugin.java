@@ -22,6 +22,9 @@ package com.adeptum.questai;
 
 import com.adeptum.questai.dialogue.ConversationManager;
 import com.adeptum.questai.event.VillageEventManager;
+import com.adeptum.questai.event.VillageEvents;
+import com.adeptum.questai.village.VillageNameplate;
+import com.adeptum.questai.village.VillageRegistry;
 import com.adeptum.questai.mob.MobForge;
 import com.adeptum.questai.quest.QuestLogListener;
 import com.adeptum.questai.relic.RelicListener;
@@ -80,7 +83,17 @@ public class Plugin extends JavaPlugin implements Listener {
 				chatModel, profileStore, eventManager);
 		final WanderingPeasantPlugin peasantPlugin = new WanderingPeasantPlugin(
 			this, conversationManager, questService, chatModel);
-		plugins.add(new AutoVillagerPlugin(this, eventManager));
+		final VillageNameplate nameplate = new VillageNameplate(this, chatModel,
+			new VillageRegistry(this, config.getDouble(
+				"villages.nameplate.radius", VillageEvents.EVENT_RADIUS)));
+		final AutoVillagerPlugin autoVillager =
+			new AutoVillagerPlugin(this, List.of(eventManager, nameplate));
+		// The scanner also feeds the nameplate its village checks, so the
+		// on-demand half is wired back in once both exist
+		nameplate.setScanner(autoVillager);
+
+		plugins.add(autoVillager);
+		plugins.add(nameplate);
 		plugins.add(randomQuestPlugin);
 		plugins.add(peasantPlugin);
 		plugins.add(new FlyingPigPlugin(this));
