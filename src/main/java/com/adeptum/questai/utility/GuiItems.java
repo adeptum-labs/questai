@@ -20,6 +20,7 @@
 
 package com.adeptum.questai.utility;
 
+import com.adeptum.questai.resourcepack.ResourcePackManager;
 import java.util.List;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Material;
@@ -32,6 +33,17 @@ import org.bukkit.inventory.meta.ItemMeta;
 public final class GuiItems {
 
 	private GuiItems() {
+	}
+
+	/**
+	 * The wooden panel framing a GUI. Built here rather than at each call
+	 * site because the pane only carries the pack's panel texture while
+	 * the model data rides along; without it the client falls back to a
+	 * vanilla glass pane, which reads as a bar in an empty slot.
+	 */
+	public static ItemStack filler() {
+		return item(Material.GRAY_STAINED_GLASS_PANE, " ", null,
+			ResourcePackManager.CMD);
 	}
 
 	public static ItemStack item(final Material material, final String displayName) {

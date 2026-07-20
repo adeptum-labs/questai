@@ -22,6 +22,7 @@ package com.adeptum.questai.quest;
 
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
+import com.adeptum.questai.resourcepack.ResourcePackManager;
 import com.adeptum.questai.utility.GuiItems;
 import java.util.List;
 import org.bukkit.Bukkit;
@@ -145,11 +146,12 @@ public final class QuestLogGui {
 	private static Inventory createEmpty() {
 		final Inventory inv = createBase();
 		inv.setItem(13, GuiItems.item(Material.PAPER, "\u00a77No active quests",
-			List.of("\u00a77Talk to villagers to discover quests!")));
+			List.of("\u00a77Talk to villagers to discover quests!"),
+			ResourcePackManager.CMD));
 		return inv;
 	}
 	private static void fillBorder(final Inventory inv) {
-		final ItemStack filler = GuiItems.item(Material.GRAY_STAINED_GLASS_PANE, " ");
+		final ItemStack filler = GuiItems.filler();
 		for (final int slot : BORDER_SLOTS) {
 			inv.setItem(slot, filler.clone());
 		}

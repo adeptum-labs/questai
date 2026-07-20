@@ -104,7 +104,7 @@ public final class DialogueGui {
 		inv.setItem(0, GuiItems.item(Material.PLAYER_HEAD,
 			"\u00a76" + npcName, List.of("\u00a77" + profession)));
 
-		final ItemStack filler = button(Material.GRAY_STAINED_GLASS_PANE, " ", CMD);
+		final ItemStack filler = GuiItems.filler();
 		for (final int slot : FILLER_SLOTS) {
 			inv.setItem(slot, filler.clone());
 		}
