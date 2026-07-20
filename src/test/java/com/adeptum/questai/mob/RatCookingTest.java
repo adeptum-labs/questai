@@ -21,10 +21,12 @@
 package com.adeptum.questai.mob;
 
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.event.block.BlockCookEvent;
 import org.bukkit.event.inventory.FurnaceSmeltEvent;
+import org.bukkit.inventory.FurnaceRecipe;
 import org.bukkit.inventory.ItemStack;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,10 +60,16 @@ class RatCookingTest {
 		MockBukkit.unmock();
 	}
 
+	/** The vanilla-shaped recipe the events carry on current Paper. */
+	private static FurnaceRecipe recipe() {
+		return new FurnaceRecipe(new NamespacedKey("questai", "test_rabbit"),
+			new ItemStack(Material.COOKED_RABBIT), Material.RABBIT, 0.0f, 200);
+	}
+
 	@Test
 	void aFurnaceTurnsRatMeatIntoCookedRatMeat() {
 		final FurnaceSmeltEvent event = new FurnaceSmeltEvent(block,
-			RatMeat.create(), new ItemStack(Material.COOKED_RABBIT));
+			RatMeat.create(), new ItemStack(Material.COOKED_RABBIT), recipe());
 
 		cooking.onSmelt(event);
 
@@ -71,7 +79,7 @@ class RatCookingTest {
 	@Test
 	void aCampfireDoesTheSame() {
 		final BlockCookEvent event = new BlockCookEvent(block,
-			RatMeat.create(), new ItemStack(Material.COOKED_RABBIT));
+			RatMeat.create(), new ItemStack(Material.COOKED_RABBIT), recipe());
 
 		cooking.onCampfireCook(event);
 
@@ -82,7 +90,7 @@ class RatCookingTest {
 	void anOrdinaryRabbitIsLeftAlone() {
 		final FurnaceSmeltEvent event = new FurnaceSmeltEvent(block,
 			new ItemStack(Material.RABBIT),
-			new ItemStack(Material.COOKED_RABBIT));
+			new ItemStack(Material.COOKED_RABBIT), recipe());
 
 		cooking.onSmelt(event);
 
@@ -95,7 +103,7 @@ class RatCookingTest {
 		// A cooked morsel back in the furnace matches no vanilla recipe,
 		// but if it ever did, the swap must not fire on it
 		final FurnaceSmeltEvent event = new FurnaceSmeltEvent(block,
-			RatMeat.createCooked(), new ItemStack(Material.COOKED_RABBIT));
+			RatMeat.createCooked(), new ItemStack(Material.COOKED_RABBIT), recipe());
 
 		cooking.onSmelt(event);
 

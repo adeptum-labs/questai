@@ -55,7 +55,11 @@ class VillageRegistryTest {
 	void setUp() {
 		mocks = MockitoAnnotations.openMocks(this);
 		when(plugin.getDataFolder()).thenReturn(tempDir.toFile());
-		when(plugin.getLogger()).thenReturn(Logger.getLogger("test"));
+		// Silenced: the malformed-row test rightly triggers the registry's
+		// skip-and-warn path, and its stack trace would read as a failure
+		final Logger quiet = Logger.getAnonymousLogger();
+		quiet.setUseParentHandlers(false);
+		when(plugin.getLogger()).thenReturn(quiet);
 		when(world.getUID()).thenReturn(WORLD_ID);
 	}
 
