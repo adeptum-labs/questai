@@ -12,6 +12,8 @@ AI-generated name and personality, and lets players discover quests through natu
 remember what each player has done for them, gossip about it to their neighbours, form kinships and rivalries
 with each other, defend their homes during night raids, and pay out mcMMO XP, rare relics and other treasures.
 
+The plugin targets Minecraft 26.2 on Paper and builds with Java 25.
+
 ## Features
 
 ### Living villagers
@@ -56,7 +58,9 @@ with each other, defend their homes during night raids, and pay out mcMMO XP, ra
   terrain, guarded by Cinderlings and holding a glowing Star Fragment that villagers pay handsomely for.
 - Wandering peasant NPCs that roam the world and offer quests to players they encounter.
 - A themed resource pack is built at runtime and served over HTTP: scroll-banner dialogue GUI, custom buttons,
-  relic and Star Fragment sprites — all generated pixel art, no bundled assets.
+  relic and Star Fragment sprites — all generated pixel art, no bundled assets. The pack declares format range
+  34-88 and emits item skins in both the legacy predicate format and the modern item definition format, so
+  clients from 1.20.2 all the way to 26.2 render the sprites.
 
 ## Architecture
 
@@ -237,9 +241,26 @@ fully-tested classes and only thin glue classes touch those registries.
 
 Requirements:
 
-- JDK 25 or newer (registered as a Maven toolchain)
+- JDK 25 or newer — Paper 26.x ships Java 25 bytecode, so older JDKs cannot even compile against the API
 - Maven
 - Paper API and mcMMO dependencies available through the configured Maven repositories
+
+The build resolves its JDK through Maven toolchains, so `~/.m2/toolchains.xml` must register a Java 25
+installation:
+
+```xml
+<toolchains>
+	<toolchain>
+		<type>jdk</type>
+		<provides>
+			<version>25</version>
+		</provides>
+		<configuration>
+			<jdkHome>/path/to/jdk-25</jdkHome>
+		</configuration>
+	</toolchain>
+</toolchains>
+```
 
 The plugin targets Minecraft 26.2 (Paper API `26.2.build.62-beta`, plugin `api-version: '26.2'`).
 
