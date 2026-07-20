@@ -26,6 +26,7 @@ import com.adeptum.questai.event.VillageKey;
 import com.adeptum.questai.model.VillageInfo;
 import com.adeptum.questai.utility.AiChat;
 import dev.langchain4j.model.openai.OpenAiChatModel;
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -33,11 +34,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.boss.BarColor;
-import org.bukkit.boss.BarStyle;
-import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -45,12 +46,13 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 
 /**
- * Shows the name of the village a player stands in, and names villages the
- * first time anyone walks into one.
+ * Greets a player with the village's name as they walk in, and names
+ * villages the first time anyone walks into one.
  *
- * <p>A boss bar rather than a title: a title fades on its own timer, so it
- * cannot track presence. The bar is raised on entry and taken down the
- * moment the player leaves.
+ * <p>A large fading title rather than a boss bar: a bar reads as progress
+ * and jostles with the quest objective and timer bars. The title shows once
+ * on entry; walking out re-arms it, with a short debounce so skirting the
+ * boundary does not replay it.
  *
  * <p>Presence is checked every second, but only against already-named
  * villages, which costs a few squared distances and reads no blocks.
@@ -63,8 +65,19 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 	/** Floor between two on-demand scans, across all players. */
 	private static final long PROBE_INTERVAL_MILLIS = 5_000L;
 
-	/** How long a cell that held no village is left alone. */
-	private static final long CELL_RETRY_MILLIS = 600_000L;
+	/**
+	 * How long a cell where a scan found nothing is left alone. Short:
+	 * a scan can miss from the edge of a village the player is still
+	 * walking toward, and the villager pre-filter already carries the
+	 * common no-village case.
+	 */
+	private static final long CELL_RETRY_MILLIS = 90_000L;
+
+	/** Consecutive outside ticks before the title re-arms. */
+	private static final int LEAVE_MISSES = 3;
+
+	private static final Title.Times TITLE_TIMES = Title.Times.times(
+		Duration.ofMillis(500), Duration.ofSeconds(3), Duration.ofSeconds(1));
 
 	private static final int PRUNE_THRESHOLD = 256;
 	private static final String DEFAULT_BIOME = "plains";
@@ -74,7 +87,9 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 	private final VillageRegistry registry;
 	private final boolean enabled;
 
-	private final Map<UUID, BossBar> bars = new HashMap<>();
+	/** The village name each player was last greeted in. */
+	private final Map<UUID, String> inside = new HashMap<>();
+	private final Map<UUID, Integer> misses = new HashMap<>();
 	private final Set<VillageKey> naming = new HashSet<>();
 	private final Map<VillageKey, Long> probedUntil = new HashMap<>();
 
@@ -116,13 +131,15 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 		if (task != null) {
 			task.cancel();
 		}
-		bars.values().forEach(BossBar::removeAll);
-		bars.clear();
+		// Titles fade on their own; only the greeting state needs dropping
+		inside.clear();
+		misses.clear();
 	}
 
 	@EventHandler
 	public void onPlayerQuit(final PlayerQuitEvent event) {
-		clearBar(event.getPlayer().getUniqueId());
+		inside.remove(event.getPlayer().getUniqueId());
+		misses.remove(event.getPlayer().getUniqueId());
 	}
 
 	@Override
@@ -138,40 +155,47 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 		for (final Player player : Bukkit.getOnlinePlayers()) {
 			final NamedVillage village = registry.find(player.getLocation());
 			if (village == null) {
-				clearBar(player.getUniqueId());
+				leaveTick(player.getUniqueId());
 				probe(player);
 			} else {
-				showBar(player, village.name());
+				greet(player, village.name());
 			}
 		}
 	}
 
-	private void showBar(final Player player, final String name) {
-		final BossBar existing = bars.get(player.getUniqueId());
-		if (existing == null) {
-			final BossBar bar =
-				Bukkit.createBossBar(name, BarColor.WHITE, BarStyle.SOLID);
-			bar.setProgress(1.0);
-			bar.addPlayer(player);
-			bars.put(player.getUniqueId(), bar);
-		} else if (!existing.getTitle().equals(name)) {
-			existing.setTitle(name);
+	/**
+	 * Shows the title once per stay. A different name while already greeted
+	 * means the player walked straight from one village into another, which
+	 * greets again without requiring a spell outside.
+	 */
+	private void greet(final Player player, final String name) {
+		misses.remove(player.getUniqueId());
+		if (!name.equals(inside.get(player.getUniqueId()))) {
+			inside.put(player.getUniqueId(), name);
+			player.showTitle(Title.title(
+				Component.text(name, NamedTextColor.GOLD),
+				Component.empty(), TITLE_TIMES));
 		}
 	}
 
-	/* default */ BossBar barOf(final UUID playerId) {
-		return bars.get(playerId);
-	}
-
-	/* default */ int barCount() {
-		return bars.size();
-	}
-
-	private void clearBar(final UUID playerId) {
-		final BossBar bar = bars.remove(playerId);
-		if (bar != null) {
-			bar.removeAll();
+	/**
+	 * Re-arms the greeting only after a few consecutive ticks outside, so a
+	 * player skirting the boundary is not greeted again on every crossing.
+	 */
+	private void leaveTick(final UUID playerId) {
+		if (!inside.containsKey(playerId)) {
+			return;
 		}
+		final int count = misses.merge(playerId, 1, Integer::sum);
+		if (count >= LEAVE_MISSES) {
+			inside.remove(playerId);
+			misses.remove(playerId);
+		}
+	}
+
+	/** The name the player is currently greeted under, or null when outside. */
+	/* default */ String insideOf(final UUID playerId) {
+		return inside.get(playerId);
 	}
 
 	/**
@@ -195,12 +219,15 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 		}
 
 		nextProbeAt = now + PROBE_INTERVAL_MILLIS;
-		probedUntil.put(key, now + CELL_RETRY_MILLIS);
 		prune(now);
 
 		final VillageInfo info = scanner.scan(location);
 		if (info.village()) {
 			nameVillage(location, info);
+		} else {
+			// Only a miss cools the cell down; a success gets named and the
+			// registry answers from then on
+			probedUntil.put(key, now + CELL_RETRY_MILLIS);
 		}
 	}
 

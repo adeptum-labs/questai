@@ -22,13 +22,11 @@ package com.adeptum.questai.village;
 
 import com.adeptum.questai.event.VillageKey;
 import java.nio.file.Path;
-import java.util.UUID;
 import java.util.logging.Logger;
 import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.boss.BossBar;
-import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,8 +40,10 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 /**
- * Runs against a real server so the boss bar is the one a player would
- * actually be shown, rather than a mock that cannot prove it was removed.
+ * Runs against a real server so the greeting state machine is driven by the
+ * same presence sweep a live server runs. The greeting itself is a fading
+ * title, so what these tests pin is the state: when a player counts as
+ * inside, when leaving re-arms, and when crossing swaps.
  */
 class VillageNameplateTest {
 
@@ -53,7 +53,6 @@ class VillageNameplateTest {
 	private Path tempDir;
 
 	private ServerMock server;
-	private JavaPlugin plugin;
 	private World world;
 	private VillageRegistry registry;
 	private VillageNameplate nameplate;
@@ -63,7 +62,7 @@ class VillageNameplateTest {
 		server = MockBukkit.mock();
 		world = server.addSimpleWorld("village-test");
 
-		plugin = mock(JavaPlugin.class);
+		final JavaPlugin plugin = mock(JavaPlugin.class);
 		when(plugin.getDataFolder()).thenReturn(tempDir.toFile());
 		when(plugin.getLogger()).thenReturn(Logger.getLogger("test"));
 		when(plugin.getConfig()).thenReturn(new YamlConfiguration());
@@ -82,115 +81,133 @@ class VillageNameplateTest {
 	}
 
 	private void claimRavenhollow() {
-		final UUID worldId = world.getUID();
-		registry.claim(VillageKey.from(worldId, 0, 0), at(0, 0), "Ravenhollow");
+		registry.claim(VillageKey.from(world.getUID(), 0, 0), at(0, 0),
+			"Ravenhollow");
 	}
 
-	/** Drives one presence sweep without waiting on the scheduler. */
-	private void sweep() {
+	private String stateOf(final PlayerMock player) {
+		return nameplate.insideOf(player.getUniqueId());
+	}
+
+	@Test
+	void enteringAVillageGreetsThePlayer() {
+		claimRavenhollow();
+		final PlayerMock player = server.addPlayer();
+		player.setLocation(at(10, 10));
+
 		nameplate.tick();
-	}
 
-	private String barTitle(final PlayerMock player) {
-		final BossBar bar = nameplate.barOf(player.getUniqueId());
-		return bar == null ? null : bar.getTitle();
+		assertEquals("Ravenhollow", stateOf(player));
 	}
 
 	@Test
-	void enteringAVillageRaisesABarNamedAfterIt() {
+	void stayingInsideGreetsOnlyOnce() {
 		claimRavenhollow();
 		final PlayerMock player = server.addPlayer();
 		player.setLocation(at(10, 10));
 
-		sweep();
+		nameplate.tick();
+		nameplate.tick();
+		nameplate.tick();
 
-		assertEquals(1, nameplate.barCount());
-		assertEquals("Ravenhollow", barTitle(player));
+		// Still greeted under the same name; a re-show would need the
+		// state to have been cleared in between, which it never was
+		assertEquals("Ravenhollow", stateOf(player));
 	}
 
 	@Test
-	void leavingTheVillageTakesTheBarDown() {
-		claimRavenhollow();
-		final PlayerMock player = server.addPlayer();
-		player.setLocation(at(10, 10));
-		sweep();
-		assertNotNull(barTitle(player));
-
-		player.setLocation(at(500, 500));
-		sweep();
-
-		assertNull(barTitle(player));
-	}
-
-	@Test
-	void aPlayerOutsideAnyVillageNeverGetsABar() {
+	void aPlayerOutsideIsNeverGreeted() {
 		claimRavenhollow();
 		final PlayerMock player = server.addPlayer();
 		player.setLocation(at(500, 500));
 
-		sweep();
+		nameplate.tick();
 
-		assertNull(barTitle(player));
+		assertNull(stateOf(player));
 	}
 
 	@Test
-	void repeatedSweepsInsideOneVillageKeepASingleBar() {
+	void leavingReArmsOnlyAfterTheDebounce() {
 		claimRavenhollow();
 		final PlayerMock player = server.addPlayer();
 		player.setLocation(at(10, 10));
+		nameplate.tick();
 
-		sweep();
-		sweep();
-		sweep();
+		player.setLocation(at(500, 500));
+		nameplate.tick();
+		nameplate.tick();
+		// Two ticks outside: still counted as inside, no re-greet on return
+		assertEquals("Ravenhollow", stateOf(player));
 
-		assertEquals("Ravenhollow", barTitle(player));
-		assertEquals(1, nameplate.barCount());
+		nameplate.tick();
+		assertNull(stateOf(player));
 	}
 
 	@Test
-	void crossingBetweenVillagesSwapsTheName() {
+	void aBoundarySkirterIsNotReGreeted() {
+		claimRavenhollow();
+		final PlayerMock player = server.addPlayer();
+		player.setLocation(at(10, 10));
+		nameplate.tick();
+
+		// Dip out for a moment, come straight back
+		player.setLocation(at(500, 500));
+		nameplate.tick();
+		player.setLocation(at(10, 10));
+		nameplate.tick();
+
+		// The miss count must have reset rather than accumulated
+		player.setLocation(at(500, 500));
+		nameplate.tick();
+		nameplate.tick();
+		assertEquals("Ravenhollow", stateOf(player));
+	}
+
+	@Test
+	void crossingBetweenVillagesSwapsWithoutPassingOutside() {
 		claimRavenhollow();
 		registry.claim(VillageKey.from(world.getUID(), 200, 0), at(200, 0),
 			"Frostmere");
 		final PlayerMock player = server.addPlayer();
 
 		player.setLocation(at(0, 0));
-		sweep();
-		assertEquals("Ravenhollow", barTitle(player));
+		nameplate.tick();
+		assertEquals("Ravenhollow", stateOf(player));
 
 		player.setLocation(at(200, 0));
-		sweep();
-		assertEquals("Frostmere", barTitle(player));
-		assertEquals(1, nameplate.barCount());
+		nameplate.tick();
+		assertEquals("Frostmere", stateOf(player));
 	}
 
 	@Test
-	void quittingReleasesTheBar() {
+	void quittingClearsTheGreetingState() {
 		claimRavenhollow();
 		final PlayerMock player = server.addPlayer();
 		player.setLocation(at(10, 10));
-		sweep();
-		assertEquals(1, nameplate.barCount());
+		nameplate.tick();
+		assertNotNull(stateOf(player));
 
 		final PlayerQuitEvent quit = mock(PlayerQuitEvent.class);
 		when(quit.getPlayer()).thenReturn(player);
 		nameplate.onPlayerQuit(quit);
 
-		assertEquals(0, nameplate.barCount());
+		assertNull(stateOf(player));
 	}
 
 	@Test
-	void disablingClearsEveryBar() {
+	void disablingClearsEveryone() {
 		claimRavenhollow();
 		final PlayerMock first = server.addPlayer();
 		final PlayerMock second = server.addPlayer();
 		first.setLocation(at(0, 0));
 		second.setLocation(at(5, 5));
-		sweep();
-		assertEquals(2, nameplate.barCount());
+		nameplate.tick();
+		assertNotNull(stateOf(first));
+		assertNotNull(stateOf(second));
 
 		nameplate.onDisable();
 
-		assertEquals(0, nameplate.barCount());
+		assertNull(stateOf(first));
+		assertNull(stateOf(second));
 	}
 }

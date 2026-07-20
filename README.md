@@ -206,10 +206,13 @@ flowchart LR
 
 ## Village Names
 
-Every village earns a name the first time someone walks into it, and a boss
-bar carries that name for as long as the player stays inside. Step outside and
-the bar goes away; a title could not do this, because a title fades on its own
-timer rather than tracking where the player is.
+Every village earns a name the first time someone walks into it, and a large
+fading title greets the player as they enter. Walking out re-arms the
+greeting — with a few seconds of debounce, so skirting the boundary does not
+replay it — and walking straight into a neighbouring village swaps titles
+without needing a spell outside. A title rather than a boss bar keeps the
+name from reading as a progress bar and from stacking with the quest
+objective and timer bars.
 
 The two halves run at very different speeds. Naming a village means surveying
 tens of thousands of blocks, so it rides the existing five-minute sweep plus a
@@ -282,7 +285,7 @@ Optional village nameplate settings (defaults shown):
 villages:
   nameplate:
     enabled: true
-    radius: 48.0   # how far from a village centre the name still shows
+    radius: 64.0   # how far from a village centre still counts as inside
 ```
 
 Optional rat settings (defaults shown):
