@@ -136,13 +136,17 @@ class ResourcePackManagerTest {
 			if (!key.startsWith("assets/questai/models/item/")) {
 				continue;
 			}
-			final String texture = json(key).getAsJsonObject("textures")
-				.get("layer0").getAsString();
-			final String name =
-				texture.substring("questai:item/".length());
-			assertTrue(ENTRIES.containsKey(
-				"assets/questai/textures/item/" + name + ".png"),
-				"Missing texture for " + key);
+			// Sprite models bind layer0; cube-built models bind numbered
+			// keys and a particle. Every questai reference must resolve.
+			for (final var entry
+				: json(key).getAsJsonObject("textures").entrySet()) {
+				final String texture = entry.getValue().getAsString();
+				final String name =
+					texture.substring("questai:item/".length());
+				assertTrue(ENTRIES.containsKey(
+					"assets/questai/textures/item/" + name + ".png"),
+					"Missing texture " + texture + " for " + key);
+			}
 		}
 	}
 

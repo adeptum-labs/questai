@@ -20,6 +20,7 @@
 
 package com.adeptum.questai.resourcepack;
 
+import com.adeptum.questai.mob.RatMeat;
 import com.adeptum.questai.relic.QuestRelic;
 import com.adeptum.questai.star.StarFragment;
 import com.sun.net.httpserver.HttpServer;
@@ -53,6 +54,9 @@ public class ResourcePackManager {
 
 	/** CustomModelData value applied to all QuestAI GUI items. */
 	public static final int CMD = 100001;
+
+	/** CustomModelData dispatching to the 3D rat body model. */
+	public static final int RAT_BODY_CMD = 100022;
 
 	/**
 	 * Private-use-area codepoint rendered via the custom font provider as a
@@ -236,6 +240,16 @@ public class ResourcePackManager {
 			StarFragment.CMD, "questai:item/star_fragment");
 		customItem(files, "star_fragment", TextureGenerator.starFragment());
 
+		overriddenItem(files, "rabbit", "item/rabbit",
+			RatMeat.CMD, "questai:item/rat_meat");
+		customItem(files, "rat_meat", TextureGenerator.ratMeat());
+
+		// The rat's body: a cube-built 3D model shown on a display entity,
+		// not a sprite, hence hand-rolled elements instead of customItem
+		overriddenItem(files, "poisonous_potato", "item/poisonous_potato",
+			RAT_BODY_CMD, "questai:item/rat_body");
+		ratBodyModel(files);
+
 		// Custom font: maps the banner glyph to a scroll emblem shown at the
 		// start of the dialogue inventory title, overriding vanilla rendering.
 		registerDialogueFont(files);
@@ -342,6 +356,69 @@ public class ResourcePackManager {
 
 		files.put("assets/minecraft/models/item/" + itemName + ".json",
 			utf8(sb.toString()));
+	}
+
+	/**
+	 * The rat as five textured cubes: body, head, two ears and a tail,
+	 * nose pointing north. Vanilla clients cannot be given new entity
+	 * geometry, but item models may be built from arbitrary cubes, and a
+	 * display entity puts one in the world.
+	 */
+	private static void ratBodyModel(final Map<String, byte[]> files) {
+		final String model = "{"
+			+ "\"textures\":{\"0\":\"questai:item/rat_body\","
+			+ "\"particle\":\"questai:item/rat_body\"},"
+			+ "\"elements\":["
+			+ cube(new double[] {5, 0, 4}, new double[] {11, 4, 13},
+				"[0,0,9,4]", "[0,9,9,11]")
+			+ ","
+			+ cube(new double[] {6, 0, 1}, new double[] {10, 3, 4},
+				"[0,12,4,15]", "[0,0,4,3]")
+			+ ","
+			+ cube(new double[] {6, 3, 1}, new double[] {7, 4, 2},
+				"[9,13,10,14]", "[9,13,10,14]")
+			+ ","
+			+ cube(new double[] {9, 3, 1}, new double[] {10, 4, 2},
+				"[9,13,10,14]", "[9,13,10,14]")
+			+ ","
+			+ cube(new double[] {7.5, 0, 13}, new double[] {8.5, 1, 16},
+				"[10,13,13,14]", "[10,13,13,14]")
+			+ "]}";
+		files.put("assets/questai/models/item/rat_body.json", utf8(model));
+		files.put("assets/questai/textures/item/rat_body.png",
+			TextureGenerator.ratBody());
+	}
+
+	/** One model element: the north face gets its own uv, the rest share. */
+	private static String cube(final double[] from, final double[] to,
+		final String northUv, final String otherUv) {
+
+		final StringBuilder sb = new StringBuilder(256);
+		sb.append("{\"from\":").append(coords(from))
+			.append(",\"to\":").append(coords(to)).append(",\"faces\":{");
+		final String[] sides = {"north", "east", "south", "west", "up", "down"};
+		for (int i = 0; i < sides.length; i++) {
+			if (i > 0) {
+				sb.append(',');
+			}
+			sb.append('"').append(sides[i]).append("\":{\"uv\":")
+				.append(i == 0 ? northUv : otherUv)
+				.append(",\"texture\":\"#0\"}");
+		}
+		return sb.append("}}").toString();
+	}
+
+	private static String coords(final double[] point) {
+		// Integral values print as integers to keep the JSON tidy
+		final StringBuilder sb = new StringBuilder("[");
+		for (int i = 0; i < point.length; i++) {
+			if (i > 0) {
+				sb.append(',');
+			}
+			sb.append(point[i] == Math.floor(point[i])
+				? String.valueOf((long) point[i]) : String.valueOf(point[i]));
+		}
+		return sb.append(']').toString();
 	}
 
 	private static void customItem(final Map<String, byte[]> files,

@@ -76,6 +76,14 @@ final class TextureGenerator {
 	private static final Color STAR_MID = new Color(0x7FD6E8);
 	private static final Color STAR_DARK = new Color(0x3A8FA8);
 
+	private static final Color FUR_LIGHT = new Color(0xA8A29A);
+	private static final Color FUR_MID = new Color(0x847E76);
+	private static final Color FUR_DARK = new Color(0x5C5650);
+	private static final Color RAT_PINK = new Color(0xE0A0A8);
+	private static final Color MEAT_RED = new Color(0xB84438);
+	private static final Color MEAT_DARK = new Color(0x8A2E26);
+	private static final Color BONE = new Color(0xEDE5D4);
+
 	private TextureGenerator() {
 	}
 
@@ -629,6 +637,54 @@ final class TextureGenerator {
 		setPixel(img, 3, 7, STAR_LIGHT);
 		setPixel(img, 13, 12, STAR_LIGHT);
 		setPixel(img, 8, 0, STAR_LIGHT);
+	}
+
+	/* default */ static byte[] ratMeat() {
+		final BufferedImage img = create();
+		// A small haunch: rounded red flesh tapering toward a bone stub
+		fillRect(img, 4, 6, 8, 6, MEAT_RED);
+		fillRect(img, 5, 5, 6, 1, MEAT_RED);
+		fillRect(img, 5, 12, 6, 1, MEAT_RED);
+		fillRect(img, 3, 7, 1, 4, MEAT_RED);
+		// Shading along the lower edge, highlight on top
+		fillRect(img, 5, 11, 6, 2, MEAT_DARK);
+		fillRect(img, 4, 10, 1, 2, MEAT_DARK);
+		fillRect(img, 5, 5, 3, 1, RAT_PINK);
+		fillRect(img, 4, 6, 2, 2, RAT_PINK);
+		// The bone, poking out to the upper right
+		fillRect(img, 11, 4, 2, 2, BONE);
+		setPixel(img, 12, 3, BONE);
+		setPixel(img, 13, 3, BONE);
+		setPixel(img, 13, 5, BONE);
+		return encode(img);
+	}
+
+	/**
+	 * The 16x16 atlas the 3D rat model maps its cube faces onto: fur in the
+	 * upper region, a face patch with eyes and nose lower-left, bright pink
+	 * for ears and tail lower-right.
+	 */
+	/* default */ static byte[] ratBody() {
+		final BufferedImage img = create();
+		// Fur field with mottling so large faces do not read as flat
+		fillRect(img, 0, 0, 16, 11, FUR_MID);
+		for (int y = 0; y < 11; y += 2) {
+			for (int x = y % 4 / 2; x < 16; x += 4) {
+				setPixel(img, x, y, FUR_DARK);
+				setPixel(img, (x + 2) % 16, y + 1, FUR_LIGHT);
+			}
+		}
+		// Belly strip
+		fillRect(img, 0, 9, 16, 2, FUR_LIGHT);
+		// Face patch: fur with two dark eyes and a pink nose
+		fillRect(img, 0, 12, 6, 4, FUR_MID);
+		setPixel(img, 1, 13, FUR_DARK);
+		setPixel(img, 4, 13, FUR_DARK);
+		fillRect(img, 2, 15, 2, 1, RAT_PINK);
+		// Pink block for ears and tail
+		fillRect(img, 8, 12, 8, 4, RAT_PINK);
+		fillRect(img, 8, 12, 8, 1, FUR_MID);
+		return encode(img);
 	}
 
 	// Drawing primitives
