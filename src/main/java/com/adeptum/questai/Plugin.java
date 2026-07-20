@@ -26,6 +26,7 @@ import com.adeptum.questai.event.VillageEvents;
 import com.adeptum.questai.village.VillageNameplate;
 import com.adeptum.questai.village.VillageRegistry;
 import com.adeptum.questai.mob.MobForge;
+import com.adeptum.questai.mob.RatSpawner;
 import com.adeptum.questai.quest.QuestLogListener;
 import com.adeptum.questai.relic.RelicListener;
 import com.adeptum.questai.resourcepack.ResourcePackManager;
@@ -100,6 +101,7 @@ public class Plugin extends JavaPlugin implements Listener {
 		plugins.add(new RelicListener(profileStore, peasantPlugin));
 		final MobForge mobForge = new MobForge(this);
 		plugins.add(mobForge);
+		plugins.add(new RatSpawner(this, mobForge, autoVillager));
 		plugins.add(new StarfallManager(this, mobForge));
 		plugins.add(eventManager);
 

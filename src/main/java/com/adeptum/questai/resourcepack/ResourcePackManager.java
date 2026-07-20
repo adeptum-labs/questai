@@ -408,9 +408,9 @@ public class ResourcePackManager {
 		return sb.append("}}").toString();
 	}
 
-	private static String coords(final double[] point) {
+	private static String coords(final double... point) {
 		// Integral values print as integers to keep the JSON tidy
-		final StringBuilder sb = new StringBuilder("[");
+		final StringBuilder sb = new StringBuilder(32).append('[');
 		for (int i = 0; i < point.length; i++) {
 			if (i > 0) {
 				sb.append(',');

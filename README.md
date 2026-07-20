@@ -56,6 +56,9 @@ The plugin runs on Minecraft 26.2 on Paper, builds against the 26.1.2 API and us
   **Gravelings** and the blaze-touched **Cinderling**, each with a tiny chance of dropping enchanted gear.
 - Forged mobs sound like themselves. The Gravehulk growls an octave down with a ravager roar and a heartbeat
   under it, and thuds as it walks; Gravelings chitter an octave up. Ordinary zombies are untouched.
+- Rats: harmless 3D-modelled vermin that scurry through caves — lit or dark — and around villages, squeak,
+  never fight back even when struck, and drop cookable Rat Meat. Built from an invisible silverfish carrying
+  a cube-built model from the pack, since vanilla clients cannot be given new entity geometry.
 - Starfall: a very rare, visible night event — a star streaks across the sky and blasts a crater into natural
   terrain, guarded by Cinderlings and holding a glowing Star Fragment that villagers pay handsomely for.
 - Wandering peasant NPCs that roam the world and offer quests to players they encounter.
@@ -278,6 +281,13 @@ villages:
   nameplate:
     enabled: true
     radius: 48.0   # how far from a village centre the name still shows
+```
+
+Optional rat settings (defaults shown):
+
+```yaml
+rats:
+  enabled: true
 ```
 
 `src/main/resources/config.yml` is ignored by Git in this repository. Keep real secrets out of commits and deployment
