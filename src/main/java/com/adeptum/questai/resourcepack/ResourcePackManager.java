@@ -62,7 +62,7 @@ public class ResourcePackManager {
 	public static final String DIALOGUE_BANNER_GLYPH = "\uE000";
 
 	private static final int PACK_FORMAT = 34; // MC 1.21-1.21.1 baseline
-	private static final int PACK_FORMAT_MAX = 75; // MC 1.21.11
+	private static final int PACK_FORMAT_MAX = 88; // MC 26.2
 
 	private byte[] packBytes;
 	private byte[] packHash;

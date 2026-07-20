@@ -68,10 +68,10 @@ class ResourcePackManagerTest {
 		final JsonObject supported =
 			pack.getAsJsonObject("supported_formats");
 		assertEquals(34, supported.get("min_inclusive").getAsInt());
-		assertEquals(75, supported.get("max_inclusive").getAsInt());
+		assertEquals(88, supported.get("max_inclusive").getAsInt());
 		assertEquals(34,
 			pack.getAsJsonArray("min_format").get(0).getAsInt());
-		assertEquals(75,
+		assertEquals(88,
 			pack.getAsJsonArray("max_format").get(0).getAsInt());
 	}
 

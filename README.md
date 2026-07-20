@@ -237,9 +237,11 @@ fully-tested classes and only thin glue classes touch those registries.
 
 Requirements:
 
-- JDK 21 or newer
+- JDK 25 or newer (registered as a Maven toolchain)
 - Maven
 - Paper API and mcMMO dependencies available through the configured Maven repositories
+
+The plugin targets Minecraft 26.2 (Paper API `26.2.build.62-beta`, plugin `api-version: '26.2'`).
 
 Useful commands:
 

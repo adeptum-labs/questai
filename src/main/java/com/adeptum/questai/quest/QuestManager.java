@@ -46,7 +46,6 @@ import org.bukkit.scheduler.BukkitTask;
  * Manages active quests, NPC data, boss bars, quest log book, and
  * scheduled progress tasks. Supports multiple concurrent quests per player.
  */
-@SuppressWarnings("PMD.GodClass")
 public class QuestManager {
 	private final Map<UUID, List<QuestProgress>> playerQuests = new ConcurrentHashMap<>();
 	private final Map<UUID, Npc> npcs = new ConcurrentHashMap<>();
