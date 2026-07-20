@@ -54,6 +54,8 @@ The plugin runs on Minecraft 26.2 on Paper, builds against the 26.1.2 API and us
   bonus.
 - Custom mob variants forged from rare natural spawns: the towering **Gravehulk**, swarming knee-high
   **Gravelings** and the blaze-touched **Cinderling**, each with a tiny chance of dropping enchanted gear.
+- Forged mobs sound like themselves. The Gravehulk growls an octave down with a ravager roar and a heartbeat
+  under it, and thuds as it walks; Gravelings chitter an octave up. Ordinary zombies are untouched.
 - Starfall: a very rare, visible night event — a star streaks across the sky and blasts a crater into natural
   terrain, guarded by Cinderlings and holding a glowing Star Fragment that villagers pay handsomely for.
 - Wandering peasant NPCs that roam the world and offer quests to players they encounter.
@@ -218,6 +220,29 @@ left anonymous and never retried in a loop.
 Villages are matched by distance from a stored centre rather than by map cell.
 A large village straddling a cell boundary would otherwise answer to two
 different names depending on which half you were standing in.
+
+## Mob Voices
+
+A mob's sounds are chosen client-side from its **entity type**, so there is no
+way to hand one zombie a different growl, and replacing `entity.zombie.ambient`
+in a resource pack would change every zombie in the world. Forged mobs are
+therefore silenced outright and given their voices back from the plugin.
+
+That is all-or-nothing: silencing takes the hurt cry and the footsteps with it,
+so a variant's voice has to cover everything it should still be heard doing.
+`MobVoiceTest` guards against a gap, since a missing entry means silence rather
+than a fallback.
+
+Pitch is clamped by the client to 0.5-2.0, one octave either side of normal.
+That is not much room, so the Gravehulk's weight comes from layering a ravager
+roar and a warden heartbeat beneath the groan rather than from pitch alone. The
+Graveling has an easier job going up.
+
+Sounds are named by string rather than by the `Sound` enum, which keeps the
+table free of registry-backed types and testable — and means a pack-supplied
+`questai:` sound would be a data change rather than a rewrite. They play under
+`SoundCategory.HOSTILE`, so a player's Hostile Creatures volume slider governs
+them exactly as it would the vanilla growls they stand in for.
 
 ## Persistence
 

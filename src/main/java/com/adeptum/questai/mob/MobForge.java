@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Random;
 import lombok.extern.slf4j.Slf4j;
 import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
@@ -38,8 +39,11 @@ import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 
 /**
  * Forges rare natural spawns into custom mob variants and handles their
@@ -51,6 +55,9 @@ import org.bukkit.inventory.ItemStack;
 public class MobForge implements SubPlugin {
 
 	private static final int CINDERLING_FIRE_TICKS = 60;
+
+	/** How often the ambient sweep runs; roughly vanilla's own cadence. */
+	private static final long VOICE_INTERVAL_TICKS = 60L;
 
 	private static final Map<GearEnchant, Enchantment> ENCHANTMENTS =
 		Map.ofEntries(
@@ -68,14 +75,27 @@ public class MobForge implements SubPlugin {
 			Map.entry(GearEnchant.PIERCING, Enchantment.PIERCING));
 
 	private final Random random = new Random();
+	private final JavaPlugin plugin;
+
+	private BukkitTask voiceTask;
+
+	public MobForge(final JavaPlugin plugin) {
+		this.plugin = plugin;
+	}
 
 	@Override
 	public void onEnable() {
+		voiceTask = Bukkit.getScheduler().runTaskTimer(plugin,
+			() -> MobVoices.sweep(random),
+			VOICE_INTERVAL_TICKS, VOICE_INTERVAL_TICKS);
 		log.atInfo().log("MobForge enabled; the night grows stranger.");
 	}
 
 	@Override
 	public void onDisable() {
+		if (voiceTask != null) {
+			voiceTask.cancel();
+		}
 		log.atInfo().log("MobForge disabled.");
 	}
 
@@ -150,6 +170,9 @@ public class MobForge implements SubPlugin {
 		mob.setCustomNameVisible(true);
 		MobTags.tag(mob.getPersistentDataContainer(), variant);
 
+		// Sounds belong to the entity type, so the only way to give this mob
+		// a voice of its own is to take away the one every zombie shares
+		MobVoices.silence(mob, variant);
 		if (variant == MobVariant.CINDERLING) {
 			mob.setVisualFire(true);
 		}
@@ -201,6 +224,16 @@ public class MobForge implements SubPlugin {
 		}
 	}
 
+	/**
+	 * Gives a wounded mob its cry back. Separate from the handler above,
+	 * which inspects the damager rather than the victim, and listening for
+	 * every damage cause so falls and fire are heard as well as blows.
+	 */
+	@EventHandler(ignoreCancelled = true)
+	public void onEntityHurt(final EntityDamageEvent event) {
+		MobVoices.hurt(event.getEntity());
+	}
+
 	private boolean isCinderling(final Entity damager) {
 		return damager instanceof LivingEntity living
 			&& MobTags.variantOf(living.getPersistentDataContainer())
@@ -215,6 +248,7 @@ public class MobForge implements SubPlugin {
 			return;
 		}
 
+		MobVoices.death(event.getEntity(), variant);
 		event.setDroppedExp(event.getDroppedExp() + variant.getBonusXp());
 		final MobDrops.GearRoll roll =
 			MobDrops.roll(random, variant.getDropChance());
