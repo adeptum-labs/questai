@@ -12,7 +12,7 @@ AI-generated name and personality, and lets players discover quests through natu
 remember what each player has done for them, gossip about it to their neighbours, form kinships and rivalries
 with each other, defend their homes during night raids, and pay out mcMMO XP, rare relics and other treasures.
 
-The plugin targets Minecraft 26.2 on Paper and builds with Java 25.
+The plugin runs on Minecraft 26.2 on Paper, builds against the 26.1.2 API and uses Java 25.
 
 ## Features
 
@@ -262,7 +262,11 @@ installation:
 </toolchains>
 ```
 
-The plugin targets Minecraft 26.2 (Paper API `26.2.build.62-beta`, plugin `api-version: '26.2'`).
+The plugin builds against Minecraft 26.1.2 (Paper API `26.1.2.build.74-stable`, plugin
+`api-version: '26.1'`) and runs on 26.2 servers, since the Paper API stays backwards compatible.
+The compile target trails the newest release because MockBukkit, which backs the GUI tests, ships
+one artifact per Minecraft version and has not published one beyond 26.1.2. Raising the API means
+waiting for `mockbukkit-v26.2`; until then the older stable API keeps the GUI suite runnable.
 
 Useful commands:
 
