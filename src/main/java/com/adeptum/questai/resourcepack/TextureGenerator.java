@@ -83,6 +83,10 @@ final class TextureGenerator {
 	private static final Color MEAT_RED = new Color(0xB84438);
 	private static final Color MEAT_DARK = new Color(0x8A2E26);
 	private static final Color BONE = new Color(0xEDE5D4);
+	private static final Color COOKED_BROWN = new Color(0x9A6438);
+	private static final Color COOKED_DARK = new Color(0x6E4424);
+	private static final Color COOKED_SEAR = new Color(0x4A2C16);
+	private static final Color COOKED_GLAZE = new Color(0xC08A50);
 
 	private TextureGenerator() {
 	}
@@ -656,6 +660,31 @@ final class TextureGenerator {
 		setPixel(img, 12, 3, BONE);
 		setPixel(img, 13, 3, BONE);
 		setPixel(img, 13, 5, BONE);
+		return encode(img);
+	}
+
+	/** The raw haunch's silhouette in browned, seared tones. */
+	/* default */ static byte[] ratMeatCooked() {
+		final BufferedImage img = create();
+		// Same haunch as the raw sprite, browned through
+		fillRect(img, 4, 6, 8, 6, COOKED_BROWN);
+		fillRect(img, 5, 5, 6, 1, COOKED_BROWN);
+		fillRect(img, 5, 12, 6, 1, COOKED_BROWN);
+		fillRect(img, 3, 7, 1, 4, COOKED_BROWN);
+		// Sear underneath, glaze highlight on top
+		fillRect(img, 5, 11, 6, 2, COOKED_DARK);
+		fillRect(img, 4, 10, 1, 2, COOKED_DARK);
+		fillRect(img, 5, 5, 3, 1, COOKED_GLAZE);
+		fillRect(img, 4, 6, 2, 2, COOKED_GLAZE);
+		// Grill marks
+		fillRect(img, 6, 7, 1, 4, COOKED_SEAR);
+		fillRect(img, 9, 7, 1, 4, COOKED_SEAR);
+		// The bone, scorched at the joint
+		fillRect(img, 11, 4, 2, 2, BONE);
+		setPixel(img, 12, 3, BONE);
+		setPixel(img, 13, 3, BONE);
+		setPixel(img, 13, 5, BONE);
+		setPixel(img, 11, 5, COOKED_SEAR);
 		return encode(img);
 	}
 

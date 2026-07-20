@@ -243,6 +243,9 @@ public class ResourcePackManager {
 		overriddenItem(files, "rabbit", "item/rabbit",
 			RatMeat.CMD, "questai:item/rat_meat");
 		customItem(files, "rat_meat", TextureGenerator.ratMeat());
+		overriddenItem(files, "cooked_rabbit", "item/cooked_rabbit",
+			RatMeat.COOKED_CMD, "questai:item/rat_meat_cooked");
+		customItem(files, "rat_meat_cooked", TextureGenerator.ratMeatCooked());
 
 		// The rat's body: a cube-built 3D model shown on a display entity,
 		// not a sprite, hence hand-rolled elements instead of customItem

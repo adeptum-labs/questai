@@ -57,8 +57,10 @@ The plugin runs on Minecraft 26.2 on Paper, builds against the 26.1.2 API and us
 - Forged mobs sound like themselves. The Gravehulk growls an octave down with a ravager roar and a heartbeat
   under it, and thuds as it walks; Gravelings chitter an octave up. Ordinary zombies are untouched.
 - Rats: harmless 3D-modelled vermin that scurry through caves — lit or dark — and around villages, squeak,
-  never fight back even when struck, and drop cookable Rat Meat. Built from an invisible silverfish carrying
-  a cube-built model from the pack, since vanilla clients cannot be given new entity geometry.
+  never fight back even when struck, and drop Rat Meat. Built from an invisible silverfish carrying a
+  cube-built model from the pack, since vanilla clients cannot be given new entity geometry. Furnaces,
+  smokers and campfires all cook the meat into sprited Cooked Rat Meat rather than letting the vanilla
+  recipe strip its identity into a plain cooked rabbit.
 - Starfall: a very rare, visible night event — a star streaks across the sky and blasts a crater into natural
   terrain, guarded by Cinderlings and holding a glowing Star Fragment that villagers pay handsomely for.
 - Wandering peasant NPCs that roam the world and offer quests to players they encounter.

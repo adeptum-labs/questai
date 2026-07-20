@@ -29,40 +29,64 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
 /**
- * What a rat leaves behind: a persistent-data-tagged morsel with its own
- * sprite, so identity survives renames. Rabbit as the base keeps it
- * cookable in any furnace without further wiring.
+ * What a rat leaves behind, raw and cooked: persistent-data-tagged morsels
+ * with their own sprites, so identity survives renames. Rabbit as the base
+ * keeps furnaces accepting the raw form and the cooked form as nourishing
+ * as any other meat, with no food-component wiring.
  */
 public final class RatMeat {
 
-	/** CustomModelData for the meat sprite, above the star fragment. */
+	/** CustomModelData for the raw sprite, above the star fragment. */
 	public static final int CMD = 100021;
+
+	/** CustomModelData for the cooked sprite, above the rat body model. */
+	public static final int COOKED_CMD = 100023;
 
 	private static final NamespacedKey KEY =
 		new NamespacedKey("questai", "rat_meat");
 	private static final String ID = "rat_meat";
+	private static final String COOKED_ID = "rat_meat_cooked";
 
 	private RatMeat() {
 	}
 
 	public static ItemStack create() {
-		final ItemStack item = GuiItems.item(Material.RABBIT,
+		return tagged(GuiItems.item(Material.RABBIT,
 			"§7Rat Meat", List.of(
 				"§7Stringy, but it fills a pan.",
-				"§7Best not to ask where it ran."), CMD);
+				"§7Best not to ask where it ran."), CMD), ID);
+	}
+
+	public static ItemStack createCooked() {
+		return tagged(GuiItems.item(Material.COOKED_RABBIT,
+			"§7Cooked Rat Meat", List.of(
+				"§7Seared past all objection.",
+				"§7Tastes almost like chicken."), COOKED_CMD), COOKED_ID);
+	}
+
+	/** True only for genuine raw rat meat. */
+	public static boolean isRatMeat(final ItemStack item) {
+		return ID.equals(idOf(item));
+	}
+
+	/** True only for genuine cooked rat meat. */
+	public static boolean isCookedRatMeat(final ItemStack item) {
+		return COOKED_ID.equals(idOf(item));
+	}
+
+	private static ItemStack tagged(final ItemStack item, final String id) {
 		final ItemMeta meta = item.getItemMeta();
-		meta.getPersistentDataContainer().set(KEY, PersistentDataType.STRING, ID);
+		meta.getPersistentDataContainer().set(KEY, PersistentDataType.STRING, id);
 		item.setItemMeta(meta);
 		return item;
 	}
 
-	/** True only for genuine rat meat. */
-	public static boolean isRatMeat(final ItemStack item) {
+	private static String idOf(final ItemStack item) {
 		if (item == null) {
-			return false;
+			return null;
 		}
 		final ItemMeta meta = item.getItemMeta();
-		return meta != null && ID.equals(meta.getPersistentDataContainer()
-			.get(KEY, PersistentDataType.STRING));
+		return meta == null ? null
+			: meta.getPersistentDataContainer().get(KEY, PersistentDataType.STRING);
 	}
 }

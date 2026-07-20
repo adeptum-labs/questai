@@ -49,10 +49,23 @@ class RatMeatTest {
 	}
 
 	@Test
+	void recognizesGenuineCookedRatMeat() {
+		assertTrue(RatMeat.isCookedRatMeat(tagged("rat_meat_cooked")));
+	}
+
+	@Test
+	void rawAndCookedNeverCrossRecognize() {
+		assertFalse(RatMeat.isCookedRatMeat(tagged("rat_meat")));
+		assertFalse(RatMeat.isRatMeat(tagged("rat_meat_cooked")));
+	}
+
+	@Test
 	void rejectsEverythingElse() {
 		assertFalse(RatMeat.isRatMeat(null));
 		assertFalse(RatMeat.isRatMeat(mock(ItemStack.class)));
 		assertFalse(RatMeat.isRatMeat(tagged(null)));
 		assertFalse(RatMeat.isRatMeat(tagged("star_fragment")));
+		assertFalse(RatMeat.isCookedRatMeat(null));
+		assertFalse(RatMeat.isCookedRatMeat(tagged(null)));
 	}
 }
