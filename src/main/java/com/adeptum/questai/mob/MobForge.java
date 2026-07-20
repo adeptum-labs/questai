@@ -26,6 +26,7 @@ import java.util.Random;
 import lombok.extern.slf4j.Slf4j;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.enchantments.Enchantment;
@@ -85,12 +86,36 @@ public class MobForge implements SubPlugin {
 			return;
 		}
 		final MobVariant variant = rollFor(event.getEntityType());
-		if (variant != null) {
+		if (variant != null && fits(event.getLocation(), variant)) {
 			upgrade(event.getEntity(), variant);
 			if (variant == MobVariant.GRAVELING) {
 				spawnSwarmMates(event.getEntity());
 			}
 		}
+	}
+
+	/**
+	 * Whether the scaled variant has room where the server put the vanilla
+	 * mob. Only the default hitbox was measured before the spawn, so a
+	 * larger variant would otherwise arrive wedged in stone; declining
+	 * leaves an ordinary mob rather than moving it somewhere unvetted.
+	 */
+	private boolean fits(final Location loc, final MobVariant variant) {
+		final World world = loc.getWorld();
+		final int x = loc.getBlockX();
+		final int y = loc.getBlockY();
+		final int z = loc.getBlockZ();
+
+		for (final MobFit.Offset off
+			: MobFit.clearanceOffsets(variant.getCombat().scale())) {
+
+			final int by = y + off.y();
+			if (by >= world.getMaxHeight() || !world.getBlockAt(
+				x + off.x(), by, z + off.z()).isPassable()) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/** Forges an already-spawned entity into the given variant. */
