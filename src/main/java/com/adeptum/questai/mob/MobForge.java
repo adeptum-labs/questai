@@ -21,6 +21,7 @@
 package com.adeptum.questai.mob;
 
 import com.adeptum.questai.SubPlugin;
+import com.adeptum.questai.utility.SpawnGround;
 import java.util.Map;
 import java.util.Random;
 import lombok.extern.slf4j.Slf4j;
@@ -174,14 +175,20 @@ public class MobForge implements SubPlugin {
 	}
 
 	private void spawnSwarmMates(final LivingEntity leader) {
+		final Location origin = leader.getLocation();
 		final int extras = MobRoll.swarmSize(random) - 1;
 		for (int i = 0; i < extras; i++) {
-			final Location loc = leader.getLocation().clone().add(
-				(random.nextDouble() - 0.5) * 3, 0,
-				(random.nextDouble() - 0.5) * 3);
-			// world.spawn arrives as CUSTOM, so mates are never re-rolled
-			leader.getWorld().spawn(loc, Zombie.class,
-				mate -> upgrade(mate, MobVariant.GRAVELING));
+			// Scattering blindly buried mates in whatever the leader stood
+			// beside, so each one needs its own floor near the leader's depth
+			final Location loc = SpawnGround.findNear(leader.getWorld(),
+				origin.getBlockX() + random.nextInt(3) - 1,
+				origin.getBlockY(),
+				origin.getBlockZ() + random.nextInt(3) - 1);
+			if (loc != null) {
+				// world.spawn arrives as CUSTOM, so mates are never re-rolled
+				leader.getWorld().spawn(loc, Zombie.class,
+					mate -> upgrade(mate, MobVariant.GRAVELING));
+			}
 		}
 	}
 

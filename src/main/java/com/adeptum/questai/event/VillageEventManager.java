@@ -22,6 +22,7 @@ package com.adeptum.questai.event;
 
 import com.adeptum.questai.SubPlugin;
 import com.adeptum.questai.model.VillageInfo;
+import com.adeptum.questai.utility.SpawnGround;
 import com.adeptum.questai.villager.MemoryEvent;
 import com.adeptum.questai.villager.StoredLocation;
 import com.adeptum.questai.villager.VillagerProfileStore;
@@ -193,7 +194,6 @@ public class VillageEventManager implements SubPlugin, VillageCheckListener {
 		}
 	}
 
-	@SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
 	private Set<UUID> spawnRaiders(final Location center,
 		final List<Villager> defenders) {
 
@@ -204,10 +204,14 @@ public class VillageEventManager implements SubPlugin, VillageCheckListener {
 		for (final VillageEvents.SpawnOffset offset
 			: VillageEvents.spawnRing(VillageEvents.raiderCount(rng), rng)) {
 
-			final int x = (int) Math.floor(center.getX() + offset.x());
-			final int z = (int) Math.floor(center.getZ() + offset.z());
-			final Location spawnLoc = new Location(world, x + 0.5,
-				world.getHighestBlockYAt(x, z) + 1, z + 0.5);
+			// A ring position over a roof, a canopy or open water yields no
+			// raider; the wave arrives thinner rather than inside a tree
+			final Location spawnLoc = SpawnGround.findSurface(world,
+				(int) Math.floor(center.getX() + offset.x()),
+				(int) Math.floor(center.getZ() + offset.z()));
+			if (spawnLoc == null) {
+				continue;
+			}
 
 			final Zombie zombie = world.spawn(spawnLoc, Zombie.class,
 				raider -> {

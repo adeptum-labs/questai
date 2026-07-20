@@ -23,6 +23,7 @@ package com.adeptum.questai.star;
 import com.adeptum.questai.SubPlugin;
 import com.adeptum.questai.mob.MobForge;
 import com.adeptum.questai.mob.MobVariant;
+import com.adeptum.questai.utility.SpawnGround;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
@@ -235,16 +236,18 @@ public class StarfallManager implements SubPlugin {
 		item.setInvulnerable(true);
 	}
 
-	@SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
 	private void spawnGuards(final Location center, final Random rng) {
 		final World world = center.getWorld();
 		for (final Starfall.Offset offset : Starfall.guardOffsets(rng)) {
-			final int x = center.getBlockX() + offset.x();
-			final int z = center.getBlockZ() + offset.z();
-			final Location loc = new Location(world, x + 0.5,
-				world.getHighestBlockYAt(x, z) + 1, z + 0.5);
-			world.spawn(loc, Spider.class,
-				spider -> mobForge.forge(spider, MobVariant.CINDERLING));
+			// A guard whose ring position lands on a roof, a canopy or open
+			// water is simply not posted; the crater keeps the rest
+			final Location loc = SpawnGround.findSurface(world,
+				center.getBlockX() + offset.x(),
+				center.getBlockZ() + offset.z());
+			if (loc != null) {
+				world.spawn(loc, Spider.class,
+					spider -> mobForge.forge(spider, MobVariant.CINDERLING));
+			}
 		}
 	}
 

@@ -21,12 +21,11 @@
 package com.adeptum.questai.star;
 
 import com.adeptum.questai.relic.RelicCompass;
+import com.adeptum.questai.utility.NaturalTerrain;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.Set;
 import org.bukkit.Material;
 
 /**
@@ -59,8 +58,6 @@ public final class Starfall {
 	private static final double ARC_HEIGHT = 40.0;
 	private static final int GUARD_COUNT = 3;
 
-	private static final Set<Material> NATURAL_TERRAIN = naturalTerrain();
-
 	private static final Map<String, String> DIRECTION_WORDS = Map.of(
 		"N", "north", "NE", "north-east", "E", "east", "SE", "south-east",
 		"S", "south", "SW", "south-west", "W", "west", "NW", "north-west");
@@ -85,13 +82,9 @@ public final class Starfall {
 			(int) Math.round(distance * Math.sin(angle)));
 	}
 
-	/**
-	 * True for the ordinary natural terrain a star may strike and carve.
-	 * Everything player-made, living, liquid or tile-entity based is
-	 * excluded by construction.
-	 */
+	/** True for the ordinary natural terrain a star may strike and carve. */
 	public static boolean isNaturalSurface(final Material material) {
-		return NATURAL_TERRAIN.contains(material);
+		return NaturalTerrain.isSurface(material);
 	}
 
 	/** The hemispheric bowl carved to air, relative to the impact block. */
@@ -162,26 +155,6 @@ public final class Starfall {
 	/** The compass direction of the impact as a spoken word. */
 	public static String directionPhrase(final double dx, final double dz) {
 		return DIRECTION_WORDS.get(RelicCompass.cardinal(dx, dz));
-	}
-
-	private static Set<Material> naturalTerrain() {
-		final Set<Material> materials = EnumSet.of(Material.GRASS_BLOCK,
-			Material.DIRT, Material.COARSE_DIRT, Material.ROOTED_DIRT,
-			Material.PODZOL, Material.MYCELIUM, Material.STONE,
-			Material.DEEPSLATE, Material.ANDESITE, Material.DIORITE,
-			Material.GRANITE, Material.TUFF, Material.CALCITE, Material.SAND,
-			Material.RED_SAND, Material.SANDSTONE, Material.RED_SANDSTONE,
-			Material.GRAVEL, Material.CLAY, Material.SNOW,
-			Material.SNOW_BLOCK, Material.MOSS_BLOCK);
-		for (final Material material : Material.values()) {
-			// Plain and colored terracotta are natural badlands surfaces;
-			// glazed terracotta is always player-crafted
-			if (material.name().endsWith("TERRACOTTA")
-				&& !material.name().contains("GLAZED")) {
-				materials.add(material);
-			}
-		}
-		return materials;
 	}
 
 	private static void forSphere(final SphereVisitor visitor) {
