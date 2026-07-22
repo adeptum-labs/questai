@@ -107,6 +107,14 @@ public class VillageRegistry {
 		return villages.size();
 	}
 
+	/**
+	 * The persistence key for a village, shared with any store that hangs
+	 * state off a village rather than off a cell.
+	 */
+	public static String rowIdFor(final NamedVillage village) {
+		return rowId(village.centre());
+	}
+
 	private void load() {
 		if (!file.exists()) {
 			return;
