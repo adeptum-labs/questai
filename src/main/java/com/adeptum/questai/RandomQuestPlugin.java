@@ -42,6 +42,8 @@ import com.adeptum.questai.relic.QuestRelic;
 import com.adeptum.questai.relic.RelicEffects;
 import com.adeptum.questai.relic.RelicItems;
 import com.adeptum.questai.relic.RelicRoll;
+import com.adeptum.questai.reputation.Reputation;
+import com.adeptum.questai.reputation.Standings;
 import com.adeptum.questai.service.QuestGenerationService;
 import com.adeptum.questai.star.StarFragment;
 import com.adeptum.questai.star.Starfall;
@@ -63,6 +65,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.ArmorStand;
@@ -108,6 +111,7 @@ public class RandomQuestPlugin implements SubPlugin {
 	private PlacedEntityStore placedEntityStore;
 	private BukkitTask ambientGreetingTask;
 	private BukkitTask gossipTask;
+	private Standings standings;
 
 	public RandomQuestPlugin(JavaPlugin plugin, ConversationManager conversationManager,
 		QuestGenerationService questService, OpenAiChatModel chatModel,
@@ -123,6 +127,12 @@ public class RandomQuestPlugin implements SubPlugin {
 		this.eventManager = eventManager;
 		this.fortification = fortification;
 	}
+
+	/** Wired after construction; standing hooks stay quiet until set. */
+	public void setStandings(final Standings standings) {
+		this.standings = standings;
+	}
+
 	@Override
 	public void onEnable() {
 		final Logger logger = plugin.getLogger();
@@ -203,6 +213,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		if (quest.getVillagerUuid() != null) {
 			profileStore.recordEvent(quest.getVillagerUuid(), player.getUniqueId(),
 				MemoryEvent.Type.QUEST_COMPLETED, quest.getShortTitle());
+			awardQuestStanding(player, quest.getVillagerUuid());
 			final String giverName = profileStore.getName(quest.getVillagerUuid());
 			if (giverName != null) {
 				completionMessage = message + " §7— §a" + giverName
@@ -214,6 +225,23 @@ public class RandomQuestPlugin implements SubPlugin {
 		rewardPlayer(player, quest);
 		maybeAwardRelic(player, relicChance);
 		return true;
+	}
+
+	/**
+	 * Standing is earned with the giver's village — falling back to
+	 * wherever the player stands when the giver has no known home.
+	 */
+	private void awardQuestStanding(final Player player, final UUID giver) {
+		if (standings == null) {
+			return;
+		}
+		Location where = player.getLocation();
+		final VillagerProfile profile = profileStore.get(giver);
+		if (profile != null && profile.getLocation() != null) {
+			final Location home = profile.getLocation().toLocation();
+			where = home != null ? home : where;
+		}
+		standings.change(player, where, Reputation.QUEST_COMPLETED);
 	}
 
 	/**
@@ -311,8 +339,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		}
 
 		final Villager.Profession profession = villager.getProfession();
-		final boolean tradeable = profession != Villager.Profession.NONE
-			&& profession != Villager.Profession.NITWIT;
+		final boolean tradeable = isTradeable(villager, player, profession);
 
 		conversationManager.startConversation(player, villager.getUniqueId(),
 			uniqueName, profession.name(), isQuestAvailable(villager, player),
@@ -334,8 +361,27 @@ public class RandomQuestPlugin implements SubPlugin {
 			return npc.isQuest();
 		}
 		questManager.setVillagerData(villager.getUniqueId(), null);
-		return Math.random() <= RelicEffects.questOfferChance(RelicItems.holds(
-			player.getInventory().getContents(), QuestRelic.WHISPERING_LOCKET));
+		final double chance = RelicEffects.questOfferChance(RelicItems.holds(
+			player.getInventory().getContents(), QuestRelic.WHISPERING_LOCKET))
+			* offerScaleFor(villager, player);
+		return Math.random() <= chance;
+	}
+
+	private double offerScaleFor(final Villager villager, final Player player) {
+		return standings == null ? 1.0 : Reputation.offerScale(
+			standings.at(villager.getLocation(), player.getUniqueId()));
+	}
+
+	/** True when the profession trades at all and standing has not soured. */
+	private boolean isTradeable(final Villager villager, final Player player,
+		final Villager.Profession profession) {
+
+		if (profession == Villager.Profession.NONE
+			|| profession == Villager.Profession.NITWIT) {
+			return false;
+		}
+		return standings == null || Reputation.tradesWith(
+			standings.at(villager.getLocation(), player.getUniqueId()));
 	}
 
 	/**
@@ -636,10 +682,17 @@ public class RandomQuestPlugin implements SubPlugin {
 			&& fortification.bellBoostApplies(player.getLocation())) {
 			xp = WorkRewards.bellBoost(xp);
 		}
+		xp = applyStandingReward(xp, player);
 		ExperienceAPI.addXP(player, skill, xp, "COMMAND");
 		player.sendMessage("§aYou earned " + xp + " MCMMO XP in " + skill + "!"
 			+ (quill ? " §6(Elder's Quill +25%)" : "")
 			+ (festival ? " §6(Festival +50%)" : ""));
+	}
+
+	/** Scales XP by standing with the village at the player's feet. */
+	private int applyStandingReward(final int xp, final Player player) {
+		return standings == null ? xp : Reputation.rewardScale(xp,
+			standings.at(player.getLocation(), player.getUniqueId()));
 	}
 	private void removeQuestIndicator(UUID villagerId) {
 		final UUID standId = questManager.getIndicator(villagerId);

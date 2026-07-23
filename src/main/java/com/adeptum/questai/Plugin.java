@@ -99,6 +99,7 @@ public class Plugin extends JavaPlugin implements Listener {
 		final RandomQuestPlugin randomQuestPlugin =
 			new RandomQuestPlugin(this, conversationManager, questService,
 				chatModel, profileStore, eventManager, fortification);
+		randomQuestPlugin.setStandings(standings);
 		final WanderingPeasantPlugin peasantPlugin = new WanderingPeasantPlugin(
 			this, conversationManager, questService, chatModel);
 		final VillageNameplate nameplate = new VillageNameplate(this, chatModel,
