@@ -31,6 +31,7 @@ import com.adeptum.questai.mob.RatCooking;
 import com.adeptum.questai.mob.RatSpawner;
 import com.adeptum.questai.quest.QuestLogListener;
 import com.adeptum.questai.relic.RelicListener;
+import com.adeptum.questai.reputation.DemolitionWatch;
 import com.adeptum.questai.reputation.Standings;
 import com.adeptum.questai.reputation.VillageReputationStore;
 import com.adeptum.questai.resourcepack.ResourcePackManager;
@@ -123,6 +124,7 @@ public class Plugin extends JavaPlugin implements Listener {
 		plugins.add(new StarfallManager(this, mobForge));
 		plugins.add(eventManager);
 		plugins.add(fortification);
+		plugins.add(new DemolitionWatch(registry, worksStore, standings));
 
 		plugins.forEach(p -> {
 			pm.registerEvents(p, this);
