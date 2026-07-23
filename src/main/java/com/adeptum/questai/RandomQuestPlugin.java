@@ -28,6 +28,7 @@ import com.adeptum.questai.dialogue.DialoguePrompts;
 import com.adeptum.questai.event.VillageEventManager;
 import com.adeptum.questai.event.VillageEvents;
 import com.adeptum.questai.fortify.VillageFortification;
+import com.adeptum.questai.fortify.WorkRewards;
 import com.adeptum.questai.model.world.Npc;
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
@@ -630,6 +631,10 @@ public class RandomQuestPlugin implements SubPlugin {
 		int xp = RelicEffects.questXp(quest.getRewardAmount(), quill);
 		if (festival) {
 			xp = VillageEvents.festivalXp(xp);
+		}
+		if (fortification != null
+			&& fortification.bellBoostApplies(player.getLocation())) {
+			xp = WorkRewards.bellBoost(xp);
 		}
 		ExperienceAPI.addXP(player, skill, xp, "COMMAND");
 		player.sendMessage("§aYou earned " + xp + " MCMMO XP in " + skill + "!"

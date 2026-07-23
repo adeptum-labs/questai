@@ -55,4 +55,9 @@ class WorkRewardsTest {
 		assertNotNull(roll.item());
 		assertTrue(roll.enchants().size() >= 1);
 	}
+
+	@Test
+	void theBellTowerBoostsQuestXpByAQuarter() {
+		assertEquals(125, WorkRewards.bellBoost(100));
+	}
 }

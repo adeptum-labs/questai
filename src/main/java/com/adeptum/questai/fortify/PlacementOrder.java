@@ -26,13 +26,14 @@ public final class PlacementOrder {
 		return switch (role) {
 			case AIR -> 0;
 			case ROUGH_STONE, MOSSY_STONE, ANDESITE, DRESSED_STONE,
-				CRACKED_STONE, LOG_Y, LOG_X, STRIPPED_LOG, PLANKS, HAY, SPOIL,
-				PATH, SCAFFOLDING -> 1;
-			case STONE_STAIRS, STONE_WALL, WOOD_STAIRS, WOOD_SLAB, FENCE -> 2;
+				CRACKED_STONE, DAUB, LOG_Y, LOG_X, STRIPPED_LOG, PLANKS, HAY,
+				SPOIL, PATH, SCAFFOLDING, ROOF_TILE -> 1;
+			case STONE_STAIRS, STONE_WALL, WOOD_STAIRS, WOOD_SLAB, FENCE,
+				DRESSED_STAIRS, ROOF_STAIRS, GLASS_PANE -> 2;
 			case DOOR -> 3;
 			case LADDER, TRAPDOOR, WALL_TORCH, BANNER, WALL_BANNER, LANTERN,
-				BARREL, CAULDRON -> 4;
-			case CAMPFIRE -> 5;
+				BARREL, CAULDRON, BELL -> 4;
+			case CAMPFIRE, ROD -> 5;
 		};
 	}
 
@@ -44,8 +45,9 @@ public final class PlacementOrder {
 		return entry.state().contains("half=upper") ? 1 : 0;
 	}
 
-	/** Fences and walls need physics so their connections compute. */
+	/** Fences, walls and panes need physics so their connections compute. */
 	public static boolean needsPhysics(final PaletteRole role) {
-		return role == PaletteRole.FENCE || role == PaletteRole.STONE_WALL;
+		return role == PaletteRole.FENCE || role == PaletteRole.STONE_WALL
+			|| role == PaletteRole.GLASS_PANE;
 	}
 }

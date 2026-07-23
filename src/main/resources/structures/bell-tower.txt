@@ -1,0 +1,182 @@
+# Bell tower, 7x7: a timber shaft over an open arcade, plus the apron.
+# Local south faces the square. Roof fixed deepslate in every biome.
+size 7 7
+
+def x FENCE - SURVEY
+def y LANTERN hanging=false SURVEY
+def c ROUGH_STONE - SURVEY
+def l LOG_X axis=x SURVEY
+def r BARREL facing=up SURVEY
+def z SCAFFOLDING - FRAME
+def # DRESSED_STONE - FRAME
+def k CRACKED_STONE - FRAME
+def J STRIPPED_LOG - FRAME
+def X DAUB - SHELL
+def P PLANKS - SHELL
+def = LOG_X axis=x SHELL
+def | LOG_X axis=z SHELL
+def H LADDER facing=south SHELL
+def N DRESSED_STAIRS facing=south,half=top SHELL
+def S DRESSED_STAIRS facing=north,half=top SHELL
+def E DRESSED_STAIRS facing=west,half=top SHELL
+def W DRESSED_STAIRS facing=east,half=top SHELL
+def % GLASS_PANE - SHELL
+def u TRAPDOOR facing=south,open=true SHELL
+def F FENCE - ROOF
+def s ROOF_STAIRS facing=south,half=bottom ROOF
+def n ROOF_STAIRS facing=north,half=bottom ROOF
+def e ROOF_STAIRS facing=east,half=bottom ROOF
+def w ROOF_STAIRS facing=west,half=bottom ROOF
+def 1 ROOF_STAIRS facing=south,shape=outer_right ROOF
+def 2 ROOF_STAIRS facing=south,shape=outer_left ROOF
+def 3 ROOF_STAIRS facing=north,shape=outer_left ROOF
+def 4 ROOF_STAIRS facing=north,shape=outer_right ROOF
+def T ROOF_TILE - ROOF
+def v WOOD_STAIRS facing=north,half=bottom DETAIL
+def g LANTERN hanging=true DETAIL
+def Z BELL attachment=ceiling DETAIL
+def R ROD - DETAIL
+
+layer -1
+.......
+.#####.
+.#####.
+.#####.
+.#####.
+.#####.
+.......
+
+layer 0
+x.....x
+.##k##c
+..vH..c
+z.....z
+.......
+.#...#.
+x.....x
+
+layer 1
+y......
+.#k###l
+...H..r
+z.....z
+.......
+.#...#.
+.......
+
+layer 2
+.......
+.#####.
+.N.H.N.
+z..g..z
+.S...S.
+.#W.E#.
+.......
+
+layer 3
+.......
+.J===J.
+.|PuP|.
+z|PPP|z
+.|PPP|.
+.J===J.
+.......
+
+layer 4
+.......
+.JXXXJ.
+.X.H.X.
+zX...Xz
+.X...X.
+.JXXXJ.
+.......
+
+layer 5
+.......
+.J===J.
+.|.H.|.
+z|...|z
+.|...|.
+.J===J.
+.......
+
+layer 6
+.......
+.JXXXJ.
+.X.H.X.
+zX...%z
+.X...X.
+.JXuXJ.
+.......
+
+layer 7
+.......
+.JXXXJ.
+.X.H.X.
+zX...Xz
+.X...X.
+.JXXXJ.
+.......
+
+layer 8
+.......
+.J===J.
+.|PuP|.
+z|PPP|z
+.|PPP|.
+.J===J.
+.......
+
+layer 9
+.......
+.JFFFJ.
+.F...F.
+zF...Fz
+.F...F.
+.JFFFJ.
+.......
+
+layer 10
+.......
+.J...J.
+.......
+..gZ...
+.......
+.J...J.
+.......
+
+layer 11
+1sssss2
+e.....w
+e.....w
+e.===.w
+e.....w
+e.....w
+3nnnnn4
+
+layer 12
+.......
+.1sss2.
+.e...w.
+.e...w.
+.e...w.
+.3nnn4.
+.......
+
+layer 13
+.......
+.......
+..1s2..
+..eTw..
+..3n4..
+.......
+.......
+
+layer 14
+.......
+.......
+.......
+...R...
+.......
+.......
+.......

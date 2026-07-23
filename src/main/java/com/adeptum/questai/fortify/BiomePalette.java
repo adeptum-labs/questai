@@ -93,6 +93,8 @@ public final class BiomePalette {
 		map.put(PaletteRole.CRACKED_STONE, Material.CRACKED_STONE_BRICKS);
 		map.put(PaletteRole.STONE_STAIRS, Material.COBBLESTONE_STAIRS);
 		map.put(PaletteRole.STONE_WALL, Material.COBBLESTONE_WALL);
+		map.put(PaletteRole.DAUB, Material.WHITE_TERRACOTTA);
+		map.put(PaletteRole.DRESSED_STAIRS, Material.STONE_BRICK_STAIRS);
 		return map;
 	}
 
@@ -108,6 +110,8 @@ public final class BiomePalette {
 		map.put(PaletteRole.CRACKED_STONE, Material.CHISELED_SANDSTONE);
 		map.put(PaletteRole.STONE_STAIRS, Material.SANDSTONE_STAIRS);
 		map.put(PaletteRole.STONE_WALL, Material.SANDSTONE_WALL);
+		map.put(PaletteRole.DAUB, Material.SMOOTH_SANDSTONE);
+		map.put(PaletteRole.DRESSED_STAIRS, Material.SMOOTH_SANDSTONE_STAIRS);
 		return map;
 	}
 
@@ -126,6 +130,11 @@ public final class BiomePalette {
 		map.put(PaletteRole.PATH, Material.DIRT_PATH);
 		map.put(PaletteRole.CAULDRON, Material.WATER_CAULDRON);
 		map.put(PaletteRole.SCAFFOLDING, Material.SCAFFOLDING);
+		map.put(PaletteRole.GLASS_PANE, Material.GLASS_PANE);
+		map.put(PaletteRole.BELL, Material.BELL);
+		map.put(PaletteRole.ROD, Material.LIGHTNING_ROD);
+		map.put(PaletteRole.ROOF_STAIRS, Material.DEEPSLATE_TILE_STAIRS);
+		map.put(PaletteRole.ROOF_TILE, Material.DEEPSLATE_TILES);
 		return map;
 	}
 }

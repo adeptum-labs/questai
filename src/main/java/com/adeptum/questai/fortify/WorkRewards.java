@@ -33,4 +33,9 @@ public final class WorkRewards {
 
 		return MobDrops.roll(rng, work.getGearChance());
 	}
+
+	/** Quests completed under a finished bell tower ring a little richer. */
+	public static int bellBoost(final int xp) {
+		return xp * 5 / 4;
+	}
 }

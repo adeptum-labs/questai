@@ -29,7 +29,7 @@ public enum VillageWork {
 		requirements("logs", 192, "rough_stone", 64)),
 	GATE("a gate", 2200, 0.18, true, "structures/gate.txt",
 		requirements("dressed_stone", 128, "iron", 24, "torches", 16)),
-	BELL_TOWER("a bell tower", 3200, 0.30, false, null,
+	BELL_TOWER("a bell tower", 3200, 0.30, true, "structures/bell-tower.txt",
 		requirements("dressed_stone", 256, "iron", 48, "gold", 8));
 
 	private static final Map<String, Set<Material>> ACCEPTED = acceptedRoles();

@@ -94,6 +94,14 @@ public class VillageFortification implements SubPlugin {
 		return village == null ? null : VillageRegistry.rowIdFor(village);
 	}
 
+	/** True inside a village whose ladder has raised its bell tower. */
+	public boolean bellBoostApplies(final Location location) {
+		final String rowId = rowIdAt(location);
+		final WorkState state = rowId == null ? null : worksStore.get(rowId);
+		return state != null && state.getBuiltSites()
+			.containsKey(VillageWork.BELL_TOWER.ordinal());
+	}
+
 	/** Every tier that comes with a point-structure drawing. */
 	private static Map<VillageWork, WorkSchematic> loadSchematics() {
 		final Map<VillageWork, WorkSchematic> map =
@@ -485,6 +493,14 @@ public class VillageFortification implements SubPlugin {
 
 		clearTemporaryWorks(site, state.getRotation(), schematic);
 		celebrate(site, schematic);
+		if (work == VillageWork.BELL_TOWER) {
+			for (int ring = 1; ring <= 3; ring++) {
+				Bukkit.getScheduler().runTaskLater(plugin,
+					() -> site.getWorld().playSound(site,
+						org.bukkit.Sound.BLOCK_BELL_USE, 1.0f, 1.0f),
+					20L * ring);
+			}
+		}
 		if (work == VillageWork.WATCHTOWER) {
 			site.getWorld().spawnEntity(site.clone().add(4, 1, 8),
 				org.bukkit.entity.EntityType.IRON_GOLEM);
