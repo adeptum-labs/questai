@@ -308,4 +308,49 @@ class MemorySummarizerTest {
 		assertTrue(context.contains("Your personality: gruff."));
 		assertTrue(context.contains(longTitle + "3"));
 	}
+
+	@Test
+	void raisedWorksReadsAsFirstHandMemory() {
+		final VillagerProfile profile = profileWith(
+			new MemoryEvent(MemoryEvent.Type.RAISED_WORKS,
+				"a watchtower", System.currentTimeMillis()));
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+
+		assertTrue(context.contains("a watchtower"),
+			"expected the project named, got: " + context);
+	}
+
+	@Test
+	void raisedWorksSpreadsAsHearsay() {
+		final VillagerProfile profile = profileWithHearsay(
+			new HearsayEvent(MemoryEvent.Type.RAISED_WORKS,
+				"a watchtower", "Bramblewick", System.currentTimeMillis()));
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+
+		assertTrue(context.contains("Word in the village"),
+			"expected gossip framing, got: " + context);
+		assertTrue(context.contains("a watchtower"));
+	}
+
+	private static VillagerProfile profileWith(final MemoryEvent event) {
+		final VillagerProfile profile =
+			VillagerProfile.builder().name("Edric Stone").build();
+		final PlayerMemory memory = new PlayerMemory();
+		memory.getEvents().add(event);
+		profile.getPlayers().put(PLAYER, memory);
+		return profile;
+	}
+
+	private static VillagerProfile profileWithHearsay(
+		final HearsayEvent event) {
+
+		final VillagerProfile profile =
+			VillagerProfile.builder().name("Edric Stone").build();
+		final PlayerMemory memory = new PlayerMemory();
+		memory.getHearsay().add(event);
+		profile.getPlayers().put(PLAYER, memory);
+		return profile;
+	}
 }

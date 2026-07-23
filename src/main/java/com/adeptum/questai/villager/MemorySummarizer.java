@@ -154,6 +154,8 @@ public final class MemorySummarizer {
 					+ event.sourceName() + ".";
 			case CLAIMED_STAR -> "sold " + event.sourceName() + " "
 				+ event.questTitle() + " from the night sky.";
+			case RAISED_WORKS -> "helped raise " + event.questTitle()
+				+ " with " + event.sourceName() + ".";
 		};
 	}
 
@@ -175,6 +177,8 @@ public final class MemorySummarizer {
 					+ " when the village was attacked.";
 			case CLAIMED_STAR -> "They once sold you " + event.questTitle()
 				+ " that fell from the night sky.";
+			case RAISED_WORKS -> "They helped your village raise "
+				+ event.questTitle() + ".";
 		};
 	}
 }
