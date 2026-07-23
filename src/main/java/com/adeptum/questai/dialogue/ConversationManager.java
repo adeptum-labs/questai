@@ -32,7 +32,10 @@ import com.adeptum.questai.quest.QuestManager;
 import com.adeptum.questai.reputation.Reputation;
 import com.adeptum.questai.reputation.Standings;
 import com.adeptum.questai.service.QuestGenerationService;
+import com.adeptum.questai.teleport.TeleportStoneCensus;
 import com.adeptum.questai.utility.AiChat;
+import com.adeptum.questai.village.NamedVillage;
+import com.adeptum.questai.village.VillageRegistry;
 import com.adeptum.questai.villager.ChainState;
 import com.adeptum.questai.villager.MemoryEvent;
 import com.adeptum.questai.villager.Relationship;
@@ -70,6 +73,8 @@ public class ConversationManager {
 	private VillageWorksStore worksStore;
 	private BiConsumer<Player, String> workDonationHandler;
 	private Standings standings;
+	private VillageRegistry registry;
+	private BiConsumer<Player, String> stoneClaimHandler;
 
 	public ConversationManager(final JavaPlugin plugin, final OpenAiChatModel chatModel,
 		final VillagerProfileStore profileStore) {
@@ -104,6 +109,17 @@ public class ConversationManager {
 
 	public void setStandings(final Standings standings) {
 		this.standings = standings;
+	}
+
+	public void setRegistry(final VillageRegistry registry) {
+		this.registry = registry;
+	}
+
+	/** Called with the player and village row id when they claim a stone. */
+	public void setStoneClaimHandler(
+		final BiConsumer<Player, String> handler) {
+
+		this.stoneClaimHandler = handler;
 	}
 
 	public void startConversation(final Player player, final UUID npcUuid,
@@ -175,6 +191,7 @@ public class ConversationManager {
 			case QUEST_ACCEPT_REJECT -> handleQuestAcceptReject(player, slot, state);
 			case CHAT_RESPONSE -> handleChatResponse(player, slot, state, npcName, profession);
 			case WORK_OFFER -> handleWorkOffer(player, slot, state);
+			case STONE_OFFER -> handleStoneOffer(player, slot, state);
 		}
 	}
 
@@ -202,7 +219,7 @@ public class ConversationManager {
 		player.openInventory(
 			DialogueGui.createOptions(npcName, state.getLastAiResponse(),
 				state.isQuestAvailable(), state.isTradeable(),
-				hasOpenWorks(player, state)));
+				hasOpenWorks(player, state), canClaimStone(player, state)));
 	}
 
 	private void handleOptions(final Player player, final int slot,
@@ -218,6 +235,8 @@ public class ConversationManager {
 			endConversation(player);
 		} else if (slot == DialogueGui.CENTER_SLOT && hasOpenWorks(player, state)) {
 			startWorkOffer(player, state, npcName);
+		} else if (slot == DialogueGui.CENTER_SLOT && canClaimStone(player, state)) {
+			startStoneOffer(player, state, npcName);
 		}
 	}
 
@@ -334,6 +353,47 @@ public class ConversationManager {
 
 		if (slot == DialogueGui.OPTION_1_SLOT && workDonationHandler != null) {
 			workDonationHandler.accept(player, state.getVillageRowId());
+			endConversation(player);
+		} else if (slot == DialogueGui.OPTION_4_SLOT) {
+			endConversation(player);
+		}
+	}
+
+	/**
+	 * Whether this villager may offer a teleport stone: the village must be
+	 * fully fortified, the player trusted enough to trade, and no stone for
+	 * the village may already exist anywhere the world scan can reach.
+	 */
+	private boolean canClaimStone(final Player player,
+		final ConversationState state) {
+
+		if (stoneClaimHandler == null || registry == null
+			|| worksStore == null || state.getVillageRowId() == null
+			|| !tradesWith(player, state.getVillageRowId())) {
+			return false;
+		}
+		final WorkState works = worksStore.get(state.getVillageRowId());
+		return works != null && works.getTier() >= VillageWork.count()
+			&& !TeleportStoneCensus.exists(state.getVillageRowId());
+	}
+
+	private void startStoneOffer(final Player player,
+		final ConversationState state, final String npcName) {
+
+		final NamedVillage village = registry.byRowId(state.getVillageRowId());
+		if (village == null) {
+			return;
+		}
+		state.setPhase(ConversationPhase.STONE_OFFER);
+		player.openInventory(
+			DialogueGui.createStoneOffer(npcName, village.name()));
+	}
+
+	private void handleStoneOffer(final Player player, final int slot,
+		final ConversationState state) {
+
+		if (slot == DialogueGui.OPTION_1_SLOT && stoneClaimHandler != null) {
+			stoneClaimHandler.accept(player, state.getVillageRowId());
 			endConversation(player);
 		} else if (slot == DialogueGui.OPTION_4_SLOT) {
 			endConversation(player);

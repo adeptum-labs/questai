@@ -25,6 +25,7 @@ import static com.adeptum.questai.resourcepack.ResourcePackManager.DIALOGUE_BANN
 
 import com.adeptum.questai.fortify.VillageWork;
 import com.adeptum.questai.model.world.quest.Quest;
+import com.adeptum.questai.teleport.VillageTeleportStone;
 import com.adeptum.questai.utility.GuiItems;
 import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
@@ -127,7 +128,8 @@ public final class DialogueGui {
 	}
 
 	public static Inventory createOptions(final String npcName, final String dialogueText,
-		final boolean questAvailable, final boolean tradeable, final boolean worksOpen) {
+		final boolean questAvailable, final boolean tradeable, final boolean worksOpen,
+		final boolean stoneOffer) {
 
 		final Inventory inv = createBase(npcName, "", dialogueText);
 		inv.setItem(OPTION_1_SLOT,
@@ -142,10 +144,17 @@ public final class DialogueGui {
 			inv.setItem(OPTION_3_SLOT,
 				button(Material.EMERALD, "\u00a7a\u00a7lLet's trade", CMD));
 		}
+		// The works and the stone share the centre slot; the ladder must be
+		// finished before a stone is offered, so the two never coincide
 		if (worksOpen) {
 			inv.setItem(CENTER_SLOT,
 				button(Material.BRICKS,
 					"\u00a76\u00a7lThe village needs materials", CMD));
+		} else if (stoneOffer) {
+			inv.setItem(CENTER_SLOT,
+				button(Material.HEART_OF_THE_SEA,
+					"\u00a7b\u00a7lThe village offers you a way home",
+					VillageTeleportStone.CMD));
 		}
 		inv.setItem(OPTION_4_SLOT,
 			button(Material.RED_DYE, "\u00a7c\u00a7lI should get going", CMD));
@@ -167,6 +176,22 @@ public final class DialogueGui {
 
 		inv.setItem(OPTION_1_SLOT, GuiItems.item(Material.CHEST,
 			"\u00a7a\u00a7lDonate what I carry", lore, CMD));
+		inv.setItem(OPTION_4_SLOT,
+			button(Material.RED_DYE, "\u00a7c\u00a7lNot now", CMD));
+		return inv;
+	}
+
+	/** Offers the finished village's teleport stone for the player to claim. */
+	public static Inventory createStoneOffer(final String npcName,
+		final String villageName) {
+
+		final Inventory inv = createBase(npcName, "", "Our walls stand "
+			+ "finished. Carry this, and you will always find your way "
+			+ "back to " + villageName + ".");
+		inv.setItem(OPTION_1_SLOT, GuiItems.item(Material.HEART_OF_THE_SEA,
+			"\u00a7b\u00a7lAccept the stone",
+			List.of("\u00a77A way home to \u00a76" + villageName),
+			VillageTeleportStone.CMD));
 		inv.setItem(OPTION_4_SLOT,
 			button(Material.RED_DYE, "\u00a7c\u00a7lNot now", CMD));
 		return inv;

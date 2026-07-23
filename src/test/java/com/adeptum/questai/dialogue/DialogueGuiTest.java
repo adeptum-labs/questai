@@ -22,6 +22,7 @@ package com.adeptum.questai.dialogue;
 
 import com.adeptum.questai.fortify.VillageWork;
 import com.adeptum.questai.resourcepack.ResourcePackManager;
+import com.adeptum.questai.teleport.VillageTeleportStone;
 import java.util.Map;
 import org.bukkit.Material;
 import org.bukkit.inventory.Inventory;
@@ -53,15 +54,41 @@ class DialogueGuiTest {
 	@Test
 	void theOptionsScreenOffersTheWorksOnlyWhenOpen() {
 		final Inventory without = DialogueGui.createOptions("Bo", "Hello",
-			true, true, false);
+			true, true, false, false);
 		final Inventory with = DialogueGui.createOptions("Bo", "Hello",
-			true, true, true);
+			true, true, true, false);
 
 		// A closed ladder leaves the centre slot as border filler
 		assertEquals(Material.GRAY_STAINED_GLASS_PANE,
 			without.getItem(DialogueGui.CENTER_SLOT).getType());
 		assertEquals(Material.BRICKS,
 			with.getItem(DialogueGui.CENTER_SLOT).getType());
+	}
+
+	@Test
+	void theStoneTakesTheCentreOnlyOnceTheWorksAreDone() {
+		final Inventory offered = DialogueGui.createOptions("Bo", "Hello",
+			true, true, false, true);
+		final Inventory worksWin = DialogueGui.createOptions("Bo", "Hello",
+			true, true, true, true);
+
+		assertEquals(Material.HEART_OF_THE_SEA,
+			offered.getItem(DialogueGui.CENTER_SLOT).getType());
+		// While the ladder is unfinished the works keep the shared slot
+		assertEquals(Material.BRICKS,
+			worksWin.getItem(DialogueGui.CENTER_SLOT).getType());
+	}
+
+	@Test
+	void theStoneOfferIsSkinnedAndCancellable() {
+		final Inventory inv = DialogueGui.createStoneOffer("Bo", "Harrowdale");
+
+		final ItemStack claim = inv.getItem(DialogueGui.OPTION_1_SLOT);
+		assertEquals(Material.HEART_OF_THE_SEA, claim.getType());
+		assertTrue(claim.getItemMeta().hasCustomModelData());
+		assertEquals(VillageTeleportStone.CMD,
+			claim.getItemMeta().getCustomModelData());
+		assertNotNull(inv.getItem(DialogueGui.OPTION_4_SLOT));
 	}
 
 	@Test

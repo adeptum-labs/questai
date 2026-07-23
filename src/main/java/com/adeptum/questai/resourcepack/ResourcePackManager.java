@@ -23,6 +23,7 @@ package com.adeptum.questai.resourcepack;
 import com.adeptum.questai.mob.RatMeat;
 import com.adeptum.questai.relic.QuestRelic;
 import com.adeptum.questai.star.StarFragment;
+import com.adeptum.questai.teleport.VillageTeleportStone;
 import com.sun.net.httpserver.HttpServer;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -252,6 +253,10 @@ public class ResourcePackManager {
 		overriddenItem(files, "poisonous_potato", "item/poisonous_potato",
 			RAT_BODY_CMD, "questai:item/rat_body");
 		ratBodyModel(files);
+
+		overriddenItem(files, "heart_of_the_sea", "item/heart_of_the_sea",
+			VillageTeleportStone.CMD, "questai:item/teleport_stone");
+		customItem(files, "teleport_stone", TextureGenerator.teleportStone());
 
 		// Custom font: maps the banner glyph to a scroll emblem shown at the
 		// start of the dialogue inventory title, overriding vanilla rendering.

@@ -22,5 +22,5 @@ package com.adeptum.questai.dialogue;
 
 public enum ConversationPhase {
 	THINKING, GREETING, OPTIONS, QUEST_OFFER, QUEST_ACCEPT_REJECT,
-	CHAT_RESPONSE, WORK_OFFER
+	CHAT_RESPONSE, WORK_OFFER, STONE_OFFER
 }

@@ -643,6 +643,38 @@ final class TextureGenerator {
 		setPixel(img, 8, 0, STAR_LIGHT);
 	}
 
+	/** A standing rune stone with a glowing portal carved into its face. */
+	/* default */ static byte[] teleportStone() {
+		final BufferedImage img = create();
+		drawStandingStone(img);
+		drawStoneGateway(img);
+		return encode(img);
+	}
+
+	private static void drawStandingStone(final BufferedImage img) {
+		// A rounded menhir, wider at the base than the crown
+		fillRect(img, 6, 1, 4, 1, FUR_MID);
+		fillRect(img, 5, 2, 6, 1, FUR_MID);
+		fillRect(img, 4, 3, 8, 11, FUR_MID);
+		fillRect(img, 5, 14, 6, 1, FUR_MID);
+		// Light catches the left flank, shadow gathers on the right and foot
+		fillRect(img, 4, 3, 1, 11, FUR_LIGHT);
+		setPixel(img, 5, 2, FUR_LIGHT);
+		fillRect(img, 11, 3, 1, 11, FUR_DARK);
+		setPixel(img, 10, 2, FUR_DARK);
+		fillRect(img, 5, 14, 6, 1, FUR_DARK);
+	}
+
+	private static void drawStoneGateway(final BufferedImage img) {
+		// A glowing oval doorway sunk into the stone
+		fillRect(img, 7, 4, 2, 8, STAR_DARK);
+		fillRect(img, 6, 6, 4, 4, STAR_DARK);
+		fillRect(img, 7, 5, 2, 6, STAR_MID);
+		fillRect(img, 7, 7, 2, 2, STAR_LIGHT);
+		setPixel(img, 8, 3, STAR_MID);
+		setPixel(img, 8, 12, STAR_MID);
+	}
+
 	/* default */ static byte[] ratMeat() {
 		final BufferedImage img = create();
 		// A small haunch: rounded red flesh tapering toward a bone stub
