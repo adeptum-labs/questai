@@ -336,6 +336,28 @@ class MemorySummarizerTest {
 			"expected full phrasing, got: " + context);
 	}
 
+	@Test
+	void aStandingClauseSpeaksWithTheIdentityClauses() {
+		final VillagerProfile profile = profileWith(
+			new MemoryEvent(MemoryEvent.Type.QUEST_COMPLETED,
+				"Kill 5 zombies", 1L));
+		final String context = MemorySummarizer.context(profile, PLAYER,
+			"You are wary and cold toward this player.");
+
+		assertTrue(context.contains(
+			"You are wary and cold toward this player."));
+	}
+
+	@Test
+	void aNullStandingClauseChangesNothing() {
+		final VillagerProfile profile = profileWith(
+			new MemoryEvent(MemoryEvent.Type.QUEST_COMPLETED,
+				"Kill 5 zombies", 1L));
+
+		assertEquals(MemorySummarizer.context(profile, PLAYER),
+			MemorySummarizer.context(profile, PLAYER, null));
+	}
+
 	private static VillagerProfile profileWith(final MemoryEvent event) {
 		final VillagerProfile profile =
 			VillagerProfile.builder().name("Edric Stone").build();

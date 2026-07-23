@@ -29,6 +29,8 @@ import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
 import com.adeptum.questai.quest.QuestChains;
 import com.adeptum.questai.quest.QuestManager;
+import com.adeptum.questai.reputation.Reputation;
+import com.adeptum.questai.reputation.Standings;
 import com.adeptum.questai.service.QuestGenerationService;
 import com.adeptum.questai.utility.AiChat;
 import com.adeptum.questai.villager.ChainState;
@@ -67,6 +69,7 @@ public class ConversationManager {
 	private BiConsumer<Player, Quest> questAcceptHandler;
 	private VillageWorksStore worksStore;
 	private BiConsumer<Player, String> workDonationHandler;
+	private Standings standings;
 
 	public ConversationManager(final JavaPlugin plugin, final OpenAiChatModel chatModel,
 		final VillagerProfileStore profileStore) {
@@ -99,6 +102,10 @@ public class ConversationManager {
 		this.workDonationHandler = handler;
 	}
 
+	public void setStandings(final Standings standings) {
+		this.standings = standings;
+	}
+
 	public void startConversation(final Player player, final UUID npcUuid,
 		final String npcName, final String profession,
 		final boolean questAvailable, final boolean tradeable,
@@ -123,7 +130,7 @@ public class ConversationManager {
 		player.playSound(player.getLocation(),
 			Sound.ENTITY_VILLAGER_AMBIENT, 1.0f, 1.0f);
 
-		final String context = contextFor(npcUuid, player);
+		final String context = contextFor(npcUuid, player, villageRowId);
 		if (profileStore != null) {
 			profileStore.recordConversation(npcUuid, player.getUniqueId());
 		}
@@ -195,7 +202,7 @@ public class ConversationManager {
 		player.openInventory(
 			DialogueGui.createOptions(npcName, state.getLastAiResponse(),
 				state.isQuestAvailable(), state.isTradeable(),
-				hasOpenWorks(state)));
+				hasOpenWorks(player, state)));
 	}
 
 	private void handleOptions(final Player player, final int slot,
@@ -209,7 +216,7 @@ public class ConversationManager {
 			openVillagerTrade(player, state.getNpcUuid());
 		} else if (slot == DialogueGui.OPTION_4_SLOT) {
 			endConversation(player);
-		} else if (slot == DialogueGui.CENTER_SLOT && hasOpenWorks(state)) {
+		} else if (slot == DialogueGui.CENTER_SLOT && hasOpenWorks(player, state)) {
 			startWorkOffer(player, state, npcName);
 		}
 	}
@@ -277,14 +284,24 @@ public class ConversationManager {
 		}
 	}
 
-	private boolean hasOpenWorks(final ConversationState state) {
+	private boolean hasOpenWorks(final Player player,
+		final ConversationState state) {
+
 		if (worksStore == null || state.getVillageRowId() == null) {
+			return false;
+		}
+		if (!tradesWith(player, state.getVillageRowId())) {
 			return false;
 		}
 		final WorkState works = worksStore.get(state.getVillageRowId());
 		final int tier = works == null ? 0 : works.getTier();
 		final VillageWork work = VillageWork.byTier(tier);
 		return work != null && work.hasPlans();
+	}
+
+	private boolean tradesWith(final Player player, final String villageRowId) {
+		return standings == null || Reputation.tradesWith(
+			standings.of(villageRowId, player.getUniqueId()));
 	}
 
 	private void startWorkOffer(final Player player,
@@ -339,7 +356,7 @@ public class ConversationManager {
 			: profileStore.chainState(state.getNpcUuid(), player.getUniqueId());
 		applyChain(quest, chain);
 		final String context = chainContext(chain, deliveryContext(quest,
-			contextFor(state.getNpcUuid(), player)));
+			contextFor(state.getNpcUuid(), player, state.getVillageRowId())));
 
 		questService.generateQuestDescription(quest, () -> {
 			final String narrativePrompt =
@@ -392,7 +409,8 @@ public class ConversationManager {
 		player.openInventory(DialogueGui.createThinking(npcName, profession));
 
 		final boolean canOfferHelp = state.isQuestAvailable();
-		final String context = contextFor(state.getNpcUuid(), player);
+		final String context = contextFor(state.getNpcUuid(), player,
+			state.getVillageRowId());
 		final String prompt = canOfferHelp
 			? DialoguePrompts.casualChatWithQuestHint(npcName, profession, context)
 			: DialoguePrompts.casualChat(npcName, profession, context);
@@ -468,13 +486,20 @@ public class ConversationManager {
 			+ recipient.getProfession() + ".";
 	}
 
-	private String contextFor(final UUID npcUuid, final Player player) {
+	private String contextFor(final UUID npcUuid, final Player player,
+		final String villageRowId) {
+
 		if (profileStore == null) {
 			return "";
 		}
 		final VillagerProfile profile = profileStore.get(npcUuid);
-		return profile == null ? ""
-			: MemorySummarizer.context(profile, player.getUniqueId());
+		if (profile == null) {
+			return "";
+		}
+		final String clause = standings == null ? null
+			: Reputation.standingClause(
+				standings.of(villageRowId, player.getUniqueId()));
+		return MemorySummarizer.context(profile, player.getUniqueId(), clause);
 	}
 
 	private void recordQuestEvent(final UUID npcUuid, final Player player,

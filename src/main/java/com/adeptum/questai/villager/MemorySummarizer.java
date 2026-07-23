@@ -45,6 +45,16 @@ public final class MemorySummarizer {
 	 * there is nothing to tell.
 	 */
 	public static String context(final VillagerProfile profile, final UUID playerId) {
+		return context(profile, playerId, null);
+	}
+
+	/**
+	 * As {@link #context(VillagerProfile, UUID)}, with the village's
+	 * feeling about the player spoken alongside the identity clauses.
+	 */
+	public static String context(final VillagerProfile profile,
+		final UUID playerId, final String standingClause) {
+
 		if (profile == null) {
 			return "";
 		}
@@ -55,6 +65,9 @@ public final class MemorySummarizer {
 				+ String.join("; ", profile.getTraits()) + ".");
 		}
 		addTieParts(parts, profile);
+		if (standingClause != null) {
+			parts.add(standingClause);
+		}
 
 		final PlayerMemory memory = profile.getPlayers().get(playerId);
 		addRelationshipParts(parts, memory);

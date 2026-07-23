@@ -96,6 +96,7 @@ public class Plugin extends JavaPlugin implements Listener {
 			this, registry, worksStore, profileStore, mobForge);
 		conversationManager.setWorksStore(worksStore);
 		conversationManager.setWorkDonationHandler(fortification::donate);
+		conversationManager.setStandings(standings);
 		final RandomQuestPlugin randomQuestPlugin =
 			new RandomQuestPlugin(this, conversationManager, questService,
 				chatModel, profileStore, eventManager, fortification);
