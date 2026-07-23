@@ -39,6 +39,34 @@ class WorkSiteTest {
 	}
 
 	@Test
+	void spreadIsTheDropFromHighestToLowest() {
+		assertEquals(0, WorkSite.spread(new int[] {64, 64, 64}));
+		assertEquals(7, WorkSite.spread(new int[] {64, 71, 66}));
+		assertEquals(0, WorkSite.spread(new int[0]));
+	}
+
+	@Test
+	void flatterGroundWinsOverClearerGround() {
+		final WorkSite.Rating flat = new WorkSite.Rating(1, 40);
+		final WorkSite.Rating clear = new WorkSite.Rating(3, 0);
+		assertTrue(flat.betterThan(clear));
+		assertFalse(clear.betterThan(flat));
+	}
+
+	@Test
+	void equalGroundIsSettledByTheTreeCount() {
+		final WorkSite.Rating pasture = new WorkSite.Rating(2, 3);
+		final WorkSite.Rating wood = new WorkSite.Rating(2, 30);
+		assertTrue(pasture.betterThan(wood));
+		assertFalse(wood.betterThan(pasture));
+	}
+
+	@Test
+	void anythingBeatsHavingFoundNothing() {
+		assertTrue(new WorkSite.Rating(5, 81).betterThan(null));
+	}
+
+	@Test
 	void southIsTheUnrotatedFacing() {
 		assertEquals(0, WorkSite.facingRotation(0, 5));
 	}

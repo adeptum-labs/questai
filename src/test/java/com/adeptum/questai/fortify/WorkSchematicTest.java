@@ -22,6 +22,11 @@ class WorkSchematicTest {
 	}
 
 	@Test
+	void theHeightCoversEveryLayerAboveTheBase() {
+		assertEquals(15, TOWER.getHeight());
+	}
+
+	@Test
 	void everyStageHasBlocks() {
 		for (final BuildStage stage : BuildStage.values()) {
 			assertFalse(TOWER.stage(stage).isEmpty(),

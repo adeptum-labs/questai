@@ -27,7 +27,9 @@ import org.bukkit.scheduler.BukkitTask;
 public class VillageFortification implements SubPlugin {
 
 	private static final long TICK_INTERVAL = 40L;
-	private static final int MAX_LEVEL_SPREAD = 3;
+	/** How far out to look for the villagers that measure a village. */
+	private static final double CROWD_RADIUS = 96.0;
+	private static final double CROWD_HEIGHT = 32.0;
 	private static final Map<VillageWork, WorkSchematic> SCHEMATICS =
 		loadSchematics();
 	private static final WorkSchematic PIECE_A =
@@ -217,12 +219,26 @@ public class VillageFortification implements SubPlugin {
 			startGate(player, rowId, work, state);
 			return;
 		}
+		if (village == null) {
+			player.sendMessage("§7They have what they need, but nobody can "
+				+ "say where the village ends.");
+			return;
+		}
+		startPointStructure(player, rowId, work, village);
+	}
 
-		final WorkSite.Candidate site = village == null ? null
-			: findSite(player.getLocation().getWorld(), village, work);
+	/**
+	 * Hunts the band around the village for ground the crew can level, and
+	 * when there is none, hands the donor the search's own account of why.
+	 */
+	private void startPointStructure(final Player player, final String rowId,
+		final VillageWork work, final NamedVillage village) {
+
+		final SiteSearch search = new SiteSearch(player.getWorld());
+		final WorkSite.Candidate site =
+			findSite(search, measureExtent(village), work);
 		if (site == null) {
-			player.sendMessage(
-				"§7They have what they need, but nowhere level to build.");
+			player.sendMessage(search.getReport().describe());
 			return;
 		}
 		beginPointStructure(player, rowId, work, site, null);
@@ -257,8 +273,8 @@ public class VillageFortification implements SubPlugin {
 		final WorkSite.Candidate site =
 			slot == null ? null : gateSite(world, slot);
 		if (site == null) {
-			player.sendMessage(
-				"§7They have what they need, but nowhere level to build.");
+			player.sendMessage("§7They have what they need, but the wall gives "
+				+ "them nowhere to hang a gate.");
 			return;
 		}
 		beginPointStructure(player, rowId, work, site, slot);
@@ -266,28 +282,51 @@ public class VillageFortification implements SubPlugin {
 
 	/**
 	 * Records the chosen site, opens the wall for the gate when it is one,
-	 * then breaks ground. {@code gateSlot} is the ring slot the gate cuts
-	 * into, already chosen alongside the site so the two never disagree.
+	 * clears and levels the pad, then breaks ground. {@code gateSlot} is the
+	 * ring slot the gate cuts into, already chosen alongside the site so the
+	 * two never disagree.
 	 */
 	private void beginPointStructure(final Player player, final String rowId,
 		final VillageWork work, final WorkSite.Candidate site,
 		final PalisadeRing.RingModule gateSlot) {
 
-		worksStore.beginBuild(rowId,
-			new StoredLocation(player.getWorld().getUID(),
-				site.x(), site.baseY(), site.z()),
-			site.rotation());
+		final StoredLocation origin = new StoredLocation(
+			player.getWorld().getUID(), site.x(), site.baseY(), site.z());
+		worksStore.beginBuild(rowId, origin, site.rotation());
 		player.sendMessage("§6Work begins on " + work.getDisplayName() + ".");
 		if (gateSlot != null) {
 			demolishRingRun(player.getWorld(), gateSlot, site.baseY());
 		}
+		clearAndLevel(player.getWorld(), origin, SCHEMATICS.get(work),
+			site.rotation());
 		// The survey stakes go in while the donor is still standing there
 		advance(rowId, worksStore.get(rowId), System.currentTimeMillis());
 	}
 
 	/**
+	 * Trees down, hollows filled: the ground work a crew does before a
+	 * single stake goes in. The footprint is taken as the plan lies on the
+	 * ground, so a quarter-turned plan clears the width it truly covers.
+	 */
+	private static void clearAndLevel(final org.bukkit.World world,
+		final StoredLocation origin, final WorkSchematic schematic,
+		final int rotation) {
+
+		if (schematic == null) {
+			return;
+		}
+		final boolean turned = rotation % 2 != 0;
+		new SiteGround(world).prepare(origin.toLocation(),
+			turned ? schematic.getDepth() : schematic.getWidth(),
+			turned ? schematic.getWidth() : schematic.getDepth(),
+			schematic.getHeight());
+	}
+
+	/**
 	 * The palisade needs no site search — its ring is a function of the
 	 * village centre — so it begins straight away and plants its stakes.
+	 * The ring itself stays the fixed square {@link PalisadeRing} draws;
+	 * only what it is centred on comes from the villagers.
 	 */
 	private void startPalisade(final Player player, final String rowId,
 		final VillageWork work, final NamedVillage village) {
@@ -297,26 +336,52 @@ public class VillageFortification implements SubPlugin {
 				+ "say where the village ends.");
 			return;
 		}
-		worksStore.beginBuild(rowId, village.centre(), 0);
+		final VillageExtent.Extent extent = measureExtent(village);
+		final StoredLocation centre = new StoredLocation(
+			player.getWorld().getUID(), extent.centreX(),
+			village.centre().y(), extent.centreZ());
+		worksStore.beginBuild(rowId, centre, 0);
 		player.sendMessage("§6Work begins on " + work.getDisplayName() + ".");
-		placeStakeRing(player.getWorld(), village.centre());
+		placeStakeRing(player.getWorld(), centre);
 	}
 
 	/**
-	 * Walks a ring around the village looking for a footprint that is natural,
-	 * unoccupied and flat enough to level. Returns null rather than forcing a
-	 * bad site, the same way the raid spawner skips a spawn it cannot ground.
+	 * Searches the band around the village for a footprint worth levelling.
+	 * Returns null rather than forcing a bad site, the same way the raid
+	 * spawner skips a spawn it cannot ground.
 	 */
-	private WorkSite.Candidate findSite(final org.bukkit.World world,
-		final NamedVillage village, final VillageWork work) {
+	private static WorkSite.Candidate findSite(final SiteSearch search,
+		final VillageExtent.Extent extent, final VillageWork work) {
 
 		final WorkSchematic schematic = SCHEMATICS.get(work);
-		final int[] band = searchBand(work);
+		final int[] band = VillageExtent.band(extent, work);
 		if (schematic == null || band == null) {
 			return null;
 		}
-		return scanBand(world, band, schematic.getWidth(),
-			village.centre().x(), village.centre().z());
+		return search.find(extent, band, schematic.getWidth());
+	}
+
+	/**
+	 * The village as its people describe it. A stored centre is only where
+	 * its finder happened to stand, so everything sited around a village is
+	 * measured from the villagers themselves where enough are about.
+	 */
+	private static VillageExtent.Extent measureExtent(
+		final NamedVillage village) {
+
+		final Location centre = village.centre().toLocation();
+		final List<VillageExtent.Point> crowd = centre == null
+			|| centre.getWorld() == null ? List.of()
+			: centre.getWorld()
+				.getNearbyEntities(centre, CROWD_RADIUS, CROWD_HEIGHT,
+					CROWD_RADIUS)
+				.stream()
+				.filter(entity -> entity instanceof org.bukkit.entity.Villager)
+				.map(entity -> new VillageExtent.Point(
+					entity.getLocation().getX(), entity.getLocation().getZ()))
+				.toList();
+		return VillageExtent.measure(crowd, village.centre().x(),
+			village.centre().z());
 	}
 
 	/**
@@ -370,80 +435,6 @@ public class VillageFortification implements SubPlugin {
 			}
 		}
 		return null;
-	}
-
-	/** Walks each ring in the band from nearest to farthest. */
-	private WorkSite.Candidate scanBand(final org.bukkit.World world,
-		final int[] band, final int footprint, final double centreX,
-		final double centreZ) {
-
-		for (int radius = band[0]; radius <= band[1]; radius += 2) {
-			final WorkSite.Candidate found =
-				scanRing(world, radius, footprint, centreX, centreZ);
-			if (found != null) {
-				return found;
-			}
-		}
-		return null;
-	}
-
-	/** Walks one ring around the centre, returning the first usable spot. */
-	private WorkSite.Candidate scanRing(final org.bukkit.World world,
-		final int radius, final int footprint, final double centreX,
-		final double centreZ) {
-
-		for (int step = 0; step < 24; step++) {
-			final double angle = 2 * Math.PI * step / 24;
-			final int x = (int) Math.round(centreX + radius * Math.cos(angle));
-			final int z = (int) Math.round(centreZ + radius * Math.sin(angle));
-			final int[] heights = sampleHeights(world, x, z, footprint);
-			if (heights == null
-				|| !WorkSite.levelFits(heights, MAX_LEVEL_SPREAD)) {
-				continue;
-			}
-			return new WorkSite.Candidate(x, WorkSite.medianHeight(heights), z,
-				WorkSite.facingRotation(centreX - x, centreZ - z));
-		}
-		return null;
-	}
-
-	/**
-	 * How far from the centre each point structure belongs — the watchtower on
-	 * the outer edge, the bell tower among the houses. Tiers built along the
-	 * ring rather than around it have no band and site themselves.
-	 */
-	private static int[] searchBand(final VillageWork work) {
-		return switch (work) {
-			case WATCHTOWER -> new int[] {36, 46};
-			case BELL_TOWER -> new int[] {4, 12};
-			default -> null;
-		};
-	}
-
-	/**
-	 * Surface heights across the footprint, or null if any column is
-	 * unusable — no resolvable ground, or ground that is not natural
-	 * terrain. The naturalness check is what keeps a site from straddling a
-	 * village house or a player's build.
-	 */
-	private int[] sampleHeights(final org.bukkit.World world, final int x,
-		final int z, final int footprint) {
-
-		final int[] heights = new int[footprint * footprint];
-		int index = 0;
-		for (int dx = 0; dx < footprint; dx++) {
-			for (int dz = 0; dz < footprint; dz++) {
-				final Location ground = com.adeptum.questai.utility.SpawnGround
-					.findSurface(world, x + dx, z + dz);
-				if (ground == null || !com.adeptum.questai.utility.NaturalTerrain
-					.isSurface(ground.getBlock().getType())) {
-
-					return null;
-				}
-				heights[index++] = ground.getBlockY();
-			}
-		}
-		return heights;
 	}
 
 	private void tick() {

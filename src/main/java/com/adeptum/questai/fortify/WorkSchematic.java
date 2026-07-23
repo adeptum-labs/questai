@@ -27,13 +27,17 @@ public final class WorkSchematic {
 	private final int width;
 	@Getter
 	private final int depth;
+	/** Layers above the base, so a crew knows how much air to clear. */
+	@Getter
+	private final int height;
 	private final Map<BuildStage, List<SchematicEntry>> byStage;
 
-	private WorkSchematic(final int width, final int depth,
+	private WorkSchematic(final int width, final int depth, final int height,
 		final Map<BuildStage, List<SchematicEntry>> byStage) {
 
 		this.width = width;
 		this.depth = depth;
+		this.height = height;
 		this.byStage = byStage;
 	}
 
@@ -68,7 +72,8 @@ public final class WorkSchematic {
 			parseLine(line.strip(), state);
 			line = reader.readLine();
 		}
-		return new WorkSchematic(state.width, state.depth, state.byStage);
+		return new WorkSchematic(state.width, state.depth, state.maxY + 1,
+			state.byStage);
 	}
 
 	private static void parseLine(final String text, final ParseState state) {
@@ -81,6 +86,7 @@ public final class WorkSchematic {
 			applyDef(text, state);
 		} else if (text.startsWith("layer ")) {
 			state.layerY = Integer.parseInt(text.substring("layer ".length()).strip());
+			state.maxY = Math.max(state.maxY, state.layerY);
 			state.row = 0;
 		} else {
 			readGridRow(text, state.legend, state.byStage, state.layerY, state.row);
@@ -110,6 +116,7 @@ public final class WorkSchematic {
 		private int width;
 		private int depth;
 		private int layerY;
+		private int maxY;
 		private int row = -1;
 	}
 
