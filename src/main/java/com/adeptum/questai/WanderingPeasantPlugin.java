@@ -218,7 +218,7 @@ public class WanderingPeasantPlugin implements SubPlugin {
 		final boolean questAvailable = Math.random() <= QUEST_CHANCE;
 
 		conversationManager.startConversation(player, traderId,
-			name, "wandering traveler", questAvailable, false);
+			name, "wandering traveler", questAvailable, false, null);
 	}
 
 	@EventHandler

@@ -23,6 +23,7 @@ package com.adeptum.questai.dialogue;
 import static com.adeptum.questai.resourcepack.ResourcePackManager.CMD;
 import static com.adeptum.questai.resourcepack.ResourcePackManager.DIALOGUE_BANNER_GLYPH;
 
+import com.adeptum.questai.fortify.VillageWork;
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.utility.GuiItems;
 import net.kyori.adventure.key.Key;
@@ -37,6 +38,7 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Factory for 27-slot chest inventory GUIs used in the NPC conversation system.
@@ -125,7 +127,7 @@ public final class DialogueGui {
 	}
 
 	public static Inventory createOptions(final String npcName, final String dialogueText,
-		final boolean questAvailable, final boolean tradeable) {
+		final boolean questAvailable, final boolean tradeable, final boolean worksOpen) {
 
 		final Inventory inv = createBase(npcName, "", dialogueText);
 		inv.setItem(OPTION_1_SLOT,
@@ -140,8 +142,33 @@ public final class DialogueGui {
 			inv.setItem(OPTION_3_SLOT,
 				button(Material.EMERALD, "\u00a7a\u00a7lLet's trade", CMD));
 		}
+		if (worksOpen) {
+			inv.setItem(CENTER_SLOT,
+				button(Material.BRICKS,
+					"\u00a76\u00a7lThe village needs materials", CMD));
+		}
 		inv.setItem(OPTION_4_SLOT,
 			button(Material.RED_DYE, "\u00a7c\u00a7lI should get going", CMD));
+		return inv;
+	}
+
+	/** What the village still wants, and what the player is carrying. */
+	public static Inventory createWorkOffer(final String npcName,
+		final VillageWork work, final Map<String, Integer> outstanding,
+		final Map<String, Integer> carried) {
+
+		final Inventory inv = createBase(npcName, "",
+			"We are raising " + work.getDisplayName() + ".");
+
+		final List<String> lore = new ArrayList<>();
+		outstanding.forEach((role, amount) -> lore.add("\u00a77" + role
+			+ ": \u00a7f" + amount + " \u00a78(carrying "
+			+ carried.getOrDefault(role, 0) + ")"));
+
+		inv.setItem(OPTION_1_SLOT, GuiItems.item(Material.CHEST,
+			"\u00a7a\u00a7lDonate what I carry", lore, CMD));
+		inv.setItem(OPTION_4_SLOT,
+			button(Material.RED_DYE, "\u00a7c\u00a7lNot now", CMD));
 		return inv;
 	}
 

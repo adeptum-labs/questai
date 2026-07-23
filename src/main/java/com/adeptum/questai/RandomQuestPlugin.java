@@ -311,7 +311,7 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		conversationManager.startConversation(player, villager.getUniqueId(),
 			uniqueName, profession.name(), isQuestAvailable(villager, player),
-			tradeable);
+			tradeable, null);
 	}
 
 	private boolean isQuestAvailable(final Villager villager, final Player player) {

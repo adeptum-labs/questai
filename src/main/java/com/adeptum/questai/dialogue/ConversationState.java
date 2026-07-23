@@ -37,4 +37,6 @@ public class ConversationState {
 	private String lastAiResponse;
 	private boolean questAvailable;
 	private boolean tradeable;
+	/** Row id of the named village this villager stands in, or null. */
+	private String villageRowId;
 }

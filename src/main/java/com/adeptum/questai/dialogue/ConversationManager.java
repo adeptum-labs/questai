@@ -20,6 +20,10 @@
 
 package com.adeptum.questai.dialogue;
 
+import com.adeptum.questai.fortify.MaterialTally;
+import com.adeptum.questai.fortify.VillageWork;
+import com.adeptum.questai.fortify.VillageWorksStore;
+import com.adeptum.questai.fortify.WorkState;
 import com.adeptum.questai.model.world.Npc;
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
@@ -34,6 +38,7 @@ import com.adeptum.questai.villager.MemorySummarizer;
 import com.adeptum.questai.villager.VillagerProfile;
 import com.adeptum.questai.villager.VillagerProfileStore;
 import dev.langchain4j.model.openai.OpenAiChatModel;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -60,6 +65,8 @@ public class ConversationManager {
 	private QuestManager questManager;
 	private QuestGenerationService questService;
 	private BiConsumer<Player, Quest> questAcceptHandler;
+	private VillageWorksStore worksStore;
+	private BiConsumer<Player, String> workDonationHandler;
 
 	public ConversationManager(final JavaPlugin plugin, final OpenAiChatModel chatModel,
 		final VillagerProfileStore profileStore) {
@@ -81,9 +88,21 @@ public class ConversationManager {
 		this.questAcceptHandler = handler;
 	}
 
+	public void setWorksStore(final VillageWorksStore worksStore) {
+		this.worksStore = worksStore;
+	}
+
+	/** Called with the player and the village row id when they donate. */
+	public void setWorkDonationHandler(
+		final BiConsumer<Player, String> handler) {
+
+		this.workDonationHandler = handler;
+	}
+
 	public void startConversation(final Player player, final UUID npcUuid,
 		final String npcName, final String profession,
-		final boolean questAvailable, final boolean tradeable) {
+		final boolean questAvailable, final boolean tradeable,
+		final String villageRowId) {
 
 		if (isInConversation(player)) {
 			endConversation(player);
@@ -97,6 +116,7 @@ public class ConversationManager {
 			.questAvailable(questAvailable)
 			.tradeable(tradeable)
 			.build();
+		state.setVillageRowId(villageRowId);
 
 		conversations.put(player.getUniqueId(), state);
 		player.openInventory(DialogueGui.createThinking(npcName, profession));
@@ -147,6 +167,7 @@ public class ConversationManager {
 			case QUEST_OFFER -> handleQuestOffer(player, slot, state, npcName);
 			case QUEST_ACCEPT_REJECT -> handleQuestAcceptReject(player, slot, state);
 			case CHAT_RESPONSE -> handleChatResponse(player, slot, state, npcName, profession);
+			case WORK_OFFER -> handleWorkOffer(player, slot, state);
 		}
 	}
 
@@ -173,7 +194,8 @@ public class ConversationManager {
 		state.setPhase(ConversationPhase.OPTIONS);
 		player.openInventory(
 			DialogueGui.createOptions(npcName, state.getLastAiResponse(),
-				state.isQuestAvailable(), state.isTradeable()));
+				state.isQuestAvailable(), state.isTradeable(),
+				hasOpenWorks(state)));
 	}
 
 	private void handleOptions(final Player player, final int slot,
@@ -187,6 +209,8 @@ public class ConversationManager {
 			openVillagerTrade(player, state.getNpcUuid());
 		} else if (slot == DialogueGui.OPTION_4_SLOT) {
 			endConversation(player);
+		} else if (slot == DialogueGui.CENTER_SLOT && hasOpenWorks(state)) {
+			startWorkOffer(player, state, npcName);
 		}
 	}
 
@@ -248,6 +272,52 @@ public class ConversationManager {
 			startCasualChat(player, state, npcName, profession);
 		} else if (slot == DialogueGui.OPTION_2_SLOT && state.isQuestAvailable()) {
 			startQuestOffer(player, state, npcName, profession);
+		} else if (slot == DialogueGui.OPTION_4_SLOT) {
+			endConversation(player);
+		}
+	}
+
+	private boolean hasOpenWorks(final ConversationState state) {
+		if (worksStore == null || state.getVillageRowId() == null) {
+			return false;
+		}
+		final WorkState works = worksStore.get(state.getVillageRowId());
+		final int tier = works == null ? 0 : works.getTier();
+		final VillageWork work = VillageWork.byTier(tier);
+		return work != null && work.hasPlans();
+	}
+
+	private void startWorkOffer(final Player player,
+		final ConversationState state, final String npcName) {
+
+		final WorkState works = worksStore.get(state.getVillageRowId());
+		final VillageWork work =
+			VillageWork.byTier(works == null ? 0 : works.getTier());
+		if (work == null || !work.hasPlans()) {
+			return;
+		}
+
+		final Map<String, Integer> outstanding = new LinkedHashMap<>();
+		final Map<String, Integer> carried = new LinkedHashMap<>();
+		work.getRequirements().forEach((role, needed) -> {
+			final int have = works == null ? 0
+				: works.getTally().getOrDefault(role, 0);
+			outstanding.put(role, Math.max(0, needed - have));
+			carried.put(role, MaterialTally.count(
+				player.getInventory().getContents(), work.accepted(role)));
+		});
+
+		state.setPhase(ConversationPhase.WORK_OFFER);
+		player.openInventory(
+			DialogueGui.createWorkOffer(npcName, work, outstanding, carried));
+	}
+
+	private void handleWorkOffer(final Player player, final int slot,
+		final ConversationState state) {
+
+		if (slot == DialogueGui.OPTION_1_SLOT && workDonationHandler != null) {
+			workDonationHandler.accept(player, state.getVillageRowId());
+			endConversation(player);
 		} else if (slot == DialogueGui.OPTION_4_SLOT) {
 			endConversation(player);
 		}
