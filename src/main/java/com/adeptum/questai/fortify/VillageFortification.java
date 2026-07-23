@@ -167,10 +167,7 @@ public class VillageFortification implements SubPlugin {
 		final VillageWork work) {
 
 		final WorkState state = worksStore.get(rowId);
-		final boolean funded = work.getRequirements().entrySet().stream()
-			.allMatch(need -> state.getTally()
-				.getOrDefault(need.getKey(), 0) >= need.getValue());
-		if (!funded) {
+		if (!isFunded(work, state)) {
 			return;
 		}
 
@@ -180,21 +177,60 @@ public class VillageFortification implements SubPlugin {
 			return;
 		}
 
-		final WorkSite.Candidate site = village == null ? null
-			: findSite(player.getLocation().getWorld(), village, work);
+		final WorkSite.Candidate site = siteFor(player, rowId, work, village);
 		if (site == null) {
 			player.sendMessage(
 				"§7They have what they need, but nowhere level to build.");
 			return;
 		}
+		beginPointStructure(player, rowId, work, site);
+	}
+
+	/** Whether the village has been handed everything this tier asks for. */
+	private static boolean isFunded(final VillageWork work, final WorkState state) {
+		return work.getRequirements().entrySet().stream()
+			.allMatch(need -> state.getTally()
+				.getOrDefault(need.getKey(), 0) >= need.getValue());
+	}
+
+	/**
+	 * Where a point structure stands: the gate rides the palisade's ring line
+	 * at the recorded gate slot, everything else searches the apron band.
+	 */
+	private WorkSite.Candidate siteFor(final Player player, final String rowId,
+		final VillageWork work, final NamedVillage village) {
+
+		if (work == VillageWork.GATE) {
+			return gateSite(player.getWorld(), worksStore.get(rowId));
+		}
+		return village == null ? null
+			: findSite(player.getLocation().getWorld(), village, work);
+	}
+
+	/** Records the chosen site, opens the wall for the gate, then breaks ground. */
+	private void beginPointStructure(final Player player, final String rowId,
+		final VillageWork work, final WorkSite.Candidate site) {
 
 		worksStore.beginBuild(rowId,
 			new StoredLocation(player.getWorld().getUID(),
 				site.x(), site.baseY(), site.z()),
 			site.rotation());
 		player.sendMessage("§6Work begins on " + work.getDisplayName() + ".");
+		if (work == VillageWork.GATE) {
+			cutGateIntoRing(player.getWorld(), rowId, site);
+		}
 		// The survey stakes go in while the donor is still standing there
 		advance(rowId, worksStore.get(rowId), System.currentTimeMillis());
+	}
+
+	/** Opens the palisade where the gate now stands, if a ring was ever built. */
+	private void cutGateIntoRing(final org.bukkit.World world,
+		final String rowId, final WorkSite.Candidate site) {
+
+		final PalisadeRing.RingModule slot = gateRingSlot(worksStore.get(rowId));
+		if (slot != null) {
+			demolishRingRun(world, slot, site.baseY());
+		}
 	}
 
 	/**
@@ -229,6 +265,48 @@ public class VillageFortification implements SubPlugin {
 		}
 		return scanBand(world, band, schematic.getWidth(),
 			village.centre().x(), village.centre().z());
+	}
+
+	/**
+	 * The gate stands on the ring line at the slot the palisade's fronts
+	 * started from, opening toward the road. Its rotation is the ring
+	 * slot's plus a half turn, because point structures are drawn with the
+	 * outside on row one where ring pieces put it on their last row.
+	 */
+	private WorkSite.Candidate gateSite(final org.bukkit.World world,
+		final WorkState state) {
+
+		final PalisadeRing.RingModule slot = gateRingSlot(state);
+		if (slot == null) {
+			return null;
+		}
+		final Location ground = com.adeptum.questai.utility.SpawnGround
+			.findSurface(world, slot.x(), slot.z());
+		if (ground == null) {
+			return null;
+		}
+
+		final int rotation = Math.floorMod(slot.rotation() + 2, 4);
+		final WorkSchematic gate = SCHEMATICS.get(VillageWork.GATE);
+		// The passage centre, grid (5, 3), lands on the ring at the slot
+		final SchematicEntry anchor = WorkSchematic.rotate(
+			new SchematicEntry(5, 0, 3, PaletteRole.AIR, null,
+				BuildStage.SHELL),
+			rotation, gate.getWidth(), gate.getDepth());
+		return new WorkSite.Candidate(slot.x() + 2 - anchor.x(),
+			ground.getBlockY(), slot.z() - anchor.z(), rotation);
+	}
+
+	/** The ring slot the palisade recorded as the gate opening, if any. */
+	private PalisadeRing.RingModule gateRingSlot(final WorkState state) {
+		final WorkState.BuiltSite palisade = state == null ? null
+			: state.getBuiltSites().get(VillageWork.PALISADE.ordinal());
+		if (palisade == null) {
+			return null;
+		}
+		final List<PalisadeRing.RingModule> ring = PalisadeRing.ring(
+			(int) palisade.origin().x(), (int) palisade.origin().z());
+		return ring.get(PalisadeRing.gateIndex(ring));
 	}
 
 	/** Walks each ring in the band from nearest to farthest. */
@@ -669,6 +747,61 @@ public class VillageFortification implements SubPlugin {
 			if (data != null) {
 				block.setBlockData(data,
 					PlacementOrder.needsPhysics(entry.role()));
+			}
+		}
+	}
+
+	/** Opening the wall is loud and deliberate, not a silent swap. */
+	private void demolishRingRun(final org.bukkit.World world,
+		final PalisadeRing.RingModule slot, final int baseY) {
+
+		final int[] along = slot.rotation() % 2 == 0
+			? new int[] {1, 0} : new int[] {0, 1};
+		clearRingCells(world, slot, along, baseY);
+		closeRingCut(world, slot, along);
+	}
+
+	/** Breaks every palisade block standing across the gate's 9-wide run. */
+	private void clearRingCells(final org.bukkit.World world,
+		final PalisadeRing.RingModule slot, final int[] along,
+		final int baseY) {
+
+		for (int offset = -4; offset <= 4; offset++) {
+			final int x = slot.x() + (2 + offset) * along[0];
+			final int z = slot.z() + (2 + offset) * along[1];
+			clearRingColumn(world, x, z, baseY);
+		}
+	}
+
+	/** Breaks the palisade blocks standing in one column of the cut. */
+	private static void clearRingColumn(final org.bukkit.World world,
+		final int x, final int z, final int baseY) {
+
+		for (int y = baseY - 1; y <= baseY + 5; y++) {
+			final org.bukkit.block.Block block = world.getBlockAt(x, y, z);
+			if (block.getType().isAir() || com.adeptum.questai.utility
+				.NaturalTerrain.isSurface(block.getType())) {
+				continue;
+			}
+			world.spawnParticle(org.bukkit.Particle.BLOCK,
+				block.getLocation().add(0.5, 0.5, 0.5), 12,
+				block.getBlockData());
+			block.setType(org.bukkit.Material.AIR, false);
+		}
+	}
+
+	/** Closes the cut with an end post one cell beyond each side of the run. */
+	private void closeRingCut(final org.bukkit.World world,
+		final PalisadeRing.RingModule slot, final int[] along) {
+
+		for (final int side : new int[] {-5, 5}) {
+			final PalisadeRing.RingModule post = new PalisadeRing.RingModule(
+				slot.x() + (2 + side) * along[0],
+				slot.z() + (2 + side) * along[1],
+				slot.rotation(), PalisadeRing.Kind.CORNER);
+			final Integer postBase = slotBase(world, post);
+			if (postBase != null) {
+				placePiece(world, PIECE_END, post, postBase);
 			}
 		}
 	}

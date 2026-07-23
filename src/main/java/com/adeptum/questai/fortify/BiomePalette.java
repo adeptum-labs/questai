@@ -119,9 +119,11 @@ public final class BiomePalette {
 		map.put(PaletteRole.WALL_TORCH, Material.WALL_TORCH);
 		map.put(PaletteRole.CAMPFIRE, Material.CAMPFIRE);
 		map.put(PaletteRole.BANNER, Material.WHITE_BANNER);
+		map.put(PaletteRole.WALL_BANNER, Material.WHITE_WALL_BANNER);
 		map.put(PaletteRole.BARREL, Material.BARREL);
 		map.put(PaletteRole.HAY, Material.HAY_BLOCK);
 		map.put(PaletteRole.SPOIL, Material.COARSE_DIRT);
+		map.put(PaletteRole.PATH, Material.DIRT_PATH);
 		map.put(PaletteRole.CAULDRON, Material.WATER_CAULDRON);
 		map.put(PaletteRole.SCAFFOLDING, Material.SCAFFOLDING);
 		return map;
