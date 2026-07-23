@@ -125,7 +125,7 @@ public final class VillageWorksStore {
 		final WorkState state = new WorkState();
 		state.setTier(readInt(row, "tier"));
 		state.setStage(readInt(row, "stage"));
-		state.setStageAt(row.getLong("stageAt"));
+		state.setStageAt(readLong(row, "stageAt"));
 		state.setRotation(readInt(row, "rotation"));
 
 		final ConfigurationSection site = row.getConfigurationSection("site");
@@ -172,6 +172,23 @@ public final class VillageWorksStore {
 			throw new IllegalArgumentException(path + " is not a number");
 		}
 		return number.intValue();
+	}
+
+	/**
+	 * Reads a long, refusing a non-numeric value rather than silently
+	 * defaulting it to zero, so a corrupt row is skipped as malformed.
+	 */
+	private static long readLong(final ConfigurationSection section,
+		final String path) {
+
+		final Object raw = section.get(path);
+		if (raw == null) {
+			return 0L;
+		}
+		if (!(raw instanceof Number number)) {
+			throw new IllegalArgumentException(path + " is not a number");
+		}
+		return number.longValue();
 	}
 
 	private void save() {

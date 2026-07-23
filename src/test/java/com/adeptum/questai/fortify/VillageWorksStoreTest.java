@@ -113,4 +113,21 @@ class VillageWorksStoreTest {
 		assertEquals(7, reloaded.get(ROW).getTally().get("logs"));
 		assertNull(reloaded.get("broken"));
 	}
+
+	@Test
+	void aCorruptStageTimestampSkipsTheRow(@TempDir final Path folder)
+		throws Exception {
+
+		final VillageWorksStore store = new VillageWorksStore(pluginIn(folder));
+		store.donate(ROW, "logs", 7);
+
+		final File file = new File(folder.toFile(), "village-works.yml");
+		final String text = java.nio.file.Files.readString(file.toPath());
+		java.nio.file.Files.writeString(file.toPath(),
+			text + "\n  broken2:\n    stageAt: not-a-number\n");
+
+		final VillageWorksStore reloaded = new VillageWorksStore(pluginIn(folder));
+		assertEquals(7, reloaded.get(ROW).getTally().get("logs"));
+		assertNull(reloaded.get("broken2"));
+	}
 }
