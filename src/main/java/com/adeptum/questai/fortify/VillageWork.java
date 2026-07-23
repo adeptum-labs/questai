@@ -25,7 +25,7 @@ public enum VillageWork {
 
 	WATCHTOWER("a watchtower", 900, 0.05, true, "structures/watchtower.txt",
 		requirements("rough_stone", 64, "logs", 32)),
-	PALISADE("a palisade", 1400, 0.08, false, null,
+	PALISADE("a palisade", 1400, 0.08, true, null,
 		requirements("logs", 192, "rough_stone", 64)),
 	GATE("a gate", 2200, 0.18, false, null,
 		requirements("dressed_stone", 128, "iron", 24, "torches", 16)),
