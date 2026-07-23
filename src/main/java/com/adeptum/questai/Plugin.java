@@ -31,6 +31,8 @@ import com.adeptum.questai.mob.RatCooking;
 import com.adeptum.questai.mob.RatSpawner;
 import com.adeptum.questai.quest.QuestLogListener;
 import com.adeptum.questai.relic.RelicListener;
+import com.adeptum.questai.reputation.Standings;
+import com.adeptum.questai.reputation.VillageReputationStore;
 import com.adeptum.questai.resourcepack.ResourcePackManager;
 import com.adeptum.questai.star.StarfallManager;
 import com.adeptum.questai.service.QuestGenerationService;
@@ -79,12 +81,15 @@ public class Plugin extends JavaPlugin implements Listener {
 
 		final PluginManager pm = getServer().getPluginManager();
 
-		final VillageEventManager eventManager =
-			new VillageEventManager(this, profileStore);
 		// Wider than EVENT_RADIUS: the stored centre is wherever the
 		// discoverer stood, so a tight radius greets big villages late
 		final VillageRegistry registry = new VillageRegistry(this,
 			config.getDouble("villages.nameplate.radius", 64.0));
+		final VillageReputationStore reputationStore =
+			new VillageReputationStore(this);
+		final Standings standings = new Standings(registry, reputationStore);
+		final VillageEventManager eventManager =
+			new VillageEventManager(this, profileStore, standings);
 		final MobForge mobForge = new MobForge(this);
 		final VillageWorksStore worksStore = new VillageWorksStore(this);
 		final VillageFortification fortification = new VillageFortification(

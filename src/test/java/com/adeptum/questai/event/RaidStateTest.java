@@ -81,4 +81,16 @@ class RaidStateTest {
 		assertFalse(raid.onRaiderDeath(UUID.randomUUID()));
 		assertEquals(RaidState.Outcome.ONGOING, raid.check(1000L));
 	}
+
+	@Test
+	void villagerLossesAreCounted() {
+		final UUID raider = UUID.randomUUID();
+		final RaidState raid = raid(Set.of(raider));
+		raid.onVillagerLost();
+		raid.onVillagerLost();
+		raid.onRaiderDeath(raider);
+
+		assertEquals(2, raid.getVillagersLost());
+		assertEquals(RaidState.Outcome.FAILED, raid.check(1000L));
+	}
 }

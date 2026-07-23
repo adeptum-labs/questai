@@ -48,7 +48,7 @@ public final class RaidState {
 
 	private final Set<UUID> raidersAlive = new HashSet<>();
 	private boolean raiderEscaped;
-	private boolean villagerLost;
+	private int villagersLost;
 
 	public RaidState(final VillageKey key, final StoredLocation center,
 		final long deadline, final Set<UUID> raiderIds) {
@@ -76,9 +76,14 @@ public final class RaidState {
 		}
 	}
 
-	/** Marks that a watched villager died during the raid. */
+	/** Marks one of the watched villagers as lost to the raid. */
 	public void onVillagerLost() {
-		villagerLost = true;
+		villagersLost++;
+	}
+
+	/** How many villagers this raid has cost so far. */
+	public int getVillagersLost() {
+		return villagersLost;
 	}
 
 	public Set<UUID> aliveRaiders() {
@@ -87,7 +92,7 @@ public final class RaidState {
 
 	public Outcome check(final long now) {
 		if (raidersAlive.isEmpty()) {
-			return raiderEscaped || villagerLost
+			return raiderEscaped || villagersLost > 0
 				? Outcome.FAILED : Outcome.DEFENDED;
 		}
 		return now > deadline ? Outcome.FAILED : Outcome.ONGOING;

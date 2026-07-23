@@ -22,6 +22,8 @@ package com.adeptum.questai.event;
 
 import com.adeptum.questai.SubPlugin;
 import com.adeptum.questai.model.VillageInfo;
+import com.adeptum.questai.reputation.Reputation;
+import com.adeptum.questai.reputation.Standings;
 import com.adeptum.questai.utility.SpawnGround;
 import com.adeptum.questai.villager.MemoryEvent;
 import com.adeptum.questai.villager.StoredLocation;
@@ -59,6 +61,7 @@ public class VillageEventManager implements SubPlugin, VillageCheckListener {
 
 	private final JavaPlugin plugin;
 	private final VillagerProfileStore profileStore;
+	private final Standings standings;
 
 	private final Map<VillageKey, RaidState> raids = new HashMap<>();
 	private final Map<VillageKey, FestivalState> festivals = new HashMap<>();
@@ -67,10 +70,11 @@ public class VillageEventManager implements SubPlugin, VillageCheckListener {
 	private BukkitTask task;
 
 	public VillageEventManager(final JavaPlugin plugin,
-		final VillagerProfileStore profileStore) {
+		final VillagerProfileStore profileStore, final Standings standings) {
 
 		this.plugin = plugin;
 		this.profileStore = profileStore;
+		this.standings = standings;
 	}
 
 	@Override
@@ -264,7 +268,7 @@ public class VillageEventManager implements SubPlugin, VillageCheckListener {
 		if (outcome == RaidState.Outcome.DEFENDED) {
 			finishDefended(raid);
 		} else {
-			removeRaiders(raid);
+			finishFailed(raid);
 		}
 	}
 
@@ -281,7 +285,7 @@ public class VillageEventManager implements SubPlugin, VillageCheckListener {
 				finishDefended(raid);
 			} else if (outcome == RaidState.Outcome.FAILED) {
 				iterator.remove();
-				removeRaiders(raid);
+				finishFailed(raid);
 			}
 		}
 		tickFestivals(now);
@@ -355,10 +359,31 @@ public class VillageEventManager implements SubPlugin, VillageCheckListener {
 			}
 		}
 		for (final Player player : players) {
+			standings.change(player, center, Reputation.RAID_DEFENDED);
 			player.sendMessage(
 				"\u00a7aThe raid is broken! The villagers will remember this.");
 			player.playSound(player.getLocation(),
 				Sound.ENTITY_VILLAGER_CELEBRATE, 1.0f, 1.0f);
+		}
+	}
+
+	/**
+	 * A raid the village lost. Whoever stood close enough to have fought
+	 * carries the blame \u2014 and more of it for every villager that fell.
+	 */
+	private void finishFailed(final RaidState raid) {
+		removeRaiders(raid);
+		final World world = Bukkit.getWorld(raid.getCenter().worldId());
+		if (world == null) {
+			return;
+		}
+		final Location center = raid.getCenter().toLocation();
+		final int blame = Reputation.RAID_FAILED
+			+ raid.getVillagersLost() * Reputation.VILLAGER_LOST;
+		for (final Player player : playersNear(center)) {
+			player.sendMessage(
+				"§cThe raid has taken its toll on the village.");
+			standings.change(player, center, blame);
 		}
 	}
 
