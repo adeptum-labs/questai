@@ -257,7 +257,11 @@ public class MobForge implements SubPlugin {
 		}
 	}
 
-	private ItemStack buildGear(final MobDrops.GearRoll roll) {
+	/**
+	 * Turns a roll into an ItemStack. This is the shared way to apply the
+	 * enchantment registry mapping that only this class owns.
+	 */
+	public ItemStack buildGear(final MobDrops.GearRoll roll) {
 		final ItemStack item = new ItemStack(roll.item().getMaterial());
 		for (final Map.Entry<GearEnchant, Integer> entry
 			: roll.enchants().entrySet()) {
