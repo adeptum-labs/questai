@@ -179,8 +179,7 @@ public final class WorkSchematic {
 		if (rotated.contains("axis=x")) {
 			rotated = rotated.replace("axis=x", "axis=z");
 		} else if (rotated.contains("axis=z")) {
-			rotated = rotated.replace("axis=x", "axis=x")
-				.replace("axis=z", "axis=x");
+			rotated = rotated.replace("axis=z", "axis=x");
 		}
 		return rotateBanner(rotated);
 	}
