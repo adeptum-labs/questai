@@ -19,7 +19,7 @@ def E WOOD_STAIRS facing=east,half=top SHELL
 def P PLANKS - ROOF
 def o STONE_WALL - ROOF
 def s STONE_STAIRS facing=south,half=bottom DETAIL
-def F FENCE - DETAIL
+def F FENCE - ROOF
 def u TRAPDOOR facing=south,open=true DETAIL
 def G LANTERN hanging=false DETAIL
 def g LANTERN hanging=true DETAIL

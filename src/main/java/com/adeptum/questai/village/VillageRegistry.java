@@ -108,6 +108,20 @@ public class VillageRegistry {
 	}
 
 	/**
+	 * The known village whose row id matches, or null when none does. A
+	 * donor can stand just past {@link #find}'s claim radius, at the
+	 * village's edge, while the works row still names the village by id.
+	 */
+	public synchronized NamedVillage byRowId(final String rowId) {
+		for (final NamedVillage village : villages.values()) {
+			if (rowIdFor(village).equals(rowId)) {
+				return village;
+			}
+		}
+		return null;
+	}
+
+	/**
 	 * The persistence key for a village, shared with any store that hangs
 	 * state off a village rather than off a cell.
 	 */

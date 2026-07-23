@@ -132,6 +132,24 @@ class VillageWorksStoreTest {
 	}
 
 	@Test
+	void aCorruptSiteCoordinateSkipsTheRow(@TempDir final Path folder)
+		throws Exception {
+
+		final VillageWorksStore store = new VillageWorksStore(pluginIn(folder));
+		store.donate(ROW, "logs", 7);
+
+		final File file = new File(folder.toFile(), "village-works.yml");
+		final String text = java.nio.file.Files.readString(file.toPath());
+		java.nio.file.Files.writeString(file.toPath(), text
+			+ "\n  broken3:\n    site:\n      world: " + UUID.randomUUID()
+			+ "\n      x: not-a-number\n      y: 64\n      z: 0\n");
+
+		final VillageWorksStore reloaded = new VillageWorksStore(pluginIn(folder));
+		assertEquals(7, reloaded.get(ROW).getTally().get("logs"));
+		assertNull(reloaded.get("broken3"));
+	}
+
+	@Test
 	void palisadeFrontsAndGapsSurviveAReload(@TempDir final Path folder) {
 		final VillageWorksStore store = new VillageWorksStore(pluginIn(folder));
 		store.donate(ROW, "logs", 1);

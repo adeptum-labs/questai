@@ -11,6 +11,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.logging.Level;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -40,6 +41,11 @@ public class VillageFortification implements SubPlugin {
 	private static final WorkSchematic PIECE_SEAM =
 		WorkSchematic.load("structures/palisade-seam.txt");
 	private static final int MODULES_PER_PULSE = 2;
+	// Tried in this order from the recorded gate index: the line itself,
+	// then the slots bracketing it outward, so a puddle at the exact gate
+	// line does not block the gate forever
+	private static final int[] GATE_SLOT_OFFSETS =
+		{0, 1, -1, 2, -2, 3, -3, 4, -4};
 
 	private final JavaPlugin plugin;
 	private final VillageRegistry registry;
@@ -90,6 +96,9 @@ public class VillageFortification implements SubPlugin {
 
 	/** The works key for the village at this location, or null when none. */
 	public String rowIdAt(final Location location) {
+		if (!enabled) {
+			return null;
+		}
 		final NamedVillage village = registry.find(location);
 		return village == null ? null : VillageRegistry.rowIdFor(village);
 	}
@@ -119,7 +128,7 @@ public class VillageFortification implements SubPlugin {
 	 * is still outstanding, and starts the build once it is fully funded.
 	 */
 	public void donate(final Player player, final String rowId) {
-		if (rowId == null) {
+		if (cannotDonate(rowId)) {
 			return;
 		}
 		final WorkState state = worksStore.get(rowId);
@@ -131,12 +140,32 @@ public class VillageFortification implements SubPlugin {
 
 		final int given = applyDonations(player, rowId, work, state);
 		if (given == 0) {
+			if (readyToRetryBuild(work, state)) {
+				startBuildIfFunded(player, rowId, work);
+				return;
+			}
 			player.sendMessage("§7They have all they need from you for now.");
 			return;
 		}
 		player.sendMessage("§aYou hand over " + given
 			+ " toward " + work.getDisplayName() + ".");
 		startBuildIfFunded(player, rowId, work);
+	}
+
+	/** True when the feature is off, or the click named no real works row. */
+	private boolean cannotDonate(final String rowId) {
+		return !enabled || rowId == null;
+	}
+
+	/**
+	 * Whether a click that handed over nothing new should still retry site
+	 * selection: the tier is fully funded but no site was ever secured, so
+	 * every later donation would otherwise dead-end on the same message.
+	 */
+	private static boolean readyToRetryBuild(final VillageWork work,
+		final WorkState state) {
+
+		return state != null && state.getSite() == null && isFunded(work, state);
 	}
 
 	/** Whether this village still wants donations toward its active tier. */
@@ -179,19 +208,33 @@ public class VillageFortification implements SubPlugin {
 			return;
 		}
 
-		final NamedVillage village = registry.find(player.getLocation());
+		final NamedVillage village = resolveVillage(player, rowId);
 		if (work == VillageWork.PALISADE) {
 			startPalisade(player, rowId, work, village);
 			return;
 		}
+		if (work == VillageWork.GATE) {
+			startGate(player, rowId, work, state);
+			return;
+		}
 
-		final WorkSite.Candidate site = siteFor(player, rowId, work, village);
+		final WorkSite.Candidate site = village == null ? null
+			: findSite(player.getLocation().getWorld(), village, work);
 		if (site == null) {
 			player.sendMessage(
 				"§7They have what they need, but nowhere level to build.");
 			return;
 		}
-		beginPointStructure(player, rowId, work, site);
+		beginPointStructure(player, rowId, work, site, null);
+	}
+
+	/**
+	 * The village at the donor's feet, or by row id when they have stepped
+	 * past the claim radius while a still-open works row names the village.
+	 */
+	private NamedVillage resolveVillage(final Player player, final String rowId) {
+		final NamedVillage found = registry.find(player.getLocation());
+		return found != null ? found : registry.byRowId(rowId);
 	}
 
 	/** Whether the village has been handed everything this tier asks for. */
@@ -202,43 +245,44 @@ public class VillageFortification implements SubPlugin {
 	}
 
 	/**
-	 * Where a point structure stands: the gate rides the palisade's ring line
-	 * at the recorded gate slot, everything else searches the apron band.
+	 * The gate rides the palisade's ring line. When the recorded slot's
+	 * ground cannot be built on, the nearest slots either side are tried
+	 * before giving up, so a puddle at the exact line cannot block it.
 	 */
-	private WorkSite.Candidate siteFor(final Player player, final String rowId,
-		final VillageWork work, final NamedVillage village) {
+	private void startGate(final Player player, final String rowId,
+		final VillageWork work, final WorkState state) {
 
-		if (work == VillageWork.GATE) {
-			return gateSite(player.getWorld(), worksStore.get(rowId));
+		final org.bukkit.World world = player.getWorld();
+		final PalisadeRing.RingModule slot = gateRingSlot(world, state);
+		final WorkSite.Candidate site =
+			slot == null ? null : gateSite(world, slot);
+		if (site == null) {
+			player.sendMessage(
+				"§7They have what they need, but nowhere level to build.");
+			return;
 		}
-		return village == null ? null
-			: findSite(player.getLocation().getWorld(), village, work);
+		beginPointStructure(player, rowId, work, site, slot);
 	}
 
-	/** Records the chosen site, opens the wall for the gate, then breaks ground. */
+	/**
+	 * Records the chosen site, opens the wall for the gate when it is one,
+	 * then breaks ground. {@code gateSlot} is the ring slot the gate cuts
+	 * into, already chosen alongside the site so the two never disagree.
+	 */
 	private void beginPointStructure(final Player player, final String rowId,
-		final VillageWork work, final WorkSite.Candidate site) {
+		final VillageWork work, final WorkSite.Candidate site,
+		final PalisadeRing.RingModule gateSlot) {
 
 		worksStore.beginBuild(rowId,
 			new StoredLocation(player.getWorld().getUID(),
 				site.x(), site.baseY(), site.z()),
 			site.rotation());
 		player.sendMessage("§6Work begins on " + work.getDisplayName() + ".");
-		if (work == VillageWork.GATE) {
-			cutGateIntoRing(player.getWorld(), rowId, site);
+		if (gateSlot != null) {
+			demolishRingRun(player.getWorld(), gateSlot, site.baseY());
 		}
 		// The survey stakes go in while the donor is still standing there
 		advance(rowId, worksStore.get(rowId), System.currentTimeMillis());
-	}
-
-	/** Opens the palisade where the gate now stands, if a ring was ever built. */
-	private void cutGateIntoRing(final org.bukkit.World world,
-		final String rowId, final WorkSite.Candidate site) {
-
-		final PalisadeRing.RingModule slot = gateRingSlot(worksStore.get(rowId));
-		if (slot != null) {
-			demolishRingRun(world, slot, site.baseY());
-		}
 	}
 
 	/**
@@ -249,8 +293,8 @@ public class VillageFortification implements SubPlugin {
 		final VillageWork work, final NamedVillage village) {
 
 		if (village == null) {
-			player.sendMessage(
-				"§7They have what they need, but nowhere level to build.");
+			player.sendMessage("§7They have what they need, but nobody can "
+				+ "say where the village ends.");
 			return;
 		}
 		worksStore.beginBuild(rowId, village.centre(), 0);
@@ -276,18 +320,14 @@ public class VillageFortification implements SubPlugin {
 	}
 
 	/**
-	 * The gate stands on the ring line at the slot the palisade's fronts
-	 * started from, opening toward the road. Its rotation is the ring
-	 * slot's plus a half turn, because point structures are drawn with the
-	 * outside on row one where ring pieces put it on their last row.
+	 * The gate stands on the ring line at the given slot, opening toward the
+	 * road. Its rotation is the ring slot's plus a half turn, because point
+	 * structures are drawn with the outside on row one where ring pieces put
+	 * it on their last row.
 	 */
 	private WorkSite.Candidate gateSite(final org.bukkit.World world,
-		final WorkState state) {
+		final PalisadeRing.RingModule slot) {
 
-		final PalisadeRing.RingModule slot = gateRingSlot(state);
-		if (slot == null) {
-			return null;
-		}
 		final Location ground = com.adeptum.questai.utility.SpawnGround
 			.findSurface(world, slot.x(), slot.z());
 		if (ground == null) {
@@ -305,8 +345,14 @@ public class VillageFortification implements SubPlugin {
 			ground.getBlockY(), slot.z() - anchor.z(), rotation);
 	}
 
-	/** The ring slot the palisade recorded as the gate opening, if any. */
-	private PalisadeRing.RingModule gateRingSlot(final WorkState state) {
+	/**
+	 * The ring slot the palisade recorded as the gate opening, or null when
+	 * no palisade stands yet. Tries that slot first, then the slots
+	 * bracketing it outward, keeping the first one whose ground resolves.
+	 */
+	private PalisadeRing.RingModule gateRingSlot(final org.bukkit.World world,
+		final WorkState state) {
+
 		final WorkState.BuiltSite palisade = state == null ? null
 			: state.getBuiltSites().get(VillageWork.PALISADE.ordinal());
 		if (palisade == null) {
@@ -314,7 +360,16 @@ public class VillageFortification implements SubPlugin {
 		}
 		final List<PalisadeRing.RingModule> ring = PalisadeRing.ring(
 			(int) palisade.origin().x(), (int) palisade.origin().z());
-		return ring.get(PalisadeRing.gateIndex(ring));
+		final int gateIndex = PalisadeRing.gateIndex(ring);
+		for (final int offset : GATE_SLOT_OFFSETS) {
+			final PalisadeRing.RingModule slot =
+				ring.get(Math.floorMod(gateIndex + offset, ring.size()));
+			if (com.adeptum.questai.utility.SpawnGround
+				.findSurface(world, slot.x(), slot.z()) != null) {
+				return slot;
+			}
+		}
+		return null;
 	}
 
 	/** Walks each ring in the band from nearest to farthest. */
@@ -393,7 +448,19 @@ public class VillageFortification implements SubPlugin {
 
 	private void tick() {
 		final long now = System.currentTimeMillis();
-		worksStore.all().forEach((rowId, state) -> tickOne(rowId, state, now));
+		worksStore.all().forEach((rowId, state) -> tickRow(rowId, state, now));
+	}
+
+	/** One bad row must not stop every other village's works from ticking. */
+	private void tickRow(final String rowId, final WorkState state,
+		final long now) {
+
+		try {
+			tickOne(rowId, state, now);
+		} catch (final RuntimeException e) {
+			plugin.getLogger().log(Level.WARNING,
+				"[VillageFortification] Skipping works row " + rowId, e);
+		}
 	}
 
 	/** Palisade rows pulse on their own clock; everything else stages. */
@@ -421,6 +488,12 @@ public class VillageFortification implements SubPlugin {
 		final WorkSchematic schematic = schematicFor(work);
 		final Location site = siteLocation(state);
 		if (schematic == null || site == null || !witnessed(site)) {
+			return;
+		}
+		if (state.getStage() >= BuildStage.values().length) {
+			// A row persisted past the last stage, most likely a crash
+			// between placing it and recording the tier as complete
+			worksStore.completeTier(rowId);
 			return;
 		}
 		final BuildStage stage = BuildStage.values()[state.getStage()];

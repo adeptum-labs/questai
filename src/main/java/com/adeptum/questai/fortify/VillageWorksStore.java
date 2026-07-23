@@ -156,7 +156,8 @@ public final class VillageWorksStore {
 		if (site != null) {
 			state.setSite(new StoredLocation(
 				UUID.fromString(site.getString("world")),
-				site.getDouble("x"), site.getDouble("y"), site.getDouble("z")));
+				readDouble(site, "x"), readDouble(site, "y"),
+				readDouble(site, "z")));
 		}
 
 		final ConfigurationSection tally = row.getConfigurationSection("tally");
@@ -178,8 +179,8 @@ public final class VillageWorksStore {
 				state.getBuiltSites().put(Integer.parseInt(tier),
 					new WorkState.BuiltSite(new StoredLocation(
 						UUID.fromString(entry.getString("world")),
-						entry.getDouble("x"), entry.getDouble("y"),
-						entry.getDouble("z")), readInt(entry, "rotation")));
+						readDouble(entry, "x"), readDouble(entry, "y"),
+						readDouble(entry, "z")), readInt(entry, "rotation")));
 			}
 		}
 		return state;
@@ -217,6 +218,23 @@ public final class VillageWorksStore {
 			throw new IllegalArgumentException(path + " is not a number");
 		}
 		return number.longValue();
+	}
+
+	/**
+	 * Reads a double, refusing a non-numeric value rather than silently
+	 * defaulting it to zero, so a corrupt row is skipped as malformed.
+	 */
+	private static double readDouble(final ConfigurationSection section,
+		final String path) {
+
+		final Object raw = section.get(path);
+		if (raw == null) {
+			return 0.0;
+		}
+		if (!(raw instanceof Number number)) {
+			throw new IllegalArgumentException(path + " is not a number");
+		}
+		return number.doubleValue();
 	}
 
 	private void save() {
