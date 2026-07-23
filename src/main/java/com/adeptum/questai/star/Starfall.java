@@ -31,13 +31,13 @@ import org.bukkit.Material;
 /**
  * The tunables and pure geometry behind the starfall event. Impacts only
  * ever target and carve ordinary natural terrain, and the trigger math
- * keeps starfalls very rare: roughly one per six to ten real hours across
- * the whole server.
+ * keeps starfalls very rare: roughly one per eighteen to thirty real
+ * hours across the whole server.
  */
 public final class Starfall {
 
-	/** About one hit per 240 eligible 30-second polls (~4.8 h of night). */
-	public static final double STARFALL_CHANCE = 1.0 / 240;
+	/** About one hit per 720 eligible 30-second polls (~14 h of night). */
+	public static final double STARFALL_CHANCE = 1.0 / 720;
 	public static final long COOLDOWN_MILLIS = 6L * 60 * 60 * 1000;
 	public static final int IMPACT_MIN = 200;
 	public static final int IMPACT_MAX = 500;
