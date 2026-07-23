@@ -36,6 +36,12 @@ public final class Standings {
 		return rowId == null ? 0 : store.get(rowId, playerId);
 	}
 
+	/** The works key for the village at this location, or null when none. */
+	public String rowIdAt(final Location location) {
+		final NamedVillage village = registry.find(location);
+		return village == null ? null : VillageRegistry.rowIdFor(village);
+	}
+
 	/**
 	 * Applies a deed to the village at this location. The player only
 	 * hears about it when their standing crosses into another bucket, so
@@ -53,8 +59,8 @@ public final class Standings {
 		final int before = store.get(rowId, player.getUniqueId());
 		final int after = store.adjust(rowId, player.getUniqueId(), delta);
 		if (Reputation.standing(before) != Reputation.standing(after)) {
-			player.sendMessage("§7Your standing with §6" + village.name()
-				+ "§7 has " + (after > before ? "risen." : "fallen."));
+			player.sendMessage("\u00a77Your standing with \u00a76" + village.name()
+				+ "\u00a77 has " + (after > before ? "risen." : "fallen."));
 		}
 	}
 }

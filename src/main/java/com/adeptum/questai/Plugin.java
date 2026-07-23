@@ -95,8 +95,11 @@ public class Plugin extends JavaPlugin implements Listener {
 		final VillageWorksStore worksStore = new VillageWorksStore(this);
 		final VillageFortification fortification = new VillageFortification(
 			this, registry, worksStore, profileStore, mobForge);
-		conversationManager.setWorksStore(worksStore);
-		conversationManager.setWorkDonationHandler(fortification::donate);
+		// A disabled fortify keeps its donation entry out of the dialogue GUI
+		if (fortification.isEnabled()) {
+			conversationManager.setWorksStore(worksStore);
+			conversationManager.setWorkDonationHandler(fortification::donate);
+		}
 		conversationManager.setStandings(standings);
 		final RandomQuestPlugin randomQuestPlugin =
 			new RandomQuestPlugin(this, conversationManager, questService,

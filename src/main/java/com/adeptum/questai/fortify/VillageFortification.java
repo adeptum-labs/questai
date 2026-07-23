@@ -96,6 +96,11 @@ public class VillageFortification implements SubPlugin {
 		}
 	}
 
+	/** True while the fortify feature is switched on in config. */
+	public boolean isEnabled() {
+		return enabled;
+	}
+
 	/** The works key for the village at this location, or null when none. */
 	public String rowIdAt(final Location location) {
 		if (!enabled) {

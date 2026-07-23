@@ -10,6 +10,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.block.BlockBreakEvent;
 
 /**
@@ -39,7 +40,7 @@ public final class DemolitionWatch implements SubPlugin {
 	public void onDisable() {
 	}
 
-	@EventHandler
+	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
 	public void onBlockBreak(final BlockBreakEvent event) {
 		final Location where = event.getBlock().getLocation();
 		final NamedVillage village = registry.find(where);

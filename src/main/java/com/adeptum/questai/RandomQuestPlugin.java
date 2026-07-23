@@ -210,6 +210,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		removeQuestIndicator(quest.getVillagerUuid());
 
 		String completionMessage = message;
+		final int standingBefore = readStandingBefore(player, quest);
 		if (quest.getVillagerUuid() != null) {
 			profileStore.recordEvent(quest.getVillagerUuid(), player.getUniqueId(),
 				MemoryEvent.Type.QUEST_COMPLETED, quest.getShortTitle());
@@ -222,9 +223,22 @@ public class RandomQuestPlugin implements SubPlugin {
 		}
 		final double relicChance = progressChain(player, quest);
 		player.sendMessage(completionMessage);
-		rewardPlayer(player, quest);
+		rewardPlayer(player, quest, standingBefore);
 		maybeAwardRelic(player, relicChance);
 		return true;
+	}
+
+	/**
+	 * Standing with the quest's anchor village before this completion's
+	 * award lands; zero when standing is unwired or the quest names no
+	 * giver, so an unwired reward path stays unscaled.
+	 */
+	private int readStandingBefore(final Player player, final Quest quest) {
+		if (standings == null || quest.getVillagerUuid() == null) {
+			return 0;
+		}
+		return standings.at(questAnchor(player, quest.getVillagerUuid()),
+			player.getUniqueId());
 	}
 
 	/**
@@ -235,13 +249,22 @@ public class RandomQuestPlugin implements SubPlugin {
 		if (standings == null) {
 			return;
 		}
+		standings.change(player, questAnchor(player, giver),
+			Reputation.QUEST_COMPLETED);
+	}
+
+	/**
+	 * The village a quest is anchored to: the giver's stored home, or
+	 * wherever the player stands when the giver has none known.
+	 */
+	private Location questAnchor(final Player player, final UUID giver) {
 		Location where = player.getLocation();
 		final VillagerProfile profile = profileStore.get(giver);
 		if (profile != null && profile.getLocation() != null) {
 			final Location home = profile.getLocation().toLocation();
 			where = home != null ? home : where;
 		}
-		standings.change(player, where, Reputation.QUEST_COMPLETED);
+		return where;
 	}
 
 	/**
@@ -343,7 +366,18 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		conversationManager.startConversation(player, villager.getUniqueId(),
 			uniqueName, profession.name(), isQuestAvailable(villager, player),
-			tradeable, fortification.rowIdAt(villager.getLocation()));
+			tradeable, villageRowId(villager));
+	}
+
+	/**
+	 * The dialogue's village key. Standing owns this lookup so the fortify
+	 * feature switch cannot silently gate the standing clause too; only
+	 * when standing itself is unwired does fortify's own lookup stand in.
+	 */
+	private String villageRowId(final Villager villager) {
+		final Location where = villager.getLocation();
+		return standings != null ? standings.rowIdAt(where)
+			: fortification.rowIdAt(where);
 	}
 
 	private boolean isQuestAvailable(final Villager villager, final Player player) {
@@ -667,7 +701,7 @@ public class RandomQuestPlugin implements SubPlugin {
 			}
 		});
 	}
-	private void rewardPlayer(Player player, Quest quest) {
+	private void rewardPlayer(Player player, Quest quest, int standingBefore) {
 		final boolean quill = RelicItems.holds(
 			player.getInventory().getContents(), QuestRelic.ELDERS_QUILL);
 		final boolean festival =
@@ -682,17 +716,11 @@ public class RandomQuestPlugin implements SubPlugin {
 			&& fortification.bellBoostApplies(player.getLocation())) {
 			xp = WorkRewards.bellBoost(xp);
 		}
-		xp = applyStandingReward(xp, player);
+		xp = Reputation.rewardScale(xp, standingBefore);
 		ExperienceAPI.addXP(player, skill, xp, "COMMAND");
 		player.sendMessage("§aYou earned " + xp + " MCMMO XP in " + skill + "!"
 			+ (quill ? " §6(Elder's Quill +25%)" : "")
 			+ (festival ? " §6(Festival +50%)" : ""));
-	}
-
-	/** Scales XP by standing with the village at the player's feet. */
-	private int applyStandingReward(final int xp, final Player player) {
-		return standings == null ? xp : Reputation.rewardScale(xp,
-			standings.at(player.getLocation(), player.getUniqueId()));
 	}
 	private void removeQuestIndicator(UUID villagerId) {
 		final UUID standId = questManager.getIndicator(villagerId);

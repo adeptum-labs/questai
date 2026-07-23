@@ -382,7 +382,7 @@ public class VillageEventManager implements SubPlugin, VillageCheckListener {
 			+ raid.getVillagersLost() * Reputation.VILLAGER_LOST;
 		for (final Player player : playersNear(center)) {
 			player.sendMessage(
-				"§cThe raid has taken its toll on the village.");
+				"\u00a7cThe raid has taken its toll on the village.");
 			standings.change(player, center, blame);
 		}
 	}
