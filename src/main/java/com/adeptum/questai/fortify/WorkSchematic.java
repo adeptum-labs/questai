@@ -62,42 +62,55 @@ public final class WorkSchematic {
 	private static WorkSchematic parse(final BufferedReader reader)
 		throws IOException {
 
-		final Map<Character, Legend> legend = new HashMap<>();
-		final Map<BuildStage, List<SchematicEntry>> byStage =
-			new EnumMap<>(BuildStage.class);
-		int width = 0;
-		int depth = 0;
-		int layerY = 0;
-		int row = -1;
-
+		final ParseState state = new ParseState();
 		String line = reader.readLine();
 		while (line != null) {
-			final String text = line.strip();
-			if (text.isEmpty() || text.startsWith("#")) {
-				line = reader.readLine();
-				continue;
-			}
-
-			if (text.startsWith("size ")) {
-				final String[] parts = text.split("\\s+");
-				width = Integer.parseInt(parts[1]);
-				depth = Integer.parseInt(parts[2]);
-			} else if (text.startsWith("def ")) {
-				final String[] parts = text.split("\\s+");
-				legend.put(parts[1].charAt(0), new Legend(
-					PaletteRole.valueOf(parts[2]),
-					"-".equals(parts[3]) ? null : parts[3],
-					BuildStage.valueOf(parts[4])));
-			} else if (text.startsWith("layer ")) {
-				layerY = Integer.parseInt(text.substring("layer ".length()).strip());
-				row = 0;
-			} else {
-				readGridRow(text, legend, byStage, layerY, row);
-				row++;
-			}
+			parseLine(line.strip(), state);
 			line = reader.readLine();
 		}
-		return new WorkSchematic(width, depth, byStage);
+		return new WorkSchematic(state.width, state.depth, state.byStage);
+	}
+
+	private static void parseLine(final String text, final ParseState state) {
+		if (text.isEmpty() || text.startsWith("#")) {
+			return;
+		}
+		if (text.startsWith("size ")) {
+			applySize(text, state);
+		} else if (text.startsWith("def ")) {
+			applyDef(text, state);
+		} else if (text.startsWith("layer ")) {
+			state.layerY = Integer.parseInt(text.substring("layer ".length()).strip());
+			state.row = 0;
+		} else {
+			readGridRow(text, state.legend, state.byStage, state.layerY, state.row);
+			state.row++;
+		}
+	}
+
+	private static void applySize(final String text, final ParseState state) {
+		final String[] parts = text.split("\\s+");
+		state.width = Integer.parseInt(parts[1]);
+		state.depth = Integer.parseInt(parts[2]);
+	}
+
+	private static void applyDef(final String text, final ParseState state) {
+		final String[] parts = text.split("\\s+");
+		state.legend.put(parts[1].charAt(0), new Legend(
+			PaletteRole.valueOf(parts[2]),
+			"-".equals(parts[3]) ? null : parts[3],
+			BuildStage.valueOf(parts[4])));
+	}
+
+	/** Mutable accumulator threaded through line-by-line parsing. */
+	private static final class ParseState {
+		private final Map<Character, Legend> legend = new HashMap<>();
+		private final Map<BuildStage, List<SchematicEntry>> byStage =
+			new EnumMap<>(BuildStage.class);
+		private int width;
+		private int depth;
+		private int layerY;
+		private int row = -1;
 	}
 
 	private static void readGridRow(final String text,
