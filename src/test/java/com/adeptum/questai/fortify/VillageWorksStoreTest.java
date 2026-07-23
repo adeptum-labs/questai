@@ -130,4 +130,20 @@ class VillageWorksStoreTest {
 		assertEquals(7, reloaded.get(ROW).getTally().get("logs"));
 		assertNull(reloaded.get("broken2"));
 	}
+
+	@Test
+	void palisadeFrontsAndGapsSurviveAReload(@TempDir final Path folder) {
+		final VillageWorksStore store = new VillageWorksStore(pluginIn(folder));
+		store.donate(ROW, "logs", 1);
+		store.advanceFronts(ROW, 12, 9, 1_700_000_000_000L);
+		store.recordGap(ROW, 40);
+		store.recordGap(ROW, 41);
+		store.recordGap(ROW, 40);
+
+		final WorkState state = new VillageWorksStore(pluginIn(folder)).get(ROW);
+		assertEquals(12, state.getFrontForward());
+		assertEquals(9, state.getFrontBackward());
+		assertEquals(1_700_000_000_000L, state.getStageAt());
+		assertEquals(java.util.List.of(40, 41), state.getRingGaps());
+	}
 }

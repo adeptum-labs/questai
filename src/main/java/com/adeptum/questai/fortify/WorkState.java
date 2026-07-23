@@ -1,7 +1,9 @@
 package com.adeptum.questai.fortify;
 
 import com.adeptum.questai.villager.StoredLocation;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import lombok.Data;
 
@@ -25,6 +27,12 @@ public class WorkState {
 	private final Map<String, Integer> tally = new LinkedHashMap<>();
 	/** Where each finished tier stands, so later tiers can respect it. */
 	private final Map<Integer, BuiltSite> builtSites = new LinkedHashMap<>();
+	/** Ring slots built clockwise from the gate; palisade tier only. */
+	private int frontForward;
+	/** Ring slots built the other way; palisade tier only. */
+	private int frontBackward;
+	/** Ring indices skipped over water, cliffs or player builds. */
+	private final List<Integer> ringGaps = new ArrayList<>();
 
 	/** A completed structure's origin and the quarter turns it was given. */
 	public record BuiltSite(StoredLocation origin, int rotation) {

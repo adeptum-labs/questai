@@ -26,7 +26,7 @@ public final class PlacementOrder {
 		return switch (role) {
 			case AIR -> 0;
 			case ROUGH_STONE, MOSSY_STONE, ANDESITE, DRESSED_STONE,
-				CRACKED_STONE, LOG_Y, LOG_X, STRIPPED_LOG, PLANKS, HAY,
+				CRACKED_STONE, LOG_Y, LOG_X, STRIPPED_LOG, PLANKS, HAY, SPOIL,
 				SCAFFOLDING -> 1;
 			case STONE_STAIRS, STONE_WALL, WOOD_STAIRS, WOOD_SLAB, FENCE -> 2;
 			case DOOR -> 3;

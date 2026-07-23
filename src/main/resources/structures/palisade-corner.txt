@@ -1,0 +1,43 @@
+# Palisade corner post with a gallows-bracket lantern over the wall.
+# Row 0 inside (unused), row 1 the turn cell, row 2 outside.
+size 1 3
+
+def C ROUGH_STONE - SHELL
+def L LOG_Y - SHELL
+def F FENCE - SHELL
+def g LANTERN hanging=true SHELL
+
+layer -1
+.
+C
+.
+
+layer 0
+.
+C
+.
+
+layer 1
+.
+L
+.
+
+layer 2
+.
+L
+.
+
+layer 3
+.
+L
+.
+
+layer 4
+.
+L
+g
+
+layer 5
+.
+F
+F

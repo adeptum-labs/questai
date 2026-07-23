@@ -79,6 +79,30 @@ public final class VillageWorksStore {
 		save();
 	}
 
+	/** Records how far each palisade front has got; stamps the pulse clock. */
+	public synchronized void advanceFronts(final String rowId,
+		final int forward, final int backward, final long now) {
+
+		final WorkState state = states.get(rowId);
+		if (state == null) {
+			return;
+		}
+		state.setFrontForward(forward);
+		state.setFrontBackward(backward);
+		state.setStageAt(now);
+		save();
+	}
+
+	/** Remembers a ring slot the wall must forever skip. */
+	public synchronized void recordGap(final String rowId, final int index) {
+		final WorkState state = states.get(rowId);
+		if (state == null || state.getRingGaps().contains(index)) {
+			return;
+		}
+		state.getRingGaps().add(index);
+		save();
+	}
+
 	/** Moves the village up a rung and clears the finished project. */
 	public synchronized void completeTier(final String rowId) {
 		final WorkState state = states.get(rowId);
@@ -141,6 +165,10 @@ public final class VillageWorksStore {
 				state.getTally().put(role, readInt(tally, role));
 			}
 		}
+
+		state.setFrontForward(readInt(row, "frontForward"));
+		state.setFrontBackward(readInt(row, "frontBackward"));
+		state.getRingGaps().addAll(row.getIntegerList("ringGaps"));
 
 		final ConfigurationSection built = row.getConfigurationSection("built");
 		if (built != null) {
@@ -215,6 +243,11 @@ public final class VillageWorksStore {
 				cfg.set(key + ".z", built.origin().z());
 				cfg.set(key + ".rotation", built.rotation());
 			});
+			cfg.set(base + ".frontForward", state.getFrontForward());
+			cfg.set(base + ".frontBackward", state.getFrontBackward());
+			if (!state.getRingGaps().isEmpty()) {
+				cfg.set(base + ".ringGaps", state.getRingGaps());
+			}
 		});
 
 		try {

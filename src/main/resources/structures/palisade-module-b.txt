@@ -1,0 +1,36 @@
+# Palisade module B: solid log wall, offset brace, inside torch, jagged top.
+# Row 0 inside, row 1 wall, row 2 outside.
+size 4 3
+
+def C ROUGH_STONE - SHELL
+def L LOG_Y - SHELL
+def J STRIPPED_LOG - SHELL
+def F FENCE - SHELL
+def n WOOD_STAIRS facing=south,half=bottom SHELL
+def S WOOD_STAIRS facing=north,half=top SHELL
+def i WALL_TORCH facing=north SHELL
+
+layer -1
+....
+CCCC
+....
+
+layer 0
+..n.
+LLLL
+....
+
+layer 1
+..S.
+LLLL
+....
+
+layer 2
+i...
+LLLL
+....
+
+layer 3
+....
+F.J.
+....

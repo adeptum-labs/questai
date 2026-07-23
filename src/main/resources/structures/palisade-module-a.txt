@@ -1,0 +1,35 @@
+# Palisade module A: solid log wall, inside brace, spoil heap, jagged top.
+# Row 0 inside, row 1 wall, row 2 outside.
+size 4 3
+
+def C ROUGH_STONE - SHELL
+def , SPOIL - SHELL
+def L LOG_Y - SHELL
+def F FENCE - SHELL
+def n WOOD_STAIRS facing=south,half=bottom SHELL
+def S WOOD_STAIRS facing=north,half=top SHELL
+
+layer -1
+....
+CCCC
+....
+
+layer 0
+.n..
+LLLL
+...,
+
+layer 1
+.S..
+LLLL
+....
+
+layer 2
+....
+LLLL
+....
+
+layer 3
+....
+.L.F
+....
