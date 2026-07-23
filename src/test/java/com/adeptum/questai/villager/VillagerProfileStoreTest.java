@@ -52,7 +52,11 @@ class VillagerProfileStoreTest {
 		mocks = MockitoAnnotations.openMocks(this);
 		dataFolder = tempDir.toFile();
 		when(plugin.getDataFolder()).thenReturn(dataFolder);
-		when(plugin.getLogger()).thenReturn(Logger.getLogger("test"));
+		// Anonymous and detached so the malformed-row warnings this suite
+		// deliberately provokes do not land in the build log
+		final Logger quiet = Logger.getAnonymousLogger();
+		quiet.setUseParentHandlers(false);
+		when(plugin.getLogger()).thenReturn(quiet);
 	}
 
 	@AfterEach
