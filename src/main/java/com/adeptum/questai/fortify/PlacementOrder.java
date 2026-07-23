@@ -1,6 +1,8 @@
 package com.adeptum.questai.fortify;
 
 import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.Map;
 
 /**
  * The order blocks must be written in so every attachment finds its support
@@ -8,6 +10,9 @@ import java.util.Comparator;
  * torches and door halves on the floor as items.
  */
 public final class PlacementOrder {
+
+	/** Attachment class per role; lower is placed first. */
+	private static final Map<PaletteRole, Integer> ROLE_RANKS = buildRanks();
 
 	private PlacementOrder() {
 	}
@@ -21,17 +26,33 @@ public final class PlacementOrder {
 
 	/** Attachment class; lower is placed first. */
 	public static int rank(final PaletteRole role) {
-		return switch (role) {
-			case AIR -> 0;
-			case ROUGH_STONE, MOSSY_STONE, ANDESITE, DRESSED_STONE,
-				CRACKED_STONE, LOG_Y, LOG_X, STRIPPED_LOG, PLANKS, HAY,
-				SCAFFOLDING -> 1;
-			case STONE_STAIRS, STONE_WALL, WOOD_STAIRS, WOOD_SLAB, FENCE -> 2;
-			case DOOR -> 3;
-			case LADDER, TRAPDOOR, WALL_TORCH, BANNER, LANTERN, BARREL,
-				CAULDRON -> 4;
-			case CAMPFIRE -> 5;
-		};
+		return ROLE_RANKS.get(role);
+	}
+
+	private static Map<PaletteRole, Integer> buildRanks() {
+		final Map<PaletteRole, Integer> ranks = new EnumMap<>(PaletteRole.class);
+		ranks.put(PaletteRole.AIR, 0);
+		putAll(ranks, 1, PaletteRole.ROUGH_STONE, PaletteRole.MOSSY_STONE,
+			PaletteRole.ANDESITE, PaletteRole.DRESSED_STONE,
+			PaletteRole.CRACKED_STONE, PaletteRole.LOG_Y, PaletteRole.LOG_X,
+			PaletteRole.STRIPPED_LOG, PaletteRole.PLANKS, PaletteRole.HAY,
+			PaletteRole.SCAFFOLDING);
+		putAll(ranks, 2, PaletteRole.STONE_STAIRS, PaletteRole.STONE_WALL,
+			PaletteRole.WOOD_STAIRS, PaletteRole.WOOD_SLAB, PaletteRole.FENCE);
+		putAll(ranks, 3, PaletteRole.DOOR);
+		putAll(ranks, 4, PaletteRole.LADDER, PaletteRole.TRAPDOOR,
+			PaletteRole.WALL_TORCH, PaletteRole.BANNER, PaletteRole.LANTERN,
+			PaletteRole.BARREL, PaletteRole.CAULDRON);
+		putAll(ranks, 5, PaletteRole.CAMPFIRE);
+		return ranks;
+	}
+
+	private static void putAll(final Map<PaletteRole, Integer> ranks,
+		final int value, final PaletteRole... roles) {
+
+		for (final PaletteRole role : roles) {
+			ranks.put(role, value);
+		}
 	}
 
 	/** Lower door half before upper, whatever order the plan listed them. */

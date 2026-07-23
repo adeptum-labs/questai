@@ -25,17 +25,16 @@ public final class BiomePalette {
 	/** The palette a village in this biome builds with. */
 	public static BiomePalette forBiome(final Biome biome) {
 		final String name = biome.getKey().getKey();
-		if (name.contains("desert") || name.contains("badlands")) {
+		if (containsAny(name, "desert", "badlands")) {
 			return new BiomePalette(desert());
 		}
-		if (name.contains("taiga") || name.contains("snowy")
-			|| name.contains("grove")) {
+		if (containsAny(name, "taiga", "snowy", "grove")) {
 			return new BiomePalette(wood(Material.SPRUCE_LOG,
 				Material.SPRUCE_PLANKS, Material.SPRUCE_STAIRS,
 				Material.SPRUCE_SLAB, Material.SPRUCE_FENCE,
 				Material.SPRUCE_TRAPDOOR, Material.SPRUCE_DOOR));
 		}
-		if (name.contains("savanna")) {
+		if (containsAny(name, "savanna")) {
 			return new BiomePalette(wood(Material.ACACIA_LOG,
 				Material.ACACIA_PLANKS, Material.ACACIA_STAIRS,
 				Material.ACACIA_SLAB, Material.ACACIA_FENCE,
@@ -44,6 +43,18 @@ public final class BiomePalette {
 		return new BiomePalette(wood(Material.OAK_LOG, Material.OAK_PLANKS,
 			Material.OAK_STAIRS, Material.OAK_SLAB, Material.OAK_FENCE,
 			Material.OAK_TRAPDOOR, Material.OAK_DOOR));
+	}
+
+	/** Whether the biome key contains any of the given keywords. */
+	private static boolean containsAny(final String name,
+		final String... keywords) {
+
+		for (final String keyword : keywords) {
+			if (name.contains(keyword)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** The block to write for this role, with its state applied. */

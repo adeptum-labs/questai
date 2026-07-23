@@ -22,6 +22,8 @@ package com.adeptum.questai;
 
 import com.adeptum.questai.dialogue.ConversationManager;
 import com.adeptum.questai.event.VillageEventManager;
+import com.adeptum.questai.fortify.VillageFortification;
+import com.adeptum.questai.fortify.VillageWorksStore;
 import com.adeptum.questai.village.VillageNameplate;
 import com.adeptum.questai.village.VillageRegistry;
 import com.adeptum.questai.mob.MobForge;
@@ -79,16 +81,23 @@ public class Plugin extends JavaPlugin implements Listener {
 
 		final VillageEventManager eventManager =
 			new VillageEventManager(this, profileStore);
-		final RandomQuestPlugin randomQuestPlugin =
-			new RandomQuestPlugin(this, conversationManager, questService,
-				chatModel, profileStore, eventManager);
-		final WanderingPeasantPlugin peasantPlugin = new WanderingPeasantPlugin(
-			this, conversationManager, questService, chatModel);
 		// Wider than EVENT_RADIUS: the stored centre is wherever the
 		// discoverer stood, so a tight radius greets big villages late
+		final VillageRegistry registry = new VillageRegistry(this,
+			config.getDouble("villages.nameplate.radius", 64.0));
+		final MobForge mobForge = new MobForge(this);
+		final VillageWorksStore worksStore = new VillageWorksStore(this);
+		final VillageFortification fortification = new VillageFortification(
+			this, registry, worksStore, profileStore, mobForge);
+		conversationManager.setWorksStore(worksStore);
+		conversationManager.setWorkDonationHandler(fortification::donate);
+		final RandomQuestPlugin randomQuestPlugin =
+			new RandomQuestPlugin(this, conversationManager, questService,
+				chatModel, profileStore, eventManager, fortification);
+		final WanderingPeasantPlugin peasantPlugin = new WanderingPeasantPlugin(
+			this, conversationManager, questService, chatModel);
 		final VillageNameplate nameplate = new VillageNameplate(this, chatModel,
-			new VillageRegistry(this, config.getDouble(
-				"villages.nameplate.radius", 64.0)));
+			registry);
 		final AutoVillagerPlugin autoVillager =
 			new AutoVillagerPlugin(this, List.of(eventManager, nameplate));
 		// The scanner also feeds the nameplate its village checks, so the
@@ -101,12 +110,12 @@ public class Plugin extends JavaPlugin implements Listener {
 		plugins.add(peasantPlugin);
 		plugins.add(new FlyingPigPlugin(this));
 		plugins.add(new RelicListener(profileStore, peasantPlugin));
-		final MobForge mobForge = new MobForge(this);
 		plugins.add(mobForge);
 		plugins.add(new RatSpawner(this, mobForge, autoVillager));
 		plugins.add(new RatCooking());
 		plugins.add(new StarfallManager(this, mobForge));
 		plugins.add(eventManager);
+		plugins.add(fortification);
 
 		plugins.forEach(p -> {
 			pm.registerEvents(p, this);

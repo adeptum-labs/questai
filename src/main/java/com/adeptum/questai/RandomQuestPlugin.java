@@ -27,6 +27,7 @@ import com.adeptum.questai.dialogue.DialogueGui;
 import com.adeptum.questai.dialogue.DialoguePrompts;
 import com.adeptum.questai.event.VillageEventManager;
 import com.adeptum.questai.event.VillageEvents;
+import com.adeptum.questai.fortify.VillageFortification;
 import com.adeptum.questai.model.world.Npc;
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.model.world.quest.QuestObjective;
@@ -100,6 +101,7 @@ public class RandomQuestPlugin implements SubPlugin {
 	private final OpenAiChatModel chatModel;
 	private final VillagerProfileStore profileStore;
 	private final VillageEventManager eventManager;
+	private final VillageFortification fortification;
 
 	private QuestManager questManager;
 	private PlacedEntityStore placedEntityStore;
@@ -108,7 +110,8 @@ public class RandomQuestPlugin implements SubPlugin {
 
 	public RandomQuestPlugin(JavaPlugin plugin, ConversationManager conversationManager,
 		QuestGenerationService questService, OpenAiChatModel chatModel,
-		VillagerProfileStore profileStore, VillageEventManager eventManager) {
+		VillagerProfileStore profileStore, VillageEventManager eventManager,
+		VillageFortification fortification) {
 
 		super();
 		this.plugin = plugin;
@@ -117,6 +120,7 @@ public class RandomQuestPlugin implements SubPlugin {
 		this.chatModel = chatModel;
 		this.profileStore = profileStore;
 		this.eventManager = eventManager;
+		this.fortification = fortification;
 	}
 	@Override
 	public void onEnable() {
@@ -311,7 +315,7 @@ public class RandomQuestPlugin implements SubPlugin {
 
 		conversationManager.startConversation(player, villager.getUniqueId(),
 			uniqueName, profession.name(), isQuestAvailable(villager, player),
-			tradeable, null);
+			tradeable, fortification.rowIdAt(villager.getLocation()));
 	}
 
 	private boolean isQuestAvailable(final Villager villager, final Player player) {
