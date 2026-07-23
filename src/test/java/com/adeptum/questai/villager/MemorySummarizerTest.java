@@ -317,21 +317,23 @@ class MemorySummarizerTest {
 
 		final String context = MemorySummarizer.context(profile, PLAYER);
 
-		assertTrue(context.contains("a watchtower"),
-			"expected the project named, got: " + context);
+		assertTrue(context.contains(
+			"They helped your village raise a watchtower."),
+			"expected full phrasing, got: " + context);
 	}
 
 	@Test
 	void raisedWorksSpreadsAsHearsay() {
 		final VillagerProfile profile = profileWithHearsay(
 			new HearsayEvent(MemoryEvent.Type.RAISED_WORKS,
-				"a watchtower", "Bramblewick", System.currentTimeMillis()));
+				"a watchtower", "Tilda Reed", System.currentTimeMillis()));
 
 		final String context = MemorySummarizer.context(profile, PLAYER);
 
-		assertTrue(context.contains("Word in the village"),
-			"expected gossip framing, got: " + context);
-		assertTrue(context.contains("a watchtower"));
+		assertTrue(context.contains(
+			"Word in the village is that they helped raise "
+				+ "a watchtower with Tilda Reed."),
+			"expected full phrasing, got: " + context);
 	}
 
 	private static VillagerProfile profileWith(final MemoryEvent event) {
