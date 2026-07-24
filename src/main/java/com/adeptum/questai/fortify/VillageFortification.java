@@ -84,8 +84,90 @@ public class VillageFortification implements SubPlugin {
 		if (!enabled) {
 			return;
 		}
+		// Once worlds are settled, mend any watchtower left capped by the
+		// old hatch placement before the build loop starts pulsing.
+		Bukkit.getScheduler().runTask(plugin, this::healWatchtowerHatches);
 		this.task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick,
 			TICK_INTERVAL, TICK_INTERVAL);
+	}
+
+	/**
+	 * Earlier watchtowers rose with their roof hatch a cell off the ladder,
+	 * leaving the shaft capped and no honest way out. Walk every finished
+	 * watchtower and, where that exact untouched cap still stands, sink the
+	 * hatch onto the ladder and floor the cell it was stranded in.
+	 */
+	private void healWatchtowerHatches() {
+		final WorkSchematic tower = SCHEMATICS.get(VillageWork.WATCHTOWER);
+		if (tower == null) {
+			return;
+		}
+		int healed = 0;
+		for (final WorkState state : worksStore.all().values()) {
+			final WorkState.BuiltSite site = state.getBuiltSites()
+				.get(VillageWork.WATCHTOWER.ordinal());
+			if (site != null && healHatch(tower, site)) {
+				healed++;
+			}
+		}
+		if (healed > 0) {
+			plugin.getLogger().info("[VillageFortification] Reopened "
+				+ healed + " watchtower hatch(es).");
+		}
+	}
+
+	/**
+	 * Puts one watchtower's hatch right, but only where the untouched cap is
+	 * still there: the ladder capped by its roof plank and the hatch stranded
+	 * beside it. A tower already mended, or one a player has altered, fails
+	 * that check and is left alone. Returns whether it changed anything.
+	 */
+	private boolean healHatch(final WorkSchematic tower,
+		final WorkState.BuiltSite site) {
+
+		final Location origin = site.origin().toLocation();
+		if (origin == null) {
+			return false;
+		}
+		final org.bukkit.World world = origin.getWorld();
+		final SchematicEntry hatch = rotatedCell(tower, site.rotation(),
+			WatchtowerHatch.target(tower), PaletteRole.TRAPDOOR,
+			"facing=south,open=true");
+		final SchematicEntry floor = rotatedCell(tower, site.rotation(),
+			WatchtowerHatch.stranded(tower), PaletteRole.PLANKS, null);
+		final org.bukkit.block.Block hatchBlock = blockAt(world, origin, hatch);
+		final org.bukkit.block.Block floorBlock = blockAt(world, origin, floor);
+
+		final BiomePalette palette =
+			BiomePalette.forBiome(origin.getBlock().getBiome());
+		final org.bukkit.block.data.BlockData planks =
+			palette.resolve(PaletteRole.PLANKS, null);
+		if (planks == null || hatchBlock.getType() != planks.getMaterial()
+			|| !org.bukkit.Tag.TRAPDOORS.isTagged(floorBlock.getType())) {
+			return false;
+		}
+		hatchBlock.setBlockData(palette.resolve(hatch.role(), hatch.state()),
+			false);
+		floorBlock.setBlockData(planks, false);
+		return true;
+	}
+
+	/** Turns one local grid cell into an entry rotated to how it was built. */
+	private static SchematicEntry rotatedCell(final WorkSchematic tower,
+		final int rotation, final WatchtowerHatch.Cell cell,
+		final PaletteRole role, final String state) {
+
+		return WorkSchematic.rotate(new SchematicEntry(cell.x(), cell.y(),
+			cell.z(), role, state, BuildStage.DETAIL), rotation,
+			tower.getWidth(), tower.getDepth());
+	}
+
+	/** The world block a rotated entry lands on, measured from the origin. */
+	private static org.bukkit.block.Block blockAt(final org.bukkit.World world,
+		final Location origin, final SchematicEntry entry) {
+
+		return world.getBlockAt(origin.getBlockX() + entry.x(),
+			origin.getBlockY() + entry.y(), origin.getBlockZ() + entry.z());
 	}
 
 	@Override
