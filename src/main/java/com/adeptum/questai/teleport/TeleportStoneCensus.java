@@ -20,21 +20,26 @@
 
 package com.adeptum.questai.teleport;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 /**
- * Decides whether a village's teleport stone already exists, so a village
- * never issues a second one. Rather than persisting an issued flag, this
- * looks at the live world: if the stone is destroyed or lost it stops being
- * found and the village is free to grant a new one.
+ * Finds the teleport stones the live world will admit to. Which villages
+ * have a stone out is answered by {@link TeleportStoneStore}, because no
+ * scan can see into a chest, an unloaded chunk or an offline player's
+ * pockets; this exists to tell that store about stones it has never heard
+ * of, so one carried over from before it kept records — or surfacing out of
+ * a chest years later — is taken onto the books rather than counted as a
+ * village free to issue another.
  *
  * <p>The scan reaches online players' inventories and ender chests and any
- * loaded dropped stone. It cannot see a stone held by an offline player or
- * sitting in an unloaded chunk, so a rare duplicate is possible until that
- * player logs in. Must run on the server thread — it touches entities.
+ * loaded dropped stone. Must run on the server thread: it touches entities.
  */
 public final class TeleportStoneCensus {
 
@@ -44,6 +49,51 @@ public final class TeleportStoneCensus {
 	/** Whether a stone bound to this village is anywhere the scan can reach. */
 	public static boolean exists(final String rowId) {
 		return rowId != null && (heldByPlayer(rowId) || droppedInWorld(rowId));
+	}
+
+	/**
+	 * Every stone the scan can reach, as village row id to whoever turned
+	 * out to be carrying it — null for one lying on the ground.
+	 */
+	public static Map<String, UUID> found() {
+		final Map<String, UUID> stones = new HashMap<>();
+		for (final Player player : Bukkit.getOnlinePlayers()) {
+			stones.putAll(carriedBy(player));
+		}
+		for (final World world : Bukkit.getWorlds()) {
+			for (final Item drop : world.getEntitiesByClass(Item.class)) {
+				final String rowId =
+					VillageTeleportStone.rowIdOf(drop.getItemStack());
+				if (rowId != null) {
+					stones.putIfAbsent(rowId, null);
+				}
+			}
+		}
+		return stones;
+	}
+
+	/** The stones this player has about them, in pack or ender chest. */
+	public static Map<String, UUID> carriedBy(final Player player) {
+		final Map<String, UUID> stones = new HashMap<>();
+		collect(stones, player.getInventory().getContents(),
+			player.getUniqueId());
+		collect(stones, player.getEnderChest().getContents(),
+			player.getUniqueId());
+		return stones;
+	}
+
+	private static void collect(final Map<String, UUID> stones,
+		final ItemStack[] contents, final UUID holder) {
+
+		if (contents == null) {
+			return;
+		}
+		for (final ItemStack item : contents) {
+			final String rowId = VillageTeleportStone.rowIdOf(item);
+			if (rowId != null) {
+				stones.put(rowId, holder);
+			}
+		}
 	}
 
 	/** A stone in any online player's inventory or ender chest. */

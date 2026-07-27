@@ -36,6 +36,7 @@ import com.adeptum.questai.reputation.Standings;
 import com.adeptum.questai.reputation.VillageReputationStore;
 import com.adeptum.questai.resourcepack.ResourcePackManager;
 import com.adeptum.questai.craft.Whetstones;
+import com.adeptum.questai.teleport.TeleportStoneStore;
 import com.adeptum.questai.teleport.VillageTeleportStones;
 import com.adeptum.questai.star.StarfallManager;
 import com.adeptum.questai.service.QuestGenerationService;
@@ -103,12 +104,13 @@ public class Plugin extends JavaPlugin implements Listener {
 			conversationManager.setWorkDonationHandler(fortification::donate);
 		}
 		conversationManager.setStandings(standings);
-		final VillageTeleportStones teleportStones =
-			new VillageTeleportStones(this, registry);
+		final VillageTeleportStones teleportStones = new VillageTeleportStones(
+			this, registry, new TeleportStoneStore(this));
 		// A disabled teleport feature keeps its claim entry out of the GUI
 		if (teleportStones.isEnabled()) {
 			conversationManager.setRegistry(registry);
 			conversationManager.setStoneClaimHandler(teleportStones::grant);
+			conversationManager.setStoneIssuedCheck(teleportStones::stoneIssued);
 		}
 		final RandomQuestPlugin randomQuestPlugin =
 			new RandomQuestPlugin(this, conversationManager, questService,

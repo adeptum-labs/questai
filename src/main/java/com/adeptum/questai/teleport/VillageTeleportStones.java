@@ -24,17 +24,24 @@ import com.adeptum.questai.SubPlugin;
 import com.adeptum.questai.utility.SpawnGround;
 import com.adeptum.questai.village.NamedVillage;
 import com.adeptum.questai.village.VillageRegistry;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -45,19 +52,48 @@ import org.bukkit.plugin.java.JavaPlugin;
  */
 public class VillageTeleportStones implements SubPlugin {
 
+	/**
+	 * Why an item entity left the world. Only these mean the stone itself
+	 * is gone; a chunk unloading, a player picking it up or a hopper
+	 * swallowing it all remove the entity while the stone lives on, and
+	 * treating those as a loss is exactly how a village ends up issuing a
+	 * second one.
+	 */
+	private static final Set<EntityRemoveEvent.Cause> DESTROYED = EnumSet.of(
+		EntityRemoveEvent.Cause.DEATH, EntityRemoveEvent.Cause.DESPAWN,
+		EntityRemoveEvent.Cause.EXPLODE, EntityRemoveEvent.Cause.OUT_OF_WORLD,
+		EntityRemoveEvent.Cause.DISCARD);
+
+	private final JavaPlugin plugin;
 	private final VillageRegistry registry;
+	private final TeleportStoneStore stones;
 	private final boolean enabled;
 	private final long cooldownMillis;
 	private final Map<UUID, Long> lastUse = new HashMap<>();
 
 	public VillageTeleportStones(final JavaPlugin plugin,
-		final VillageRegistry registry) {
+		final VillageRegistry registry, final TeleportStoneStore stones) {
 
+		this.plugin = plugin;
 		this.registry = registry;
+		this.stones = stones;
 		this.enabled = plugin.getConfig()
 			.getBoolean("villages.teleport.enabled", true);
 		this.cooldownMillis = plugin.getConfig()
 			.getInt("villages.teleport.cooldown-seconds", 120) * 1000L;
+	}
+
+	/**
+	 * Whether this village's stone is already out there, and so whether the
+	 * dialogue may offer another. The books are the answer; the world scan
+	 * only ever adds to them.
+	 */
+	public boolean stoneIssued(final String rowId) {
+		if (stones.issued(rowId)) {
+			return true;
+		}
+		// A stone the books never knew about is adopted, not ignored
+		return TeleportStoneCensus.exists(rowId) && stones.adopt(rowId, null);
 	}
 
 	/** False keeps the stone's claim entry out of the dialogue GUI. */
@@ -67,12 +103,75 @@ public class VillageTeleportStones implements SubPlugin {
 
 	@Override
 	public void onEnable() {
-		// Event registration is handled by the plugin loader
+		if (enabled) {
+			// Once the worlds are up: anything the scan can already see and
+			// the books have not heard of goes onto them before the first
+			// villager gets a chance to offer a second one
+			Bukkit.getScheduler().runTask(plugin, this::adoptStrayStones);
+		}
 	}
 
 	@Override
 	public void onDisable() {
-		// Cooldowns are in-memory only; nothing to tear down
+		// Cooldowns are in-memory only; the books look after themselves
+	}
+
+	/**
+	 * Takes every stone the world will admit to onto the books. At startup
+	 * that is little — nobody is online and only the spawn chunks are up —
+	 * so the same adoption runs again as each player joins and whenever a
+	 * stone is used, which is where a stone that outlived the records
+	 * actually surfaces.
+	 */
+	private void adoptStrayStones() {
+		final int adopted = adopt(TeleportStoneCensus.found());
+		plugin.getLogger().info("[VillageTeleportStones] " + stones.size()
+			+ " village stone(s) on the books" + (adopted == 0 ? "."
+				: ", " + adopted + " adopted from the world."));
+	}
+
+	/** Records any of these stones the books had not heard of. */
+	private int adopt(final Map<String, UUID> found) {
+		int adopted = 0;
+		for (final Map.Entry<String, UUID> stone : found.entrySet()) {
+			if (stones.adopt(stone.getKey(), stone.getValue())) {
+				adopted++;
+			}
+		}
+		return adopted;
+	}
+
+	/**
+	 * A joining player brings their pockets into view for the first time.
+	 * A stone that was issued before the books existed, or that sat out a
+	 * migration in an ender chest, is adopted here.
+	 */
+	@EventHandler
+	public void onPlayerJoin(final PlayerJoinEvent event) {
+		if (enabled) {
+			adopt(TeleportStoneCensus.carriedBy(event.getPlayer()));
+		}
+	}
+
+	/**
+	 * A stone that leaves the world for good frees its village to issue a
+	 * replacement. Only real destruction counts: an entity removed because
+	 * its chunk unloaded, or because somebody picked it up, is a stone that
+	 * still very much exists.
+	 */
+	@EventHandler(priority = EventPriority.MONITOR)
+	public void onEntityRemove(final EntityRemoveEvent event) {
+		if (!enabled || !(event.getEntity() instanceof Item item)
+			|| !DESTROYED.contains(event.getCause())) {
+
+			return;
+		}
+		final String rowId = VillageTeleportStone.rowIdOf(item.getItemStack());
+		if (rowId != null) {
+			stones.release(rowId);
+			plugin.getLogger().info("[VillageTeleportStones] The stone of "
+				+ rowId + " was destroyed; the village may issue another.");
+		}
 	}
 
 	/**
@@ -82,10 +181,11 @@ public class VillageTeleportStones implements SubPlugin {
 	 */
 	public void grant(final Player player, final String rowId) {
 		final NamedVillage village = registry.byRowId(rowId);
-		if (village == null || TeleportStoneCensus.exists(rowId)) {
+		if (village == null || stoneIssued(rowId)) {
 			player.sendMessage("\u00a77The stone will not answer to you just now.");
 			return;
 		}
+		stones.issue(rowId, player.getUniqueId());
 
 		player.getInventory()
 			.addItem(VillageTeleportStone.create(rowId, village.name(),
@@ -114,6 +214,9 @@ public class VillageTeleportStones implements SubPlugin {
 	}
 
 	private void useStone(final Player player, final String rowId) {
+		// Using one proves it exists and names who has it, which is the
+		// surest adoption point of all
+		stones.adopt(rowId, player.getUniqueId());
 		final long now = System.currentTimeMillis();
 		final Long last = lastUse.get(player.getUniqueId());
 		final long cooling = last == null ? 0 : cooldownMillis - (now - last);
