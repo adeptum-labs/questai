@@ -545,6 +545,7 @@ public class VillageFortification implements SubPlugin {
 	private void tickOne(final String rowId, final WorkState state,
 		final long now) {
 
+		mendPalisade(rowId, state);
 		if (state.getSite() == null) {
 			return;
 		}
@@ -701,10 +702,78 @@ public class VillageFortification implements SubPlugin {
 		if (PalisadeRing.complete(fronts.forward, fronts.backward,
 			context.size())) {
 
-			sweepStakes(centre.getWorld(), ring);
+			sweepStakes(centre.getWorld(), ring, state.getRingGaps());
 			celebrateSeam(centre, ring, context.gate(), context.size());
 			payOff(rowId, VillageWork.PALISADE, centre);
 		}
+	}
+
+	/**
+	 * Gives back the ring slots an older build wrote off while its own survey
+	 * stakes were still standing in them. The ground was read with a stake
+	 * capping the column, which reads as unbuildable, so those slots were
+	 * skipped for a reason that was never about the terrain. A gap that still
+	 * holds a stake therefore gets one more attempt; one that does not was
+	 * refused by real ground and is left as it is, which is what keeps this
+	 * from retrying the same water and cliffs forever.
+	 *
+	 * <p>Runs for any village whose palisade already stands, whatever the
+	 * ladder has moved on to since, and only where somebody can watch.
+	 */
+	private void mendPalisade(final String rowId, final WorkState state) {
+		final WorkState.BuiltSite palisade = state.getBuiltSites()
+			.get(VillageWork.PALISADE.ordinal());
+		if (palisade == null || state.getRingGaps().isEmpty()) {
+			return;
+		}
+		final Location centre = palisade.origin().toLocation();
+		if (centre != null && witnessed(centre)) {
+			mendGaps(rowId, state, centre.getWorld(), PalisadeRing.ring(
+				(int) palisade.origin().x(), (int) palisade.origin().z()));
+		}
+	}
+
+	/** Works down the recorded gaps, a couple of slots per tick. */
+	private void mendGaps(final String rowId, final WorkState state,
+		final org.bukkit.World world,
+		final List<PalisadeRing.RingModule> ring) {
+
+		int mended = 0;
+		for (final int index : List.copyOf(state.getRingGaps())) {
+			if (mended >= MODULES_PER_PULSE) {
+				return;
+			}
+			if (mendSlot(rowId, state, world, ring, index)) {
+				mended++;
+			}
+		}
+	}
+
+	/**
+	 * Raises one skipped slot where a stake is all that stood in the way.
+	 * Reports whether it touched the world, so the pass stays paced; a slot
+	 * the ground still refuses has at least lost its stake and will not be
+	 * offered again.
+	 */
+	private boolean mendSlot(final String rowId, final WorkState state,
+		final org.bukkit.World world,
+		final List<PalisadeRing.RingModule> ring, final int index) {
+
+		final PalisadeRing.RingModule slot = slotAt(ring, index);
+		if (slot == null || !world.isChunkLoaded(slot.x() >> 4, slot.z() >> 4)
+			|| !staked(world, slot)) {
+
+			return false;
+		}
+		pullStakes(world, slot);
+		final Integer baseY = slotBase(world, slot);
+		if (baseY == null) {
+			return true;
+		}
+		placePiece(world, pieceFor(slot.kind(), false), slot, baseY);
+		worksStore.clearGap(rowId, index);
+		buttressGaps(state, world, ring, index, baseY);
+		return true;
 	}
 
 	/** The fixed facts of one pulse, bundled so the helpers stay narrow. */
@@ -745,7 +814,7 @@ public class VillageFortification implements SubPlugin {
 		final boolean lastSlot =
 			fronts.forward + fronts.backward == context.size() - 1;
 		if (!buildSlot(context.rowId(), context.state(), context.centre(),
-			context.ring(), index, lastSlot, forwards)) {
+			context.ring(), index, lastSlot)) {
 			return;
 		}
 		if (forwards) {
@@ -777,7 +846,7 @@ public class VillageFortification implements SubPlugin {
 	 */
 	private boolean buildSlot(final String rowId, final WorkState state,
 		final Location centre, final List<PalisadeRing.RingModule> ring,
-		final int index, final boolean lastSlot, final boolean forwards) {
+		final int index, final boolean lastSlot) {
 
 		final PalisadeRing.RingModule slot = ring.get(index);
 		final org.bukkit.World world = centre.getWorld();
@@ -785,14 +854,14 @@ public class VillageFortification implements SubPlugin {
 			return false;
 		}
 
+		pullStakes(world, slot);
 		final Integer baseY = slotBase(world, slot);
 		if (baseY == null) {
 			worksStore.recordGap(rowId, index);
 			return true;
 		}
-		clearStake(world, slot, baseY);
 		placePiece(world, pieceFor(slot.kind(), lastSlot), slot, baseY);
-		closeGapBehind(state, world, ring, index, forwards);
+		buttressGaps(state, world, ring, index, baseY);
 		return true;
 	}
 
@@ -800,9 +869,7 @@ public class VillageFortification implements SubPlugin {
 	private static Integer slotBase(final org.bukkit.World world,
 		final PalisadeRing.RingModule slot) {
 
-		final int length = slot.kind() == PalisadeRing.Kind.MODULE_A
-			|| slot.kind() == PalisadeRing.Kind.MODULE_B
-			? PalisadeRing.MODULE_LENGTH : 1;
+		final int length = PalisadeRing.length(slot.kind());
 		final int[] heights = new int[length];
 		for (int i = 0; i < length; i++) {
 			final Integer height = groundHeight(world, slot, i);
@@ -819,31 +886,10 @@ public class VillageFortification implements SubPlugin {
 	private static Integer groundHeight(final org.bukkit.World world,
 		final PalisadeRing.RingModule slot, final int offset) {
 
+		final PalisadeRing.RingCell cell = PalisadeRing.cell(slot, offset);
 		final Location ground = com.adeptum.questai.utility.SpawnGround
-			.findSurface(world, stepX(slot, offset), stepZ(slot, offset));
+			.findSurface(world, cell.x(), cell.z());
 		return ground == null ? null : ground.getBlockY();
-	}
-
-	/** Advances the x coordinate along the slot's run direction. */
-	private static int stepX(final PalisadeRing.RingModule slot,
-		final int offset) {
-
-		return switch (slot.rotation()) {
-			case 0 -> slot.x() + offset;
-			case 2 -> slot.x() - offset;
-			default -> slot.x();
-		};
-	}
-
-	/** Advances the z coordinate along the slot's run direction. */
-	private static int stepZ(final PalisadeRing.RingModule slot,
-		final int offset) {
-
-		return switch (slot.rotation()) {
-			case 1 -> slot.z() + offset;
-			case 3 -> slot.z() - offset;
-			default -> slot.z();
-		};
 	}
 
 	/** The filler columns reuse the corner post — a lone braced post reads
@@ -863,22 +909,37 @@ public class VillageFortification implements SubPlugin {
 		};
 	}
 
-	/** A built slot bordering a recorded gap closes it with an end post. */
-	private void closeGapBehind(final WorkState state,
+	/**
+	 * Buttresses this piece's ends wherever the ring had to skip its
+	 * neighbour, so a gap reads as a deliberate terminus rather than a run
+	 * that stopped halfway. The posts take the wall's own base — measuring the
+	 * ground again here would find the piece that has just gone up.
+	 */
+	private void buttressGaps(final WorkState state,
 		final org.bukkit.World world,
 		final List<PalisadeRing.RingModule> ring, final int index,
-		final boolean forwards) {
+		final int baseY) {
 
-		final int behind =
-			Math.floorMod(forwards ? index - 1 : index + 1, ring.size());
-		if (!state.getRingGaps().contains(behind)) {
-			return;
+		final PalisadeRing.RingModule slot = ring.get(index);
+		final int size = ring.size();
+		if (state.getRingGaps().contains(Math.floorMod(index - 1, size))) {
+			placeEndPost(world, slot, -1, baseY);
 		}
-		final PalisadeRing.RingModule gapSlot = ring.get(behind);
-		final Integer baseY = slotBase(world, ring.get(index));
-		if (baseY != null) {
-			placePiece(world, PIECE_END, gapSlot, baseY);
+		if (state.getRingGaps().contains(Math.floorMod(index + 1, size))) {
+			placeEndPost(world, slot, PalisadeRing.length(slot.kind()), baseY);
 		}
+	}
+
+	/** Stands an end post on the wall line, {@code offset} steps along it. */
+	private void placeEndPost(final org.bukkit.World world,
+		final PalisadeRing.RingModule slot, final int offset,
+		final int baseY) {
+
+		final PalisadeRing.RingCell cell = PalisadeRing.cell(slot, offset);
+		final PalisadeRing.RingModule post = new PalisadeRing.RingModule(
+			cell.x(), cell.z(), slot.rotation(), PalisadeRing.Kind.CORNER);
+		pullStakes(world, post);
+		placePiece(world, PIECE_END, post, baseY);
 	}
 
 	/** Anchors a piece by its first wall cell — local {@code (0, z=1)}. */
@@ -925,7 +986,7 @@ public class VillageFortification implements SubPlugin {
 		final int[] along = slot.rotation() % 2 == 0
 			? new int[] {1, 0} : new int[] {0, 1};
 		clearRingCells(world, slot, along, baseY);
-		closeRingCut(world, slot, along);
+		closeRingCut(world, slot, along, baseY);
 	}
 
 	/** Breaks every palisade block standing across the gate's 9-wide run. */
@@ -957,19 +1018,22 @@ public class VillageFortification implements SubPlugin {
 		}
 	}
 
-	/** Closes the cut with an end post one cell beyond each side of the run. */
+	/**
+	 * Closes the cut with an end post one cell beyond each side of the run,
+	 * flush with the gate's own base — the ground either side is under the
+	 * wall the cut was opened in, so it cannot be measured for this.
+	 */
 	private void closeRingCut(final org.bukkit.World world,
-		final PalisadeRing.RingModule slot, final int[] along) {
+		final PalisadeRing.RingModule slot, final int[] along,
+		final int baseY) {
 
 		for (final int side : new int[] {-5, 5}) {
 			final PalisadeRing.RingModule post = new PalisadeRing.RingModule(
 				slot.x() + (2 + side) * along[0],
 				slot.z() + (2 + side) * along[1],
 				slot.rotation(), PalisadeRing.Kind.CORNER);
-			final Integer postBase = slotBase(world, post);
-			if (postBase != null) {
-				placePiece(world, PIECE_END, post, postBase);
-			}
+			pullStakes(world, post);
+			placePiece(world, PIECE_END, post, baseY);
 		}
 	}
 
@@ -989,43 +1053,94 @@ public class VillageFortification implements SubPlugin {
 			if (ground == null) {
 				continue;
 			}
-			world.getBlockAt(slot.x(), ground.getBlockY() + 1, slot.z())
+			// findSurface hands back the feet position, so this is the first
+			// cell above the ground: a stake driven in, not floating over it
+			world.getBlockAt(slot.x(), ground.getBlockY(), slot.z())
 				.setType(org.bukkit.Material.OAK_FENCE, false);
 			if (i % 4 == 0) {
-				world.getBlockAt(slot.x(), ground.getBlockY() + 2, slot.z())
+				world.getBlockAt(slot.x(), ground.getBlockY() + 1, slot.z())
 					.setType(org.bukkit.Material.LANTERN, false);
 			}
 		}
 	}
 
-	/** Stakes come down as the wall goes up, or at the latest at the end. */
-	private static void clearStake(final org.bukkit.World world,
-		final PalisadeRing.RingModule slot, final int baseY) {
+	/**
+	 * Pulls the survey stakes out of a slot's columns. This has to happen
+	 * before the ground is measured: a stake caps the column it stands in, and
+	 * a fence is not natural ground, so a staked slot would measure as
+	 * unbuildable and be written off as a gap the wall never returns to.
+	 */
+	private static void pullStakes(final org.bukkit.World world,
+		final PalisadeRing.RingModule slot) {
 
-		for (int y = baseY; y <= baseY + 3; y++) {
-			final org.bukkit.block.Block block =
-				world.getBlockAt(slot.x(), y, slot.z());
-			if (org.bukkit.Tag.FENCES.isTagged(block.getType())
-				|| block.getType() == org.bukkit.Material.LANTERN) {
-				block.setType(org.bukkit.Material.AIR, false);
+		for (int i = 0; i < PalisadeRing.length(slot.kind()); i++) {
+			final PalisadeRing.RingCell cell = PalisadeRing.cell(slot, i);
+			int y = stakeTop(world, cell);
+			while (y >= 0 && isStake(world.getBlockAt(cell.x(), y, cell.z()))) {
+				world.getBlockAt(cell.x(), y, cell.z())
+					.setType(org.bukkit.Material.AIR, false);
+				y--;
 			}
 		}
 	}
 
-	/** The last stakes standing come down once the loop closes. */
-	private static void sweepStakes(final org.bukkit.World world,
-		final List<PalisadeRing.RingModule> ring) {
+	/** Whether any of a slot's columns still has a stake standing in it. */
+	private static boolean staked(final org.bukkit.World world,
+		final PalisadeRing.RingModule slot) {
 
-		for (final PalisadeRing.RingModule slot : ring) {
-			if (!world.isChunkLoaded(slot.x() >> 4, slot.z() >> 4)) {
-				continue;
-			}
-			final Location ground = com.adeptum.questai.utility.SpawnGround
-				.findSurface(world, slot.x(), slot.z());
-			if (ground != null) {
-				clearStake(world, slot, ground.getBlockY());
+		for (int i = 0; i < PalisadeRing.length(slot.kind()); i++) {
+			if (stakeTop(world, PalisadeRing.cell(slot, i)) >= 0) {
+				return true;
 			}
 		}
+		return false;
+	}
+
+	/**
+	 * The top of the stake capping this column, or -1 where there is none.
+	 * A stake is a fence post — with a lantern over it every fourth slot —
+	 * standing on nothing but ground, which is what tells it apart from the
+	 * fences the wall itself is topped with: those stand on its own logs.
+	 */
+	private static int stakeTop(final org.bukkit.World world,
+		final PalisadeRing.RingCell cell) {
+
+		final int top = world.getHighestBlockYAt(cell.x(), cell.z());
+		int y = top;
+		while (y > world.getMinHeight()
+			&& isStake(world.getBlockAt(cell.x(), y, cell.z()))) {
+
+			y--;
+		}
+		return y < top
+			&& replaceable(world.getBlockAt(cell.x(), y, cell.z())) ? top : -1;
+	}
+
+	/** A stake is one of the fence posts and lanterns the survey planted. */
+	private static boolean isStake(final org.bukkit.block.Block block) {
+		return org.bukkit.Tag.FENCES.isTagged(block.getType())
+			|| block.getType() == org.bukkit.Material.LANTERN;
+	}
+
+	/** The last stakes standing — those in the slots the wall skipped. */
+	private static void sweepStakes(final org.bukkit.World world,
+		final List<PalisadeRing.RingModule> ring, final List<Integer> gaps) {
+
+		for (final int index : gaps) {
+			final PalisadeRing.RingModule slot = slotAt(ring, index);
+			if (slot != null
+				&& world.isChunkLoaded(slot.x() >> 4, slot.z() >> 4)) {
+
+				pullStakes(world, slot);
+			}
+		}
+	}
+
+	/** The slot a recorded index names, or null once the ring has changed. */
+	private static PalisadeRing.RingModule slotAt(
+		final List<PalisadeRing.RingModule> ring, final int index) {
+
+		return index < 0 || index >= ring.size() ? null : ring.get(index);
 	}
 
 	/** The payoff moment: the village audibly enjoys its new structure. */

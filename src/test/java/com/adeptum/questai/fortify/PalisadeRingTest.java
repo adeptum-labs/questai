@@ -26,12 +26,41 @@ class PalisadeRingTest {
 	}
 
 	@Test
+	void pieceLengthsFollowTheirKind() {
+		assertEquals(PalisadeRing.MODULE_LENGTH,
+			PalisadeRing.length(PalisadeRing.Kind.MODULE_A));
+		assertEquals(PalisadeRing.MODULE_LENGTH,
+			PalisadeRing.length(PalisadeRing.Kind.MODULE_B));
+		assertEquals(1, PalisadeRing.length(PalisadeRing.Kind.CORNER));
+		assertEquals(1, PalisadeRing.length(PalisadeRing.Kind.FILLER));
+	}
+
+	@Test
+	void cellsStepForwardAndBackAlongEachRun() {
+		// rotation 0 runs east along x, 1 south along z, 2 west, 3 north
+		final int[][] steps = {{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+		for (int rotation = 0; rotation < 4; rotation++) {
+			final PalisadeRing.RingModule slot = new PalisadeRing.RingModule(
+				10, 20, rotation, PalisadeRing.Kind.MODULE_A);
+			final int[] step = steps[rotation];
+			assertEquals(new PalisadeRing.RingCell(10, 20),
+				PalisadeRing.cell(slot, 0));
+			assertEquals(new PalisadeRing.RingCell(10 + 3 * step[0],
+				20 + 3 * step[1]), PalisadeRing.cell(slot, 3));
+			assertEquals(new PalisadeRing.RingCell(10 - step[0], 20 - step[1]),
+				PalisadeRing.cell(slot, -1),
+				"a negative offset must step back down the ring");
+		}
+	}
+
+	@Test
 	void everyPerimeterCellIsCoveredExactlyOnce() {
 		final Set<String> cells = new HashSet<>();
 		for (final PalisadeRing.RingModule module : RING) {
-			for (final int[] cell : wallCells(module)) {
-				assertTrue(cells.add(cell[0] + "/" + cell[1]),
-					"cell " + cell[0] + "/" + cell[1] + " covered twice");
+			for (int i = 0; i < PalisadeRing.length(module.kind()); i++) {
+				final PalisadeRing.RingCell cell = PalisadeRing.cell(module, i);
+				assertTrue(cells.add(cell.x() + "/" + cell.z()),
+					"cell " + cell + " covered twice");
 			}
 		}
 		assertEquals(8 * PalisadeRing.RADIUS, cells.size());
@@ -112,24 +141,5 @@ class PalisadeRingTest {
 			backward++;
 		}
 		assertEquals(size, built.size(), "the fronts missed or repeated");
-	}
-
-	/** The world cells a piece's wall line occupies, from kind and rotation. */
-	private static int[][] wallCells(final PalisadeRing.RingModule module) {
-		final int length = switch (module.kind()) {
-			case MODULE_A, MODULE_B -> PalisadeRing.MODULE_LENGTH;
-			case CORNER, FILLER -> 1;
-		};
-		final int[][] cells = new int[length][2];
-		for (int i = 0; i < length; i++) {
-			// rotation 0 runs east along x, 1 south along z, 2 west, 3 north
-			cells[i] = switch (module.rotation()) {
-				case 0 -> new int[] {module.x() + i, module.z()};
-				case 1 -> new int[] {module.x(), module.z() + i};
-				case 2 -> new int[] {module.x() - i, module.z()};
-				default -> new int[] {module.x(), module.z() - i};
-			};
-		}
-		return cells;
 	}
 }

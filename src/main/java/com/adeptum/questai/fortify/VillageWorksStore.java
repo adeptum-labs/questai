@@ -103,6 +103,16 @@ public final class VillageWorksStore {
 		save();
 	}
 
+	/** Forgets a skipped ring slot, once the wall has caught up with it. */
+	public synchronized void clearGap(final String rowId, final int index) {
+		final WorkState state = states.get(rowId);
+		// Removes the slot number, not the list position at that number
+		if (state == null || !state.getRingGaps().remove(Integer.valueOf(index))) {
+			return;
+		}
+		save();
+	}
+
 	/** Moves the village up a rung and clears the finished project. */
 	public synchronized void completeTier(final String rowId) {
 		final WorkState state = states.get(rowId);

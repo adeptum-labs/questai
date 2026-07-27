@@ -70,6 +70,22 @@ public final class PalisadeRing {
 		return Math.floorMod(gateIndex - 1 - placed, size);
 	}
 
+	/** How many wall cells a piece of this kind covers walking the ring. */
+	public static int length(final Kind kind) {
+		return kind == Kind.MODULE_A || kind == Kind.MODULE_B
+			? MODULE_LENGTH : 1;
+	}
+
+	/**
+	 * The wall cell {@code offset} steps along this slot's run. A negative
+	 * offset steps back down the ring, which is how the cell bordering the
+	 * piece behind gets named without knowing which piece that is.
+	 */
+	public static RingCell cell(final RingModule slot, final int offset) {
+		return new RingCell(stepX(slot.x(), slot.rotation(), offset),
+			stepZ(slot.z(), slot.rotation(), offset));
+	}
+
 	/** True once every slot of the ring has been built or skipped. */
 	public static boolean complete(final int placedForward,
 		final int placedBackward, final int size) {
@@ -145,5 +161,9 @@ public final class PalisadeRing {
 
 	/** One placed piece: world origin, quarter turns, and which piece. */
 	public record RingModule(int x, int z, int rotation, Kind kind) {
+	}
+
+	/** One cell of the wall line, without the piece standing on it. */
+	public record RingCell(int x, int z) {
 	}
 }

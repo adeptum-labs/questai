@@ -3,6 +3,7 @@ package com.adeptum.questai.fortify;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -163,5 +164,32 @@ class VillageWorksStoreTest {
 		assertEquals(9, state.getFrontBackward());
 		assertEquals(1_700_000_000_000L, state.getStageAt());
 		assertEquals(java.util.List.of(40, 41), state.getRingGaps());
+	}
+
+	@Test
+	void mendingAGapForgetsThatSlotAndNothingElse(@TempDir final Path folder) {
+		final VillageWorksStore store = new VillageWorksStore(pluginIn(folder));
+		store.donate(ROW, "logs", 1);
+		store.recordGap(ROW, 40);
+		store.recordGap(ROW, 41);
+		// A slot nobody skipped, then one that reads as a list position
+		store.clearGap(ROW, 99);
+		store.clearGap(ROW, 1);
+		assertEquals(java.util.List.of(40, 41), store.get(ROW).getRingGaps());
+
+		store.clearGap(ROW, 40);
+		final WorkState state = new VillageWorksStore(pluginIn(folder)).get(ROW);
+		assertEquals(java.util.List.of(41), state.getRingGaps());
+	}
+
+	@Test
+	void mendingTheLastGapLeavesTheRingWithNone(@TempDir final Path folder) {
+		final VillageWorksStore store = new VillageWorksStore(pluginIn(folder));
+		store.donate(ROW, "logs", 1);
+		store.recordGap(ROW, 7);
+		store.clearGap(ROW, 7);
+
+		assertTrue(new VillageWorksStore(pluginIn(folder))
+			.get(ROW).getRingGaps().isEmpty());
 	}
 }
