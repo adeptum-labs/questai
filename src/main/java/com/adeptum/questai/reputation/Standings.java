@@ -50,8 +50,17 @@ public final class Standings {
 	public void change(final Player player, final Location location,
 		final int delta) {
 
-		final NamedVillage village =
-			location == null ? null : registry.find(location);
+		change(player, location == null ? null : registry.find(location), delta);
+	}
+
+	/**
+	 * Applies a deed to a village the caller has already named. Deeds done to
+	 * a village's works are found by the works' own reach, which runs further
+	 * out than the claim radius a location lookup would use.
+	 */
+	public void change(final Player player, final NamedVillage village,
+		final int delta) {
+
 		if (village == null || delta == 0) {
 			return;
 		}

@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Decides whether a block position belongs to a village's built works.
@@ -25,30 +26,35 @@ public final class BuiltBlocks {
 	}
 
 	/** What, if anything, of the village's works stands at this block. */
-	public static Hit hit(final WorkState state, final int x, final int y,
-		final int z) {
+	public static Hit hit(final WorkState state, final UUID worldId,
+		final int x, final int y, final int z) {
 
-		if (state == null) {
+		if (state == null || worldId == null) {
 			return Hit.NONE;
 		}
 		for (final Map.Entry<Integer, WorkState.BuiltSite> built
 			: state.getBuiltSites().entrySet()) {
 
-			if (inStructure(built.getKey(), built.getValue(), x, y, z)) {
+			if (inStructure(built.getKey(), built.getValue(), worldId,
+				x, y, z)) {
+
 				return Hit.STRUCTURE;
 			}
 		}
-		if (onRing(state, x, y, z)) {
+		if (onRing(state, worldId, x, y, z)) {
 			return Hit.RING;
 		}
 		return Hit.NONE;
 	}
 
 	private static boolean inStructure(final int tier,
-		final WorkState.BuiltSite site, final int x, final int y, final int z) {
+		final WorkState.BuiltSite site, final UUID worldId, final int x,
+		final int y, final int z) {
 
 		final VillageWork work = VillageWork.byTier(tier);
-		if (work == null || work.getSchematicResource() == null) {
+		if (work == null || work.getSchematicResource() == null
+			|| !worldId.equals(site.origin().worldId())) {
+
 			return false;
 		}
 		final Cached cached = SCHEMATICS.computeIfAbsent(work,
@@ -99,12 +105,14 @@ public final class BuiltBlocks {
 	 * a band taken from there lands wherever the two have drifted apart —
 	 * claiming blocks in the middle of the village and none of the wall.
 	 */
-	private static boolean onRing(final WorkState state, final int x,
-		final int y, final int z) {
+	private static boolean onRing(final WorkState state, final UUID worldId,
+		final int x, final int y, final int z) {
 
 		final WorkState.BuiltSite palisade = state.getBuiltSites()
 			.get(VillageWork.PALISADE.ordinal());
-		if (palisade == null) {
+		if (palisade == null
+			|| !worldId.equals(palisade.origin().worldId())) {
+
 			return false;
 		}
 		final StoredLocation origin = palisade.origin();

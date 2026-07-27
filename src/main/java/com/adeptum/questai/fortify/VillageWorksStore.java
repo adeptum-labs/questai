@@ -42,6 +42,30 @@ public final class VillageWorksStore {
 		return Map.copyOf(states);
 	}
 
+	/**
+	 * Which village's works stand at this block, or null when none do.
+	 * Asked of the works themselves rather than of a claim radius around a
+	 * village centre: the ring's far corners lie further out than any such
+	 * radius reaches, and a wall nobody owns is a wall nobody may be blamed
+	 * for pulling down.
+	 */
+	public synchronized WorksHit worksAt(final UUID worldId, final int x,
+		final int y, final int z) {
+
+		for (final Map.Entry<String, WorkState> row : states.entrySet()) {
+			final BuiltBlocks.Hit hit =
+				BuiltBlocks.hit(row.getValue(), worldId, x, y, z);
+			if (hit != BuiltBlocks.Hit.NONE) {
+				return new WorksHit(row.getKey(), hit);
+			}
+		}
+		return null;
+	}
+
+	/** Whose works were struck, and which part of them. */
+	public record WorksHit(String rowId, BuiltBlocks.Hit hit) {
+	}
+
 	/** Adds material toward the active project and writes through. */
 	public synchronized void donate(final String rowId, final String role,
 		final int amount) {

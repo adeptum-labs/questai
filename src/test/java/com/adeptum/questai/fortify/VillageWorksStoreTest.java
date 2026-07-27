@@ -183,6 +183,25 @@ class VillageWorksStoreTest {
 	}
 
 	@Test
+	void worksAtNamesTheRowStandingAtABlock(@TempDir final Path folder) {
+		final UUID world = UUID.randomUUID();
+		final VillageWorksStore store = new VillageWorksStore(pluginIn(folder));
+		store.donate(ROW, "logs", 1);
+		store.beginBuild(ROW, new StoredLocation(world, 40, 64, 40), 0);
+		store.completeTier(ROW);
+
+		// Layer 0 wall course: local (2,0,2) is a placed watchtower cell
+		final VillageWorksStore.WorksHit hit = store.worksAt(world, 42, 64, 42);
+		assertNotNull(hit);
+		assertEquals(ROW, hit.rowId());
+		assertEquals(BuiltBlocks.Hit.STRUCTURE, hit.hit());
+		assertNull(store.worksAt(world, 500, 64, 500),
+			"nothing of the village stands out there");
+		assertNull(store.worksAt(UUID.randomUUID(), 42, 64, 42),
+			"the same coordinates in another world are not the village's");
+	}
+
+	@Test
 	void mendingTheLastGapLeavesTheRingWithNone(@TempDir final Path folder) {
 		final VillageWorksStore store = new VillageWorksStore(pluginIn(folder));
 		store.donate(ROW, "logs", 1);

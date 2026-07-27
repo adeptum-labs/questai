@@ -3,8 +3,6 @@ package com.adeptum.questai.reputation;
 import com.adeptum.questai.SubPlugin;
 import com.adeptum.questai.fortify.BuiltBlocks;
 import com.adeptum.questai.fortify.VillageWorksStore;
-import com.adeptum.questai.fortify.WorkState;
-import com.adeptum.questai.village.NamedVillage;
 import com.adeptum.questai.village.VillageRegistry;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -43,21 +41,19 @@ public final class DemolitionWatch implements SubPlugin {
 	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
 	public void onBlockBreak(final BlockBreakEvent event) {
 		final Location where = event.getBlock().getLocation();
-		final NamedVillage village = registry.find(where);
-		if (village == null) {
+		if (where.getWorld() == null) {
 			return;
 		}
-		final WorkState state =
-			worksStore.get(VillageRegistry.rowIdFor(village));
-		if (state == null) {
+		final VillageWorksStore.WorksHit struck = worksStore.worksAt(
+			where.getWorld().getUID(), where.getBlockX(), where.getBlockY(),
+			where.getBlockZ());
+		if (struck == null
+			|| !shouldRecord(struck.hit(), event.getBlock().getType())) {
+
 			return;
 		}
-		final BuiltBlocks.Hit hit = BuiltBlocks.hit(state,
-			where.getBlockX(), where.getBlockY(), where.getBlockZ());
-		if (shouldRecord(hit, event.getBlock().getType())) {
-			standings.change(event.getPlayer(), where,
-				Reputation.DEMOLISHED_BLOCK);
-		}
+		standings.change(event.getPlayer(), registry.byRowId(struck.rowId()),
+			Reputation.DEMOLISHED_BLOCK);
 	}
 
 	/**
