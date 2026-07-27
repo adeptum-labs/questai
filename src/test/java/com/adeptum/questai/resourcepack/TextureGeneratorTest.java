@@ -55,6 +55,27 @@ class TextureGeneratorTest {
 		}
 	}
 
+	@Test
+	void theWingIsBrightEnoughToReadAgainstTheSky() throws Exception {
+		final BufferedImage img = ImageIO.read(
+			new ByteArrayInputStream(TextureGenerator.pigWing()));
+
+		assertEquals(16, img.getWidth());
+		assertEquals(16, img.getHeight());
+		// The flap has to carry from the ground, so the feathers stay pale
+		// and the rows stay distinct from one another
+		assertTrue(brightness(img, 0, 1) > 200, "the shoulder reads dark");
+		assertTrue(brightness(img, 8, 1) > brightness(img, 8, 6),
+			"the feather rows must shade apart to be legible");
+	}
+
+	private static int brightness(final BufferedImage img, final int x,
+		final int y) {
+
+		final int rgb = img.getRGB(x, y);
+		return (((rgb >> 16) & 0xFF) + ((rgb >> 8) & 0xFF) + (rgb & 0xFF)) / 3;
+	}
+
 	private static boolean hasVisiblePixels(final BufferedImage img) {
 		for (int y = 0; y < img.getHeight(); y++) {
 			for (int x = 0; x < img.getWidth(); x++) {

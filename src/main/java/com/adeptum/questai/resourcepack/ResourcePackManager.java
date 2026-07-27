@@ -60,6 +60,9 @@ public class ResourcePackManager {
 	/** CustomModelData dispatching to the 3D rat body model. */
 	public static final int RAT_BODY_CMD = 100022;
 
+	/** CustomModelData dispatching to a flying pig's wing model. */
+	public static final int PIG_WING_CMD = 100025;
+
 	/**
 	 * Private-use-area codepoint rendered via the custom font provider as a
 	 * themed banner glyph. Prepended to the dialogue inventory title so the
@@ -255,6 +258,11 @@ public class ResourcePackManager {
 			RAT_BODY_CMD, "questai:item/rat_body");
 		ratBodyModel(files);
 
+		// One wing, worn by a display entity either side of a flying pig
+		overriddenItem(files, "phantom_membrane", "item/phantom_membrane",
+			PIG_WING_CMD, "questai:item/pig_wing");
+		pigWingModel(files);
+
 		overriddenItem(files, "heart_of_the_sea", "item/heart_of_the_sea",
 			VillageTeleportStone.CMD, "questai:item/teleport_stone");
 		customItem(files, "teleport_stone", TextureGenerator.teleportStone());
@@ -400,6 +408,32 @@ public class ResourcePackManager {
 		files.put("assets/questai/models/item/rat_body.json", utf8(model));
 		files.put("assets/questai/textures/item/rat_body.png",
 			TextureGenerator.ratBody());
+	}
+
+	/**
+	 * One wing as three cubes stepping outward and down from the shoulder,
+	 * so the silhouette tapers instead of ending in a slab. Drawn along
+	 * positive x from a hinge at the model's origin corner, which is what
+	 * lets the same model serve both sides: the display on the far side is
+	 * simply turned through half a circle.
+	 */
+	private static void pigWingModel(final Map<String, byte[]> files) {
+		final String model = "{"
+			+ "\"textures\":{\"0\":\"questai:item/pig_wing\","
+			+ "\"particle\":\"questai:item/pig_wing\"},"
+			+ "\"elements\":["
+			+ cube(new double[] {0, 7, 6}, new double[] {5, 8, 12},
+				"[0,0,5,6]", "[0,8,5,10]")
+			+ ","
+			+ cube(new double[] {5, 6.5, 7}, new double[] {10, 7.5, 12},
+				"[5,0,10,5]", "[5,8,10,10]")
+			+ ","
+			+ cube(new double[] {10, 6, 8}, new double[] {14, 7, 12},
+				"[10,0,14,4]", "[10,8,14,10]")
+			+ "]}";
+		files.put("assets/questai/models/item/pig_wing.json", utf8(model));
+		files.put("assets/questai/textures/item/pig_wing.png",
+			TextureGenerator.pigWing());
 	}
 
 	/** One model element: the north face gets its own uv, the rest share. */

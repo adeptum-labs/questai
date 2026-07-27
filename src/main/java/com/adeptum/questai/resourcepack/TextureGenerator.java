@@ -92,6 +92,11 @@ final class TextureGenerator {
 	private static final Color GRIT_MID = new Color(0x8F877A);
 	private static final Color GRIT_DARK = new Color(0x615B52);
 
+	private static final Color FEATHER_LIGHT = new Color(0xFFFFFF);
+	private static final Color FEATHER_MID = new Color(0xE4E8F0);
+	private static final Color FEATHER_SHADE = new Color(0xC6CEDC);
+	private static final Color FEATHER_QUILL = new Color(0xA8B2C4);
+
 	private TextureGenerator() {
 	}
 
@@ -775,6 +780,31 @@ final class TextureGenerator {
 		// Pink block for ears and tail
 		fillRect(img, 8, 12, 8, 4, RAT_PINK);
 		fillRect(img, 8, 12, 8, 1, FUR_MID);
+		return encode(img);
+	}
+
+	/**
+	 * A feathered wing: three bands of white running from the shoulder out
+	 * to the tips, each darker than the last so the layers read as separate
+	 * rows of feathers rather than one white slab. Kept bright, because
+	 * these fly high enough that the flap has to carry at distance.
+	 */
+	/* default */ static byte[] pigWing() {
+		final BufferedImage img = create();
+		// The membrane the feathers are laid over
+		fillRect(img, 0, 0, 16, 8, FEATHER_LIGHT);
+		// Three rows of feather tips, shading outward from the shoulder
+		fillRect(img, 0, 3, 16, 2, FEATHER_MID);
+		fillRect(img, 0, 5, 16, 3, FEATHER_SHADE);
+		for (int x = 1; x < 16; x += 3) {
+			// The quill dividing one feather from the next
+			fillRect(img, x, 2, 1, 6, FEATHER_QUILL);
+			setPixel(img, x, 7, FEATHER_SHADE);
+		}
+		// The shoulder end stays plain: it sits against the pig
+		fillRect(img, 0, 0, 3, 8, FEATHER_LIGHT);
+		// Edge strip, used by the wing's thin sides
+		fillRect(img, 0, 8, 16, 2, FEATHER_MID);
 		return encode(img);
 	}
 
