@@ -169,6 +169,8 @@ public final class MemorySummarizer {
 				+ event.questTitle() + " from the night sky.";
 			case RAISED_WORKS -> "helped raise " + event.questTitle()
 				+ " with " + event.sourceName() + ".";
+			case COMMISSION_FILLED -> "had " + event.sourceName() + " make them "
+				+ event.questTitle() + ".";
 		};
 	}
 
@@ -192,6 +194,8 @@ public final class MemorySummarizer {
 				+ " that fell from the night sky.";
 			case RAISED_WORKS -> "They helped your village raise "
 				+ event.questTitle() + ".";
+			case COMMISSION_FILLED ->
+				"You made them " + event.questTitle() + ".";
 		};
 	}
 }

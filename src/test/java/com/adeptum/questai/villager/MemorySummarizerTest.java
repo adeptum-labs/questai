@@ -337,6 +337,32 @@ class MemorySummarizerTest {
 	}
 
 	@Test
+	void aFilledCommissionReadsAsFirstHandMemory() {
+		final VillagerProfile profile = profileWith(
+			new MemoryEvent(MemoryEvent.Type.COMMISSION_FILLED,
+				"a keen blade", System.currentTimeMillis()));
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+
+		assertTrue(context.contains("You made them a keen blade."),
+			"expected full phrasing, got: " + context);
+	}
+
+	@Test
+	void aFilledCommissionSpreadsAsHearsay() {
+		final VillagerProfile profile = profileWithHearsay(
+			new HearsayEvent(MemoryEvent.Type.COMMISSION_FILLED,
+				"a keen blade", "Tilda Reed", System.currentTimeMillis()));
+
+		final String context = MemorySummarizer.context(profile, PLAYER);
+
+		assertTrue(context.contains(
+			"Word in the village is that they had Tilda Reed "
+				+ "make them a keen blade."),
+			"expected full phrasing, got: " + context);
+	}
+
+	@Test
 	void aStandingClauseSpeaksWithTheIdentityClauses() {
 		final VillagerProfile profile = profileWith(
 			new MemoryEvent(MemoryEvent.Type.QUEST_COMPLETED,
