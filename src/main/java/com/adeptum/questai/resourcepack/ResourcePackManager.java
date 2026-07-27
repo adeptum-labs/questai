@@ -20,6 +20,7 @@
 
 package com.adeptum.questai.resourcepack;
 
+import com.adeptum.questai.craft.CraftsmansWhetstone;
 import com.adeptum.questai.mob.RatMeat;
 import com.adeptum.questai.relic.QuestRelic;
 import com.adeptum.questai.star.StarFragment;
@@ -257,6 +258,10 @@ public class ResourcePackManager {
 		overriddenItem(files, "heart_of_the_sea", "item/heart_of_the_sea",
 			VillageTeleportStone.CMD, "questai:item/teleport_stone");
 		customItem(files, "teleport_stone", TextureGenerator.teleportStone());
+
+		overriddenItem(files, "brick", "item/brick",
+			CraftsmansWhetstone.CMD, "questai:item/whetstone");
+		customItem(files, "whetstone", TextureGenerator.whetstone());
 
 		// Custom font: maps the banner glyph to a scroll emblem shown at the
 		// start of the dialogue inventory title, overriding vanilla rendering.

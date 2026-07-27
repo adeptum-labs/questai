@@ -88,6 +88,10 @@ final class TextureGenerator {
 	private static final Color COOKED_SEAR = new Color(0x4A2C16);
 	private static final Color COOKED_GLAZE = new Color(0xC08A50);
 
+	private static final Color GRIT_LIGHT = new Color(0xBFB6A4);
+	private static final Color GRIT_MID = new Color(0x8F877A);
+	private static final Color GRIT_DARK = new Color(0x615B52);
+
 	private TextureGenerator() {
 	}
 
@@ -673,6 +677,32 @@ final class TextureGenerator {
 		fillRect(img, 7, 7, 2, 2, STAR_LIGHT);
 		setPixel(img, 8, 3, STAR_MID);
 		setPixel(img, 8, 12, STAR_MID);
+	}
+
+	/* default */ static byte[] whetstone() {
+		final BufferedImage img = create();
+		drawWhetstoneHaft(img);
+		drawWhetstoneGrit(img);
+		return encode(img);
+	}
+
+	private static void drawWhetstoneHaft(final BufferedImage img) {
+		// A short wooden haft at the near end, ringed with brass
+		fillRect(img, 2, 10, 4, 4, LEATHER);
+		fillRect(img, 2, 10, 4, 1, BRASS_LIGHT);
+		fillRect(img, 2, 13, 4, 1, BRASS_DARK);
+		fillRect(img, 5, 10, 1, 4, BRASS_MID);
+	}
+
+	private static void drawWhetstoneGrit(final BufferedImage img) {
+		// A bevelled block of grit rising away from the haft, lit along the
+		// working face and shadowed on the far side and foot
+		fillRect(img, 6, 6, 8, 6, GRIT_MID);
+		fillRect(img, 6, 5, 6, 1, GRIT_LIGHT);
+		fillRect(img, 6, 6, 8, 1, GRIT_LIGHT);
+		fillRect(img, 6, 11, 8, 1, GRIT_DARK);
+		fillRect(img, 13, 6, 1, 5, GRIT_DARK);
+		fillRect(img, 7, 8, 4, 1, GRIT_LIGHT);
 	}
 
 	/* default */ static byte[] ratMeat() {

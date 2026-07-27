@@ -26,6 +26,7 @@ import com.google.gson.JsonParser;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
@@ -100,6 +101,23 @@ class ResourcePackManagerTest {
 				"assets/minecraft/models/item/".length(),
 				key.length() - ".json".length());
 			assertDefinitionMatches(itemName, json(key));
+		}
+	}
+
+	/**
+	 * Overrides are written into the pack by key, so skinning two custom
+	 * items onto one base material would drop the first without a word.
+	 */
+	@Test
+	void everyOverriddenBaseItemKeepsItsOwnEntry() {
+		for (final String base : List.of("feather", "rabbit_foot",
+			"amethyst_shard", "gold_nugget", "gold_ingot", "echo_shard",
+			"rabbit", "cooked_rabbit", "poisonous_potato", "heart_of_the_sea",
+			"brick")) {
+
+			assertNotNull(
+				ENTRIES.get("assets/minecraft/models/item/" + base + ".json"),
+				base + " lost its override to a later registration");
 		}
 	}
 
