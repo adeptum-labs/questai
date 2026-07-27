@@ -29,6 +29,12 @@ The plugin runs on Minecraft 26.2 on Paper, builds against the 26.1.2 API and us
   over time. Ties colour dialogue and steer delivery quests toward family.
 - Ambient life: cached greeting call-outs on the action bar as you pass, curious glances from villagers who only
   know you by rumour, and parcel hints when you approach a delivery recipient.
+- Commissions: a villager's profession finally means something. Each trade takes on work of its own — arrows
+  from the fletcher, dressed stone from the mason, a named and enchanted blade from the weaponsmith — priced in
+  roles rather than exact blocks, gated behind how far the village has built and how well it thinks of you.
+  Hand over the materials and the craftsman starts work; the piece has to be collected in person later, and the
+  village remembers who commissioned it. The toolsmith's Craftsman's Whetstone hones a worn piece back toward
+  new, which no vanilla bench can do.
 - Repopulates villages around online players based on detected doors and workstations.
 
 ### Quests

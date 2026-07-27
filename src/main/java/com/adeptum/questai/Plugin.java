@@ -35,6 +35,9 @@ import com.adeptum.questai.reputation.DemolitionWatch;
 import com.adeptum.questai.reputation.Standings;
 import com.adeptum.questai.reputation.VillageReputationStore;
 import com.adeptum.questai.resourcepack.ResourcePackManager;
+import com.adeptum.questai.craft.CommissionDesk;
+import com.adeptum.questai.craft.CommissionStore;
+import com.adeptum.questai.craft.VillageCommissions;
 import com.adeptum.questai.craft.Whetstones;
 import com.adeptum.questai.teleport.TeleportStoneStore;
 import com.adeptum.questai.teleport.VillageTeleportStones;
@@ -112,6 +115,19 @@ public class Plugin extends JavaPlugin implements Listener {
 			conversationManager.setStoneClaimHandler(teleportStones::grant);
 			conversationManager.setStoneIssuedCheck(teleportStones::stoneIssued);
 		}
+		final CommissionStore commissionStore = new CommissionStore(this);
+		final CommissionDesk commissionDesk =
+			new CommissionDesk(commissionStore, worksStore, standings);
+		final VillageCommissions commissions = new VillageCommissions(this,
+			commissionStore, commissionDesk, new VillageCommissions.Parties(
+				registry, profileStore, mobForge, standings));
+		// A disabled commissions feature keeps the craftsman's entry out of
+		// the dialogue GUI
+		if (commissions.isEnabled()) {
+			conversationManager.setCommissionDesk(commissionDesk);
+			conversationManager.setCommissionOrderHandler(commissions::order);
+			conversationManager.setCommissionCollectHandler(commissions::collect);
+		}
 		final RandomQuestPlugin randomQuestPlugin =
 			new RandomQuestPlugin(this, conversationManager, questService,
 				chatModel, profileStore, eventManager, fortification);
@@ -139,6 +155,7 @@ public class Plugin extends JavaPlugin implements Listener {
 		plugins.add(eventManager);
 		plugins.add(fortification);
 		plugins.add(teleportStones);
+		plugins.add(commissions);
 		plugins.add(new Whetstones());
 		plugins.add(new DemolitionWatch(registry, worksStore, standings));
 
