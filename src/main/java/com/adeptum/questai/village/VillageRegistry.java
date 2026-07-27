@@ -95,9 +95,10 @@ public class VillageRegistry {
 	public synchronized NamedVillage claim(final VillageKey key,
 		final Location centre, final String name) {
 
-		final NamedVillage village =
-			new NamedVillage(key, StoredLocation.from(centre), name);
-		villages.put(rowId(village.centre()), village);
+		final StoredLocation stored = StoredLocation.from(centre);
+		final NamedVillage village = new NamedVillage(mintId(stored), key,
+			stored, name, System.currentTimeMillis());
+		villages.put(village.id(), village);
 		save();
 		return village;
 	}
@@ -113,20 +114,28 @@ public class VillageRegistry {
 	 * village's edge, while the works row still names the village by id.
 	 */
 	public synchronized NamedVillage byRowId(final String rowId) {
-		for (final NamedVillage village : villages.values()) {
-			if (rowIdFor(village).equals(rowId)) {
-				return village;
-			}
-		}
-		return null;
+		return rowId == null ? null : villages.get(rowId);
 	}
 
 	/**
 	 * The persistence key for a village, shared with any store that hangs
-	 * state off a village rather than off a cell.
+	 * state off a village rather than off a cell. Fixed at discovery: a
+	 * village that is re-surveyed onto a truer centre must not thereby
+	 * become a stranger to its own reputation and works.
 	 */
 	public static String rowIdFor(final NamedVillage village) {
-		return rowId(village.centre());
+		return village.id();
+	}
+
+	/** The id a newly discovered village is given, unique among the known. */
+	private String mintId(final StoredLocation centre) {
+		final String base = centre.worldId() + "_" + (int) Math.floor(centre.x())
+			+ "_" + (int) Math.floor(centre.z());
+		String id = base;
+		for (int suffix = 2; villages.containsKey(id); suffix++) {
+			id = base + "_" + suffix;
+		}
+		return id;
 	}
 
 	private void load() {
@@ -158,26 +167,22 @@ public class VillageRegistry {
 		final UUID worldId = UUID.fromString(world);
 		final StoredLocation centre = new StoredLocation(worldId,
 			sec.getDouble("x"), sec.getDouble("y"), sec.getDouble("z"));
-		villages.put(id, new NamedVillage(
+		villages.put(id, new NamedVillage(id,
 			VillageKey.from(worldId, (int) Math.floor(centre.x()),
-				(int) Math.floor(centre.z())), centre, name));
-	}
-
-	/** Stable per-village row name; the centre's column is unique enough. */
-	private static String rowId(final StoredLocation centre) {
-		return centre.worldId() + "_" + (int) Math.floor(centre.x())
-			+ "_" + (int) Math.floor(centre.z());
+				(int) Math.floor(centre.z())), centre, name,
+			sec.getLong("discoveredAt")));
 	}
 
 	private void save() {
 		final YamlConfiguration cfg = new YamlConfiguration();
 		for (final NamedVillage village : villages.values()) {
-			final String path = "villages." + rowId(village.centre());
+			final String path = "villages." + village.id();
 			cfg.set(path + ".name", village.name());
 			cfg.set(path + ".world", village.centre().worldId().toString());
 			cfg.set(path + ".x", village.centre().x());
 			cfg.set(path + ".y", village.centre().y());
 			cfg.set(path + ".z", village.centre().z());
+			cfg.set(path + ".discoveredAt", village.discoveredAt());
 		}
 		try {
 			file.getParentFile().mkdirs();

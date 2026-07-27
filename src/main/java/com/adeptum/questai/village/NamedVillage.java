@@ -24,9 +24,14 @@ import com.adeptum.questai.event.VillageKey;
 import com.adeptum.questai.villager.StoredLocation;
 
 /**
- * A village that has been discovered and named. The key identifies the row
- * on disk; the centre is what presence is measured against, because a
- * village wider than a cell must keep one name across the boundary.
+ * A village that has been discovered and named. The id is what every store
+ * files its state under and never changes; the centre is what presence is
+ * measured against and is free to move as the village is better surveyed.
+ * The key identifies the cell the village was found in.
+ *
+ * <p>Rows written before discovery was stamped carry a zero, which reads as
+ * an age nobody recorded rather than as a village found at the epoch.
  */
-public record NamedVillage(VillageKey key, StoredLocation centre, String name) {
+public record NamedVillage(String id, VillageKey key, StoredLocation centre,
+	String name, long discoveredAt) {
 }

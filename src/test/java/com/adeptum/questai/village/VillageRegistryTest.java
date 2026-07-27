@@ -21,6 +21,7 @@
 package com.adeptum.questai.village;
 
 import com.adeptum.questai.event.VillageKey;
+import com.adeptum.questai.villager.StoredLocation;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
@@ -167,5 +168,38 @@ class VillageRegistryTest {
 			+ "  not_a_key:\n    name: Broken\n    world: nonsense\n");
 
 		assertEquals("Ravenhollow", registry().find(at(0, 0)).name());
+	}
+
+	@Test
+	void aVillageKeepsItsIdWhenItsCentreMoves() {
+		final VillageRegistry registry = registry();
+		final NamedVillage claimed = registry.claim(
+			VillageKey.from(WORLD_ID, 100, 100), at(100, 100), "Ravenhollow");
+
+		final String id = VillageRegistry.rowIdFor(claimed);
+		final NamedVillage moved = new NamedVillage(claimed.id(), claimed.key(),
+			new StoredLocation(WORLD_ID, 300, 64, 300), claimed.name(),
+			claimed.discoveredAt());
+
+		assertEquals(id, VillageRegistry.rowIdFor(moved));
+	}
+
+	@Test
+	void aRowWrittenBeforeStampingLoadsAsAgeless() throws Exception {
+		final Path file = tempDir.resolve("village-names.yml");
+		Files.writeString(file, "villages:\n  " + WORLD_ID + "_140_135:\n"
+			+ "    name: Woldmere Hamlets\n    world: " + WORLD_ID + "\n"
+			+ "    x: 140.0\n    y: 66.0\n    z: 135.0\n");
+
+		assertEquals(0L, registry().find(at(140, 135)).discoveredAt());
+	}
+
+	@Test
+	void aRowOnDiskAdoptsItsKeyAsItsId() {
+		registry().claim(VillageKey.from(WORLD_ID, 140, 135), at(140, 135),
+			"Woldmere Hamlets");
+
+		final NamedVillage reloaded = registry().find(at(140, 135));
+		assertEquals(WORLD_ID + "_140_135", reloaded.id());
 	}
 }
