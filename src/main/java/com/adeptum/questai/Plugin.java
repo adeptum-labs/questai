@@ -35,6 +35,7 @@ import com.adeptum.questai.reputation.DemolitionWatch;
 import com.adeptum.questai.reputation.Standings;
 import com.adeptum.questai.reputation.VillageReputationStore;
 import com.adeptum.questai.resourcepack.ResourcePackManager;
+import com.adeptum.questai.craft.Whetstones;
 import com.adeptum.questai.teleport.VillageTeleportStones;
 import com.adeptum.questai.star.StarfallManager;
 import com.adeptum.questai.service.QuestGenerationService;
@@ -136,6 +137,7 @@ public class Plugin extends JavaPlugin implements Listener {
 		plugins.add(eventManager);
 		plugins.add(fortification);
 		plugins.add(teleportStones);
+		plugins.add(new Whetstones());
 		plugins.add(new DemolitionWatch(registry, worksStore, standings));
 
 		plugins.forEach(p -> {

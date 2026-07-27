@@ -53,7 +53,7 @@ public final class CraftsmansWhetstone {
 		final ItemStack item = GuiItems.item(MATERIAL,
 			"\u00a7b\u00a7lCraftsman's Whetstone", List.of(
 				"\u00a77Hones a worn piece back toward new.",
-				"\u00a78Right-click while holding what needs mending"), CMD);
+				"\u00a78Right-click with the worn piece in your off hand"), CMD);
 		final ItemMeta meta = item.getItemMeta();
 		meta.getPersistentDataContainer()
 			.set(KEY, PersistentDataType.BYTE, (byte) 1);
