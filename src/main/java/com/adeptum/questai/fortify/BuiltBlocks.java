@@ -25,8 +25,8 @@ public final class BuiltBlocks {
 	}
 
 	/** What, if anything, of the village's works stands at this block. */
-	public static Hit hit(final WorkState state, final StoredLocation centre,
-		final int x, final int y, final int z) {
+	public static Hit hit(final WorkState state, final int x, final int y,
+		final int z) {
 
 		if (state == null) {
 			return Hit.NONE;
@@ -38,7 +38,7 @@ public final class BuiltBlocks {
 				return Hit.STRUCTURE;
 			}
 		}
-		if (centre != null && onRing(state, centre, x, y, z)) {
+		if (onRing(state, x, y, z)) {
 			return Hit.RING;
 		}
 		return Hit.NONE;
@@ -92,18 +92,27 @@ public final class BuiltBlocks {
 		return false;
 	}
 
-	private static boolean onRing(final WorkState state,
-		final StoredLocation centre, final int x, final int y, final int z) {
+	/**
+	 * Whether this block stands on the ring line. Measured from the origin the
+	 * palisade was raised on, which is the only point the wall was ever drawn
+	 * around: a village's stored centre is merely where its finder stood, and
+	 * a band taken from there lands wherever the two have drifted apart —
+	 * claiming blocks in the middle of the village and none of the wall.
+	 */
+	private static boolean onRing(final WorkState state, final int x,
+		final int y, final int z) {
 
-		if (!state.getBuiltSites()
-			.containsKey(VillageWork.PALISADE.ordinal())) {
+		final WorkState.BuiltSite palisade = state.getBuiltSites()
+			.get(VillageWork.PALISADE.ordinal());
+		if (palisade == null) {
 			return false;
 		}
-		if (Math.abs(y - (int) centre.y()) > RING_HEIGHT_WINDOW) {
+		final StoredLocation origin = palisade.origin();
+		if (Math.abs(y - (int) origin.y()) > RING_HEIGHT_WINDOW) {
 			return false;
 		}
-		final int cheb = Math.max(Math.abs(x - (int) centre.x()),
-			Math.abs(z - (int) centre.z()));
+		final int cheb = Math.max(Math.abs(x - (int) origin.x()),
+			Math.abs(z - (int) origin.z()));
 		return Math.abs(cheb - PalisadeRing.RADIUS) <= RING_BAND;
 	}
 

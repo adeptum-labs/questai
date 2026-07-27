@@ -24,7 +24,7 @@ class BuiltBlocksTest {
 	void aBlockInsideTheWatchtowerIsTheVillages() {
 		// Layer 0 wall course: local (2,0,2) is a placed cell at rotation 0
 		assertEquals(BuiltBlocks.Hit.STRUCTURE,
-			BuiltBlocks.hit(withWatchtower(0), CENTRE, 42, 64, 42));
+			BuiltBlocks.hit(withWatchtower(0), 42, 64, 42));
 	}
 
 	@Test
@@ -32,15 +32,15 @@ class BuiltBlocksTest {
 		// Local (0,0,0) held a survey stake; stakes and scaffolding come
 		// down at the finish, so their cells are not the standing works
 		assertEquals(BuiltBlocks.Hit.NONE,
-			BuiltBlocks.hit(withWatchtower(0), CENTRE, 40, 64, 40));
+			BuiltBlocks.hit(withWatchtower(0), 40, 64, 40));
 	}
 
 	@Test
 	void outsideTheBoundingBoxIsCheapNo() {
 		assertEquals(BuiltBlocks.Hit.NONE,
-			BuiltBlocks.hit(withWatchtower(0), CENTRE, 60, 64, 60));
+			BuiltBlocks.hit(withWatchtower(0), 60, 64, 60));
 		assertEquals(BuiltBlocks.Hit.NONE,
-			BuiltBlocks.hit(withWatchtower(0), CENTRE, 42, 200, 42));
+			BuiltBlocks.hit(withWatchtower(0), 42, 200, 42));
 	}
 
 	@Test
@@ -53,7 +53,7 @@ class BuiltBlocksTest {
 		final SchematicEntry rotated = WorkSchematic.rotate(sample, 1,
 			tower.getWidth(), tower.getDepth());
 
-		assertEquals(BuiltBlocks.Hit.STRUCTURE, BuiltBlocks.hit(turned, CENTRE,
+		assertEquals(BuiltBlocks.Hit.STRUCTURE, BuiltBlocks.hit(turned,
 			40 + rotated.x(), 64 + rotated.y(), 40 + rotated.z()));
 	}
 
@@ -64,25 +64,41 @@ class BuiltBlocksTest {
 			new WorkState.BuiltSite(CENTRE, 0));
 
 		assertEquals(BuiltBlocks.Hit.RING,
-			BuiltBlocks.hit(state, CENTRE, PalisadeRing.RADIUS, 66, 10));
+			BuiltBlocks.hit(state, PalisadeRing.RADIUS, 66, 10));
 		assertEquals(BuiltBlocks.Hit.RING,
-			BuiltBlocks.hit(state, CENTRE, -(PalisadeRing.RADIUS - 1), 66, 3));
+			BuiltBlocks.hit(state, -(PalisadeRing.RADIUS - 1), 66, 3));
 		assertEquals(BuiltBlocks.Hit.NONE,
-			BuiltBlocks.hit(state, CENTRE, PalisadeRing.RADIUS - 5, 66, 10));
+			BuiltBlocks.hit(state, PalisadeRing.RADIUS - 5, 66, 10));
 		assertEquals(BuiltBlocks.Hit.NONE,
-			BuiltBlocks.hit(state, CENTRE, PalisadeRing.RADIUS, 20, 10));
+			BuiltBlocks.hit(state, PalisadeRing.RADIUS, 20, 10));
+	}
+
+	@Test
+	void theRingBandFollowsTheWallAndNotTheVillageCentre() {
+		// The ring is centred on where the villagers actually stand, which
+		// drifts from the stored village centre, so the band has to be taken
+		// from the wall's own origin or it claims blocks nowhere near it
+		final WorkState state = new WorkState();
+		state.getBuiltSites().put(VillageWork.PALISADE.ordinal(),
+			new WorkState.BuiltSite(new StoredLocation(WORLD, -2, 66, 16), 0));
+
+		assertEquals(BuiltBlocks.Hit.RING,
+			BuiltBlocks.hit(state, -2, 66, 16 + PalisadeRing.RADIUS));
+		assertEquals(BuiltBlocks.Hit.NONE,
+			BuiltBlocks.hit(state, -2, 66, PalisadeRing.RADIUS),
+			"the band still sits on the village centre, not on the wall");
 	}
 
 	@Test
 	void noRingClaimBeforeThePalisadeIsBuilt() {
 		assertEquals(BuiltBlocks.Hit.NONE,
-			BuiltBlocks.hit(withWatchtower(0), CENTRE,
+			BuiltBlocks.hit(withWatchtower(0),
 				PalisadeRing.RADIUS, 66, 10));
 	}
 
 	@Test
 	void nullStateClaimsNothing() {
 		assertEquals(BuiltBlocks.Hit.NONE,
-			BuiltBlocks.hit(null, CENTRE, 0, 64, 0));
+			BuiltBlocks.hit(null, 0, 64, 0));
 	}
 }

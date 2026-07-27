@@ -52,7 +52,7 @@ public final class DemolitionWatch implements SubPlugin {
 		if (state == null) {
 			return;
 		}
-		final BuiltBlocks.Hit hit = BuiltBlocks.hit(state, village.centre(),
+		final BuiltBlocks.Hit hit = BuiltBlocks.hit(state,
 			where.getBlockX(), where.getBlockY(), where.getBlockZ());
 		if (shouldRecord(hit, event.getBlock().getType())) {
 			standings.change(event.getPlayer(), where,
