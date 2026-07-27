@@ -51,6 +51,9 @@ public class VillageRegistry {
 	// Keyed by id, not by VillageKey: two villages can share one 64-block
 	// cell, and a cell-keyed map would evict the first
 	private final Map<String, NamedVillage> villages = new HashMap<>();
+	// An absorbed village's id still arrives from teleport stones already in
+	// players' hands, so it must keep answering rather than become a stranger
+	private final Map<String, String> aliases = new HashMap<>();
 
 	public VillageRegistry(final JavaPlugin plugin, final double claimRadius) {
 		this.plugin = plugin;
@@ -115,7 +118,42 @@ public class VillageRegistry {
 	 * village's edge, while the works row still names the village by id.
 	 */
 	public synchronized NamedVillage byRowId(final String rowId) {
-		return rowId == null ? null : villages.get(rowId);
+		return rowId == null ? null : villages.get(resolve(rowId));
+	}
+
+	/**
+	 * The live id this one stands for. Ids handed out before a merge keep
+	 * turning up on stones and in conversations long afterwards, so every
+	 * lookup goes through here rather than trusting the id it was given.
+	 */
+	public synchronized String resolve(final String rowId) {
+		String id = rowId;
+		// Bounded by the table's size: a cycle would otherwise spin forever
+		for (int hops = 0; hops < aliases.size() + 1; hops++) {
+			final String next = aliases.get(id);
+			if (next == null) {
+				return id;
+			}
+			id = next;
+		}
+		return id;
+	}
+
+	/**
+	 * Folds one village's id into another's and forgets the absorbed row.
+	 * The state filed under the old id is moved by {@code VillageMerger};
+	 * this only settles which id is the living one.
+	 */
+	public synchronized void absorb(final String absorbedId,
+		final String survivorId) {
+
+		if (absorbedId == null || survivorId == null
+			|| absorbedId.equals(survivorId)) {
+			return;
+		}
+		villages.remove(absorbedId);
+		aliases.put(absorbedId, survivorId);
+		save();
 	}
 
 	/**
@@ -143,8 +181,13 @@ public class VillageRegistry {
 		if (!file.exists()) {
 			return;
 		}
-		final ConfigurationSection root = YamlConfiguration
-			.loadConfiguration(file).getConfigurationSection("villages");
+		final YamlConfiguration cfg = YamlConfiguration.loadConfiguration(file);
+		loadVillages(cfg);
+		loadAliases(cfg);
+	}
+
+	private void loadVillages(final YamlConfiguration cfg) {
+		final ConfigurationSection root = cfg.getConfigurationSection("villages");
 		if (root == null) {
 			return;
 		}
@@ -156,6 +199,16 @@ public class VillageRegistry {
 				plugin.getLogger().log(Level.WARNING,
 					"[VillageRegistry] Skipping malformed village " + id, e);
 			}
+		}
+	}
+
+	private void loadAliases(final YamlConfiguration cfg) {
+		final ConfigurationSection alias = cfg.getConfigurationSection("aliases");
+		if (alias == null) {
+			return;
+		}
+		for (final String id : alias.getKeys(false)) {
+			aliases.put(id, alias.getString(id));
 		}
 	}
 
@@ -184,6 +237,9 @@ public class VillageRegistry {
 			cfg.set(path + ".y", village.centre().y());
 			cfg.set(path + ".z", village.centre().z());
 			cfg.set(path + ".discoveredAt", village.discoveredAt());
+		}
+		for (final Map.Entry<String, String> alias : aliases.entrySet()) {
+			cfg.set("aliases." + alias.getKey(), alias.getValue());
 		}
 		try {
 			file.getParentFile().mkdirs();

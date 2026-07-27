@@ -202,4 +202,53 @@ class VillageRegistryTest {
 		final NamedVillage reloaded = registry().find(at(140, 135));
 		assertEquals(WORLD_ID + "_140_135", reloaded.id());
 	}
+
+	@Test
+	void anAbsorbedIdResolvesToItsSurvivor() {
+		final VillageRegistry registry = registry();
+		final NamedVillage keep = registry.claim(VillageKey.from(WORLD_ID, 0, 0),
+			at(0, 0), "Ravenhollow");
+		final NamedVillage gone = registry.claim(
+			VillageKey.from(WORLD_ID, 200, 0), at(200, 0), "Frostmere");
+
+		registry.absorb(gone.id(), keep.id());
+
+		assertEquals(keep.id(), registry.resolve(gone.id()));
+		assertEquals(keep.id(), registry.byRowId(gone.id()).id());
+		assertEquals(1, registry.size());
+	}
+
+	@Test
+	void anAliasChainResolvesToTheLastSurvivor() {
+		final VillageRegistry registry = registry();
+		final NamedVillage keep = registry.claim(VillageKey.from(WORLD_ID, 0, 0),
+			at(0, 0), "Ravenhollow");
+		final NamedVillage first = registry.claim(
+			VillageKey.from(WORLD_ID, 200, 0), at(200, 0), "Frostmere");
+		final NamedVillage second = registry.claim(
+			VillageKey.from(WORLD_ID, 400, 0), at(400, 0), "Elder Mere");
+
+		registry.absorb(second.id(), first.id());
+		registry.absorb(first.id(), keep.id());
+
+		assertEquals(keep.id(), registry.resolve(second.id()));
+	}
+
+	@Test
+	void aliasesSurviveAcrossInstances() {
+		final VillageRegistry registry = registry();
+		final NamedVillage keep = registry.claim(VillageKey.from(WORLD_ID, 0, 0),
+			at(0, 0), "Ravenhollow");
+		final NamedVillage gone = registry.claim(
+			VillageKey.from(WORLD_ID, 200, 0), at(200, 0), "Frostmere");
+		registry.absorb(gone.id(), keep.id());
+
+		assertEquals(keep.id(), registry().resolve(gone.id()));
+	}
+
+	@Test
+	void anUnknownIdResolvesToItself() {
+		assertEquals("nobody", registry().resolve("nobody"));
+		assertNull(registry().resolve(null));
+	}
 }
