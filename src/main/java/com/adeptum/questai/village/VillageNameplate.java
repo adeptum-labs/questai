@@ -27,6 +27,7 @@ import com.adeptum.questai.model.VillageInfo;
 import com.adeptum.questai.reputation.Reputation;
 import com.adeptum.questai.reputation.Standings;
 import com.adeptum.questai.utility.AiChat;
+import com.adeptum.questai.villager.StoredLocation;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import java.time.Duration;
 import java.util.HashMap;
@@ -299,10 +300,24 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 			}
 			final String chosen = name == null ? VillageNames.fallbackName(key) : name;
 			Bukkit.getScheduler().runTask(plugin, () -> {
-				registry.claim(key, centre, chosen);
+				claimSurveyed(key, centre, chosen);
 				naming.remove(key);
 			});
 		});
+	}
+
+	/**
+	 * Claims a village on the centre its villagers describe, falling back
+	 * to the claimant's own spot when too few are about to survey, or the
+	 * surveyed world turns out not to be loaded.
+	 */
+	/* default */ NamedVillage claimSurveyed(final VillageKey key,
+		final Location centre, final String name) {
+
+		final StoredLocation surveyed =
+			VillageCrowd.measure(StoredLocation.from(centre));
+		final Location claimAt = surveyed == null ? null : surveyed.toLocation();
+		return registry.claim(key, claimAt == null ? centre : claimAt, name);
 	}
 
 	private static VillageKey keyOf(final Location location) {

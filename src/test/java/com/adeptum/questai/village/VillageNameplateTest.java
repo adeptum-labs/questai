@@ -25,10 +25,13 @@ import com.adeptum.questai.reputation.Reputation;
 import com.adeptum.questai.reputation.Standings;
 import com.adeptum.questai.reputation.VillageReputationStore;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.logging.Logger;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Villager;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.AfterEach;
@@ -88,6 +91,29 @@ class VillageNameplateTest {
 
 	private void claimRavenhollow() {
 		registry.claim(VillageKey.from(world.getUID(), 0, 0), at(0, 0),
+			"Ravenhollow");
+	}
+
+	/** A villager standing at this spot in the mock world. */
+	private Villager point(final double x, final double z) {
+		return world.spawn(new Location(world, x, 64, z), Villager.class);
+	}
+
+	/** Leaves only this crowd standing, for the next nearby-entity sweep. */
+	private void stubCrowd(final Villager... crowd) {
+		final List<Villager> keep = List.of(crowd);
+		world.getEntitiesByClass(Villager.class).stream()
+			.filter(villager -> !keep.contains(villager))
+			.forEach(Entity::remove);
+	}
+
+	/** Claims a village from this spot, with these villagers about. */
+	private NamedVillage claimFrom(final double x, final double z,
+		final Villager... crowd) {
+
+		stubCrowd(crowd);
+		return nameplate.claimSurveyed(
+			VillageKey.from(world.getUID(), (int) x, (int) z), at(x, z),
 			"Ravenhollow");
 	}
 
@@ -244,5 +270,23 @@ class VillageNameplateTest {
 
 		assertNull(stateOf(first));
 		assertNull(stateOf(second));
+	}
+
+	@Test
+	void aClaimLandsOnTheCrowdNotTheClaimant() {
+		// Three villagers well north of where the player is standing
+		final NamedVillage village = claimFrom(140, 135,
+			point(130, 150), point(137, 161), point(150, 170));
+
+		assertEquals(137, village.centre().x(), 0.5);
+		assertEquals(161, village.centre().z(), 0.5);
+	}
+
+	@Test
+	void aClaimWithNoCrowdKeepsTheClaimantsSpot() {
+		final NamedVillage village = claimFrom(140, 135);
+
+		assertEquals(140, village.centre().x(), 0.5);
+		assertEquals(135, village.centre().z(), 0.5);
 	}
 }
