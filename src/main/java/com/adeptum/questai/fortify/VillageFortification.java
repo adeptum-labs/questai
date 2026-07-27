@@ -3,6 +3,7 @@ package com.adeptum.questai.fortify;
 import com.adeptum.questai.SubPlugin;
 import com.adeptum.questai.mob.MobForge;
 import com.adeptum.questai.village.NamedVillage;
+import com.adeptum.questai.village.VillageCrowd;
 import com.adeptum.questai.village.VillageRegistry;
 import com.adeptum.questai.villager.MemoryEvent;
 import com.adeptum.questai.villager.StoredLocation;
@@ -27,9 +28,6 @@ import org.bukkit.scheduler.BukkitTask;
 public class VillageFortification implements SubPlugin {
 
 	private static final long TICK_INTERVAL = 40L;
-	/** How far out to look for the villagers that measure a village. */
-	private static final double CROWD_RADIUS = 96.0;
-	private static final double CROWD_HEIGHT = 32.0;
 	private static final Map<VillageWork, WorkSchematic> SCHEMATICS =
 		loadSchematics();
 	private static final WorkSchematic PIECE_A =
@@ -461,19 +459,10 @@ public class VillageFortification implements SubPlugin {
 	private static VillageExtent.Extent measureExtent(
 		final NamedVillage village) {
 
-		final Location centre = village.centre().toLocation();
-		final List<VillageExtent.Point> crowd = centre == null
-			|| centre.getWorld() == null ? List.of()
-			: centre.getWorld()
-				.getNearbyEntities(centre, CROWD_RADIUS, CROWD_HEIGHT,
-					CROWD_RADIUS)
-				.stream()
-				.filter(entity -> entity instanceof org.bukkit.entity.Villager)
-				.map(entity -> new VillageExtent.Point(
-					entity.getLocation().getX(), entity.getLocation().getZ()))
-				.toList();
-		return VillageExtent.measure(crowd, village.centre().x(),
-			village.centre().z());
+		return VillageExtent.measure(
+			VillageCrowd.points(village.centre().toLocation(),
+				VillageCrowd.CROWD_RADIUS),
+			village.centre().x(), village.centre().z());
 	}
 
 	/**
