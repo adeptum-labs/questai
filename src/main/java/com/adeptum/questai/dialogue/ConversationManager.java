@@ -20,6 +20,11 @@
 
 package com.adeptum.questai.dialogue;
 
+import com.adeptum.questai.craft.Commission;
+import com.adeptum.questai.craft.CommissionDesk;
+import com.adeptum.questai.craft.CommissionGate;
+import com.adeptum.questai.craft.CommissionOrder;
+import com.adeptum.questai.craft.CommissionOrders;
 import com.adeptum.questai.fortify.MaterialTally;
 import com.adeptum.questai.fortify.VillageWork;
 import com.adeptum.questai.fortify.VillageWorksStore;
@@ -32,7 +37,6 @@ import com.adeptum.questai.quest.QuestManager;
 import com.adeptum.questai.reputation.Reputation;
 import com.adeptum.questai.reputation.Standings;
 import com.adeptum.questai.service.QuestGenerationService;
-import com.adeptum.questai.teleport.TeleportStoneCensus;
 import com.adeptum.questai.utility.AiChat;
 import com.adeptum.questai.village.NamedVillage;
 import com.adeptum.questai.village.VillageRegistry;
@@ -48,6 +52,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
@@ -75,6 +80,10 @@ public class ConversationManager {
 	private Standings standings;
 	private VillageRegistry registry;
 	private BiConsumer<Player, String> stoneClaimHandler;
+	private Predicate<String> stoneIssuedCheck;
+	private CommissionDesk commissionDesk;
+	private CommissionOrders commissionOrderHandler;
+	private BiConsumer<Player, String> commissionCollectHandler;
 
 	public ConversationManager(final JavaPlugin plugin, final OpenAiChatModel chatModel,
 		final VillagerProfileStore profileStore) {
@@ -120,6 +129,27 @@ public class ConversationManager {
 		final BiConsumer<Player, String> handler) {
 
 		this.stoneClaimHandler = handler;
+	}
+
+	/** Answers whether a village's stone is already out in the world. */
+	public void setStoneIssuedCheck(final Predicate<String> check) {
+		this.stoneIssuedCheck = check;
+	}
+
+	public void setCommissionDesk(final CommissionDesk desk) {
+		this.commissionDesk = desk;
+	}
+
+	/** Called when the player agrees to a piece the craftsman named. */
+	public void setCommissionOrderHandler(final CommissionOrders handler) {
+		this.commissionOrderHandler = handler;
+	}
+
+	/** Called with the player and village row id when they collect. */
+	public void setCommissionCollectHandler(
+		final BiConsumer<Player, String> handler) {
+
+		this.commissionCollectHandler = handler;
 	}
 
 	public void startConversation(final Player player, final UUID npcUuid,
@@ -192,6 +222,11 @@ public class ConversationManager {
 			case CHAT_RESPONSE -> handleChatResponse(player, slot, state, npcName, profession);
 			case WORK_OFFER -> handleWorkOffer(player, slot, state);
 			case STONE_OFFER -> handleStoneOffer(player, slot, state);
+			case COMMISSION_OFFER ->
+				handleCommissionOffer(player, slot, state);
+			case COMMISSION_WAIT -> endConversation(player);
+			case COMMISSION_COLLECT ->
+				handleCommissionCollect(player, slot, state);
 		}
 	}
 
@@ -225,11 +260,17 @@ public class ConversationManager {
 	private DialogueOptions optionsFor(final Player player,
 		final ConversationState state) {
 
+		final CommissionOrder open = openCommission(player, state);
+		final boolean ready = canCollectCommission(player, state);
 		return DialogueOptions.builder()
 			.questAvailable(state.isQuestAvailable())
 			.tradeable(state.isTradeable())
 			.worksOpen(hasOpenWorks(player, state))
 			.stoneOffer(canClaimStone(player, state))
+			.commissionOffer(open == null
+				&& commissionOffer(player, state) != null)
+			.commissionWaiting(open != null && !ready)
+			.commissionReady(ready)
 			.build();
 	}
 
@@ -248,6 +289,28 @@ public class ConversationManager {
 			startWorkOffer(player, state, npcName);
 		} else if (slot == DialogueGui.CENTER_SLOT && canClaimStone(player, state)) {
 			startStoneOffer(player, state, npcName);
+		} else if (slot == DialogueGui.CRAFT_SLOT) {
+			handleCraftSlot(player, state, npcName);
+		}
+	}
+
+	/**
+	 * The craftsman's slot means one of three things depending on what the
+	 * village already has in hand for this player, so the decision lives
+	 * here rather than adding three more arms to the options chain.
+	 */
+	private void handleCraftSlot(final Player player,
+		final ConversationState state, final String npcName) {
+
+		if (canCollectCommission(player, state)) {
+			startCommissionCollect(player, state, npcName);
+			return;
+		}
+		final CommissionOrder open = openCommission(player, state);
+		if (open != null) {
+			startCommissionWait(player, state, npcName, open);
+		} else if (commissionOffer(player, state) != null) {
+			startCommissionOffer(player, state, npcName);
 		}
 	}
 
@@ -378,14 +441,15 @@ public class ConversationManager {
 	private boolean canClaimStone(final Player player,
 		final ConversationState state) {
 
-		if (stoneClaimHandler == null || registry == null
-			|| worksStore == null || state.getVillageRowId() == null
+		if (stoneClaimHandler == null || stoneIssuedCheck == null
+			|| registry == null || worksStore == null
+			|| state.getVillageRowId() == null
 			|| !tradesWith(player, state.getVillageRowId())) {
 			return false;
 		}
 		final WorkState works = worksStore.get(state.getVillageRowId());
 		return works != null && works.getTier() >= VillageWork.count()
-			&& !TeleportStoneCensus.exists(state.getVillageRowId());
+			&& !stoneIssuedCheck.test(state.getVillageRowId());
 	}
 
 	private void startStoneOffer(final Player player,
@@ -398,6 +462,107 @@ public class ConversationManager {
 		state.setPhase(ConversationPhase.STONE_OFFER);
 		player.openInventory(
 			DialogueGui.createStoneOffer(npcName, village.name()));
+	}
+
+	/** The piece this craftsman would take on, or null for none. */
+	private Commission commissionOffer(final Player player,
+		final ConversationState state) {
+
+		if (commissionDesk == null || commissionOrderHandler == null) {
+			return null;
+		}
+		return commissionDesk.offerFor(state.getNpcProfession(),
+			state.getVillageRowId(), player.getUniqueId());
+	}
+
+	/** The work this village already has in hand for the player, or null. */
+	private CommissionOrder openCommission(final Player player,
+		final ConversationState state) {
+
+		return commissionDesk == null ? null
+			: commissionDesk.openOrder(state.getVillageRowId(),
+				player.getUniqueId());
+	}
+
+	/** Whether this villager will hand a finished piece over right now. */
+	private boolean canCollectCommission(final Player player,
+		final ConversationState state) {
+
+		return commissionDesk != null && commissionCollectHandler != null
+			&& commissionDesk.collectable(state.getNpcProfession(),
+				state.getVillageRowId(), player.getUniqueId(),
+				System.currentTimeMillis());
+	}
+
+	private void startCommissionOffer(final Player player,
+		final ConversationState state, final String npcName) {
+
+		final Commission commission = commissionOffer(player, state);
+		if (commission == null) {
+			return;
+		}
+		final Map<String, Integer> carried = new LinkedHashMap<>();
+		commission.getRequirements().forEach((role, needed) -> carried.put(role,
+			commissionDesk.carried(player.getInventory().getContents(),
+				commission, role)));
+
+		state.setPhase(ConversationPhase.COMMISSION_OFFER);
+		player.openInventory(DialogueGui.createCommissionOffer(npcName,
+			commission, commission.getRequirements(), carried));
+	}
+
+	private void handleCommissionOffer(final Player player, final int slot,
+		final ConversationState state) {
+
+		final Commission commission = commissionOffer(player, state);
+		if (slot == DialogueGui.OPTION_1_SLOT && commission != null) {
+			commissionOrderHandler.place(player, state.getVillageRowId(),
+				state.getNpcUuid(), commission.name());
+			endConversation(player);
+		} else if (slot == DialogueGui.OPTION_4_SLOT) {
+			endConversation(player);
+		}
+	}
+
+	private void startCommissionWait(final Player player,
+		final ConversationState state, final String npcName,
+		final CommissionOrder order) {
+
+		final Commission commission = Commission.byName(order.commission());
+		if (commission == null) {
+			return;
+		}
+		state.setPhase(ConversationPhase.COMMISSION_WAIT);
+		player.openInventory(DialogueGui.createCommissionWait(npcName,
+			commission, CommissionGate.remainingMinutes(order.readyAt(),
+				System.currentTimeMillis())));
+	}
+
+	private void startCommissionCollect(final Player player,
+		final ConversationState state, final String npcName) {
+
+		final CommissionOrder order = openCommission(player, state);
+		final Commission commission =
+			order == null ? null : Commission.byName(order.commission());
+		if (commission == null) {
+			return;
+		}
+		state.setPhase(ConversationPhase.COMMISSION_COLLECT);
+		player.openInventory(
+			DialogueGui.createCommissionCollect(npcName, commission));
+	}
+
+	private void handleCommissionCollect(final Player player, final int slot,
+		final ConversationState state) {
+
+		if (slot == DialogueGui.OPTION_1_SLOT
+			&& commissionCollectHandler != null) {
+
+			commissionCollectHandler.accept(player, state.getVillageRowId());
+			endConversation(player);
+		} else if (slot == DialogueGui.OPTION_4_SLOT) {
+			endConversation(player);
+		}
 	}
 
 	private void handleStoneOffer(final Player player, final int slot,
