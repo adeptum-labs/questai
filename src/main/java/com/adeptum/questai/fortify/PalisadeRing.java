@@ -86,6 +86,17 @@ public final class PalisadeRing {
 			stepZ(slot.z(), slot.rotation(), offset));
 	}
 
+	/**
+	 * The cell a terminus post stands in when a front stops at this slot:
+	 * the end it was approached from, so the post meets the run already
+	 * standing behind it rather than the empty ground ahead.
+	 */
+	public static RingCell terminus(final RingModule slot,
+		final boolean forwards) {
+
+		return cell(slot, forwards ? 0 : length(slot.kind()) - 1);
+	}
+
 	/** True once every slot of the ring has been built or skipped. */
 	public static boolean complete(final int placedForward,
 		final int placedBackward, final int size) {

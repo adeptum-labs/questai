@@ -6,7 +6,6 @@ import com.adeptum.questai.fortify.VillageWorksStore;
 import com.adeptum.questai.village.VillageRegistry;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.Tag;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.block.BlockBreakEvent;
@@ -68,26 +67,8 @@ public final class DemolitionWatch implements SubPlugin {
 			return false;
 		}
 		if (hit == BuiltBlocks.Hit.RING) {
-			return ringMaterial(brokenType);
+			return BuiltBlocks.ringMaterial(brokenType);
 		}
 		return true;
-	}
-
-	/** The stuff the palisade is actually made of. */
-	static boolean ringMaterial(final Material type) {
-		return isStandardBuildingMaterial(type) || isDecorativeMaterial(type);
-	}
-
-	/** Logs, fences, and stairs that form the ring's frame. */
-	private static boolean isStandardBuildingMaterial(final Material type) {
-		return Tag.LOGS.isTagged(type) || Tag.FENCES.isTagged(type)
-			|| Tag.WOODEN_STAIRS.isTagged(type)
-			|| type == Material.COBBLESTONE || type == Material.COARSE_DIRT;
-	}
-
-	/** Torches and lanterns placed on the ring. */
-	private static boolean isDecorativeMaterial(final Material type) {
-		return type == Material.LANTERN || type == Material.WALL_TORCH
-			|| type == Material.TORCH;
 	}
 }

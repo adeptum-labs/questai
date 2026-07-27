@@ -38,7 +38,18 @@ public final class GroundCover {
 		/** Water, lava or ice: no amount of clearing helps. */
 		BLOCKED,
 		/** Somebody's work, which is never cleared to make room. */
-		BUILT
+		BUILT,
+		/**
+		 * A path the village trod itself. A house has no business sitting
+		 * on one, but a wall whose line is already drawn must cross it —
+		 * refusing there is what leaves a road-width hole in the palisade.
+		 */
+		TRODDEN;
+
+		/** Whether a footing can rest on this at all. */
+		public boolean footable() {
+			return this == GROUND || this == TRODDEN;
+		}
 	}
 
 	/**
@@ -67,6 +78,9 @@ public final class GroundCover {
 
 	/** Untouched terrain to build on, or somebody's work to leave be. */
 	private static Verdict settled(final Material material) {
+		if (material == Material.DIRT_PATH) {
+			return Verdict.TRODDEN;
+		}
 		return NaturalTerrain.isSurface(material)
 			? Verdict.GROUND : Verdict.BUILT;
 	}
@@ -85,8 +99,15 @@ public final class GroundCover {
 
 	/** True for anything the crew is willing to clear away. */
 	public static boolean isCover(final Material material) {
-		return LEAVES.contains(material) || TIMBER.contains(material)
-			|| GROWTH.contains(material);
+		return isGrowth(material) || TIMBER.contains(material);
+	}
+
+	/**
+	 * Growth a wall can simply be driven through: leaves and undergrowth,
+	 * never bare timber, which read on its own might be somebody's cabin.
+	 */
+	public static boolean isGrowth(final Material material) {
+		return LEAVES.contains(material) || GROWTH.contains(material);
 	}
 
 	private static Set<Material> allTimber() {

@@ -52,9 +52,32 @@ class GroundCoverTest {
 	@Test
 	void villageAndPlayerWorkTurnsASiteAway() {
 		assertEquals(GroundCover.Verdict.BUILT, bottomOf(Material.OAK_PLANKS));
-		assertEquals(GroundCover.Verdict.BUILT, bottomOf(Material.DIRT_PATH));
 		assertEquals(GroundCover.Verdict.BUILT, bottomOf(Material.FARMLAND));
 		assertEquals(GroundCover.Verdict.BUILT, bottomOf(Material.CHEST));
+	}
+
+	@Test
+	void aTroddenPathIsItsOwnAnswer() {
+		assertEquals(GroundCover.Verdict.TRODDEN, bottomOf(Material.DIRT_PATH));
+	}
+
+	@Test
+	void onlyGroundAndPathsCarryAFooting() {
+		assertTrue(GroundCover.Verdict.GROUND.footable());
+		assertTrue(GroundCover.Verdict.TRODDEN.footable());
+		assertFalse(GroundCover.Verdict.BUILT.footable());
+		assertFalse(GroundCover.Verdict.BLOCKED.footable());
+		assertFalse(GroundCover.Verdict.COVER.footable());
+		assertFalse(GroundCover.Verdict.EMPTY.footable());
+	}
+
+	@Test
+	void growthIsCoverWithoutTheTimber() {
+		assertTrue(GroundCover.isGrowth(Material.BIRCH_LEAVES));
+		assertTrue(GroundCover.isGrowth(Material.SWEET_BERRY_BUSH));
+		assertFalse(GroundCover.isGrowth(Material.STRIPPED_OAK_LOG),
+			"bare timber might be somebody's wall");
+		assertFalse(GroundCover.isGrowth(Material.COBBLESTONE));
 	}
 
 	@Test

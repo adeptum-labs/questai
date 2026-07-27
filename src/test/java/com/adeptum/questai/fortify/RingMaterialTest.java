@@ -1,4 +1,4 @@
-package com.adeptum.questai.reputation;
+package com.adeptum.questai.fortify;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -14,7 +14,7 @@ import org.mockbukkit.mockbukkit.MockBukkit;
  * the band is positional, so the material filter is what keeps a player's
  * own builds along the ring line out of the ledger.
  */
-class DemolitionWatchTest {
+class RingMaterialTest {
 
 	@BeforeEach
 	void setUp() {
@@ -28,17 +28,17 @@ class DemolitionWatchTest {
 
 	@Test
 	void wallStuffAlongTheRingCounts() {
-		assertTrue(DemolitionWatch.ringMaterial(Material.OAK_LOG));
-		assertTrue(DemolitionWatch.ringMaterial(Material.SPRUCE_FENCE));
-		assertTrue(DemolitionWatch.ringMaterial(Material.COBBLESTONE));
-		assertTrue(DemolitionWatch.ringMaterial(Material.STRIPPED_SPRUCE_LOG));
-		assertTrue(DemolitionWatch.ringMaterial(Material.LANTERN));
+		assertTrue(BuiltBlocks.ringMaterial(Material.OAK_LOG));
+		assertTrue(BuiltBlocks.ringMaterial(Material.SPRUCE_FENCE));
+		assertTrue(BuiltBlocks.ringMaterial(Material.COBBLESTONE));
+		assertTrue(BuiltBlocks.ringMaterial(Material.STRIPPED_SPRUCE_LOG));
+		assertTrue(BuiltBlocks.ringMaterial(Material.LANTERN));
 	}
 
 	@Test
 	void aPlayersOwnBuildsAlongTheRingDoNot() {
-		assertFalse(DemolitionWatch.ringMaterial(Material.DIRT));
-		assertFalse(DemolitionWatch.ringMaterial(Material.GLASS));
-		assertFalse(DemolitionWatch.ringMaterial(Material.CHEST));
+		assertFalse(BuiltBlocks.ringMaterial(Material.DIRT));
+		assertFalse(BuiltBlocks.ringMaterial(Material.GLASS));
+		assertFalse(BuiltBlocks.ringMaterial(Material.CHEST));
 	}
 }

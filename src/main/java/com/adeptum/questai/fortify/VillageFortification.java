@@ -43,6 +43,8 @@ public class VillageFortification implements SubPlugin {
 	private static final WorkSchematic PIECE_SEAM =
 		WorkSchematic.load("structures/palisade-seam.txt");
 	private static final int MODULES_PER_PULSE = 2;
+	/** How far the ground may fall across one piece before it is skipped. */
+	private static final int RING_LEVEL_SPREAD = 2;
 	// Tried in this order from the recorded gate index: the line itself,
 	// then the slots bracketing it outward, so a puddle at the exact gate
 	// line does not block the gate forever
@@ -58,6 +60,8 @@ public class VillageFortification implements SubPlugin {
 	private final long stageIntervalMillis;
 	private final long pulseIntervalMillis;
 	private final double witnessRadius;
+	/** Where each village's mend pass left off in its list of gaps. */
+	private final Map<String, Integer> mendCursors = new java.util.HashMap<>();
 	private BukkitTask task;
 
 	public VillageFortification(final JavaPlugin plugin,
@@ -176,6 +180,7 @@ public class VillageFortification implements SubPlugin {
 			task.cancel();
 			task = null;
 		}
+		mendCursors.clear();
 	}
 
 	/** True while the fortify feature is switched on in config. */
@@ -632,9 +637,15 @@ public class VillageFortification implements SubPlugin {
 		}
 	}
 
-	/** Never overwrite a player's work; the crater carver's rule. */
+	/**
+	 * Never overwrite a player's work; the crater carver's rule. A path the
+	 * village trod itself is the one exception: works whose line is already
+	 * drawn have to cross the roads, and a footing that refuses to go into
+	 * one leaves the wall standing a course proud of itself there.
+	 */
 	private static boolean replaceable(final org.bukkit.block.Block block) {
 		return block.getType().isAir() || !block.getType().isSolid()
+			|| block.getType() == org.bukkit.Material.DIRT_PATH
 			|| com.adeptum.questai.utility.NaturalTerrain
 				.isSurface(block.getType());
 	}
@@ -689,7 +700,8 @@ public class VillageFortification implements SubPlugin {
 		final List<PalisadeRing.RingModule> ring = PalisadeRing.ring(
 			centre.getBlockX(), centre.getBlockZ());
 		final PulseContext context = new PulseContext(rowId, state, centre,
-			ring, PalisadeRing.gateIndex(ring), ring.size());
+			new SiteGround(centre.getWorld()), ring,
+			PalisadeRing.gateIndex(ring), ring.size());
 		final Fronts fronts =
 			new Fronts(state.getFrontForward(), state.getFrontBackward());
 
@@ -709,13 +721,11 @@ public class VillageFortification implements SubPlugin {
 	}
 
 	/**
-	 * Gives back the ring slots an older build wrote off while its own survey
-	 * stakes were still standing in them. The ground was read with a stake
-	 * capping the column, which reads as unbuildable, so those slots were
-	 * skipped for a reason that was never about the terrain. A gap that still
-	 * holds a stake therefore gets one more attempt; one that does not was
-	 * refused by real ground and is left as it is, which is what keeps this
-	 * from retrying the same water and cliffs forever.
+	 * Keeps offering a standing wall the slots it once wrote off. Some were
+	 * refused for reasons that have since gone: a survey stake capping the
+	 * column, a tree that has been felled, a hollow somebody has filled in.
+	 * Those close. The rest at least get their terminus posts, so a run
+	 * beside a lake or a cliff ends deliberately instead of in mid air.
 	 *
 	 * <p>Runs for any village whose palisade already stands, whatever the
 	 * ladder has moved on to since, and only where somebody can watch.
@@ -724,6 +734,7 @@ public class VillageFortification implements SubPlugin {
 		final WorkState.BuiltSite palisade = state.getBuiltSites()
 			.get(VillageWork.PALISADE.ordinal());
 		if (palisade == null || state.getRingGaps().isEmpty()) {
+			mendCursors.remove(rowId);
 			return;
 		}
 		final Location centre = palisade.origin().toLocation();
@@ -733,53 +744,83 @@ public class VillageFortification implements SubPlugin {
 		}
 	}
 
-	/** Works down the recorded gaps, a couple of slots per tick. */
+	/**
+	 * Works down the recorded gaps a couple of slots per tick, taking them
+	 * in turn round the list rather than from the top, so one long stretch
+	 * of water cannot keep the pass from ever reaching the rest.
+	 */
 	private void mendGaps(final String rowId, final WorkState state,
 		final org.bukkit.World world,
 		final List<PalisadeRing.RingModule> ring) {
 
-		int mended = 0;
-		for (final int index : List.copyOf(state.getRingGaps())) {
-			if (mended >= MODULES_PER_PULSE) {
-				return;
-			}
-			if (mendSlot(rowId, state, world, ring, index)) {
-				mended++;
-			}
+		final List<Integer> gaps = List.copyOf(state.getRingGaps());
+		final SiteGround ground = new SiteGround(world);
+		final int cursor = mendCursors.getOrDefault(rowId, 0);
+		for (int step = 0; step < MODULES_PER_PULSE && step < gaps.size();
+			step++) {
+
+			mendSlot(rowId, state, ground, world, ring,
+				gaps.get(Math.floorMod(cursor + step, gaps.size())));
+		}
+		mendCursors.put(rowId,
+			Math.floorMod(cursor + MODULES_PER_PULSE, gaps.size()));
+	}
+
+	/**
+	 * Offers one skipped slot again. Ground that now reads as buildable
+	 * closes the gap for good; ground that still refuses is left as it is,
+	 * but the runs either side of it are given their end posts.
+	 */
+	private void mendSlot(final String rowId, final WorkState state,
+		final SiteGround ground, final org.bukkit.World world,
+		final List<PalisadeRing.RingModule> ring, final int index) {
+
+		final PalisadeRing.RingModule slot = slotAt(ring, index);
+		if (slot == null || !slotLoaded(world, slot)) {
+			return;
+		}
+		pullStakes(world, slot);
+		final Integer baseY = slotBase(ground, world, slot);
+		if (baseY == null) {
+			capBothEnds(ground, world, state, ring, index);
+			return;
+		}
+		underpin(ground, world, slot, baseY);
+		placePiece(world, pieceFor(slot.kind(), false), slot, baseY);
+		worksStore.clearGap(rowId, index);
+		buttressGaps(state, world, ring, index, baseY);
+	}
+
+	/**
+	 * Posts both ends of a gap that is here to stay. Ends that run into the
+	 * next gap along are left open, so a lake keeps one terminus at each
+	 * shore rather than a picket of them out in the water.
+	 */
+	private void capBothEnds(final SiteGround ground,
+		final org.bukkit.World world, final WorkState state,
+		final List<PalisadeRing.RingModule> ring, final int index) {
+
+		final int size = ring.size();
+		if (!state.getRingGaps().contains(Math.floorMod(index - 1, size))) {
+			capGap(ground, world, ring, index, true);
+		}
+		if (!state.getRingGaps().contains(Math.floorMod(index + 1, size))) {
+			capGap(ground, world, ring, index, false);
 		}
 	}
 
 	/**
-	 * Raises one skipped slot where a stake is all that stood in the way.
-	 * Reports whether it touched the world, so the pass stays paced; a slot
-	 * the ground still refuses has at least lost its stake and will not be
-	 * offered again.
+	 * The fixed facts of one pulse, bundled so the helpers stay narrow. The
+	 * ground reading is shared across the pulse because both fronts, their
+	 * terminus posts and the buttresses all ask about the same columns.
 	 */
-	private boolean mendSlot(final String rowId, final WorkState state,
-		final org.bukkit.World world,
-		final List<PalisadeRing.RingModule> ring, final int index) {
-
-		final PalisadeRing.RingModule slot = slotAt(ring, index);
-		if (slot == null || !world.isChunkLoaded(slot.x() >> 4, slot.z() >> 4)
-			|| !staked(world, slot)) {
-
-			return false;
-		}
-		pullStakes(world, slot);
-		final Integer baseY = slotBase(world, slot);
-		if (baseY == null) {
-			return true;
-		}
-		placePiece(world, pieceFor(slot.kind(), false), slot, baseY);
-		worksStore.clearGap(rowId, index);
-		buttressGaps(state, world, ring, index, baseY);
-		return true;
-	}
-
-	/** The fixed facts of one pulse, bundled so the helpers stay narrow. */
 	private record PulseContext(String rowId, WorkState state,
-		Location centre, List<PalisadeRing.RingModule> ring, int gate,
-		int size) {
+		Location centre, SiteGround ground,
+		List<PalisadeRing.RingModule> ring, int gate, int size) {
+
+		org.bukkit.World world() {
+			return centre.getWorld();
+		}
 	}
 
 	/** How far each ring front has got, mutated in place across one pulse. */
@@ -806,21 +847,63 @@ public class VillageFortification implements SubPlugin {
 			context.size())) {
 			return;
 		}
+		final int placed = forwards ? fronts.forward : fronts.backward;
 		final int index = forwards
-			? PalisadeRing.nextForward(context.gate(), fronts.forward,
-				context.size())
-			: PalisadeRing.nextBackward(context.gate(), fronts.backward,
-				context.size());
+			? PalisadeRing.nextForward(context.gate(), placed, context.size())
+			: PalisadeRing.nextBackward(context.gate(), placed, context.size());
 		final boolean lastSlot =
 			fronts.forward + fronts.backward == context.size() - 1;
-		if (!buildSlot(context.rowId(), context.state(), context.centre(),
-			context.ring(), index, lastSlot)) {
+		if (!buildSlot(context, index, lastSlot)) {
 			return;
+		}
+		if (context.state().getRingGaps().contains(index)) {
+			capBehind(context, index, forwards, placed);
 		}
 		if (forwards) {
 			fronts.forward++;
 		} else {
 			fronts.backward++;
+		}
+	}
+
+	/**
+	 * Stands the wall's terminus the moment a front writes a slot off. The
+	 * run behind it has already gone up, and nothing else will ever come
+	 * back to it — without this the wall simply stops in mid air, which is
+	 * what makes a finished palisade read as an abandoned one.
+	 */
+	private void capBehind(final PulseContext context, final int index,
+		final boolean forwards, final int placed) {
+
+		final int behind = Math.floorMod(index + (forwards ? -1 : 1),
+			context.size());
+		if (placed == 0 || context.state().getRingGaps().contains(behind)) {
+			return;
+		}
+		capGap(context.ground(), context.world(), context.ring(), index,
+			forwards);
+	}
+
+	/**
+	 * Stands a terminus post at one end of a skipped slot. The post takes
+	 * the ground at its own cell, so a run ending on a slope still meets it
+	 * squarely; where that cell reads no footing at all — open water,
+	 * somebody's floor — the wall just ends, because a post standing in a
+	 * lake is worse than none.
+	 */
+	private void capGap(final SiteGround ground, final org.bukkit.World world,
+		final List<PalisadeRing.RingModule> ring, final int index,
+		final boolean forwards) {
+
+		final PalisadeRing.RingModule slot = ring.get(index);
+		final PalisadeRing.RingCell cell =
+			PalisadeRing.terminus(slot, forwards);
+		final PalisadeRing.RingModule post = new PalisadeRing.RingModule(
+			cell.x(), cell.z(), slot.rotation(), PalisadeRing.Kind.CORNER);
+		pullStakes(world, post);
+		final Integer baseY = ringBase(ground, world, cell);
+		if (baseY != null) {
+			placePiece(world, PIECE_END, post, baseY);
 		}
 	}
 
@@ -844,52 +927,149 @@ public class VillageFortification implements SubPlugin {
 	 * loaded — that front simply waits for a wanderer to load it. Ground the
 	 * wall cannot stand on becomes a recorded gap the front steps past.
 	 */
-	private boolean buildSlot(final String rowId, final WorkState state,
-		final Location centre, final List<PalisadeRing.RingModule> ring,
-		final int index, final boolean lastSlot) {
+	private boolean buildSlot(final PulseContext context, final int index,
+		final boolean lastSlot) {
 
-		final PalisadeRing.RingModule slot = ring.get(index);
-		final org.bukkit.World world = centre.getWorld();
-		if (!world.isChunkLoaded(slot.x() >> 4, slot.z() >> 4)) {
+		final PalisadeRing.RingModule slot = context.ring().get(index);
+		final org.bukkit.World world = context.world();
+		if (!slotLoaded(world, slot)) {
 			return false;
 		}
 
 		pullStakes(world, slot);
-		final Integer baseY = slotBase(world, slot);
+		final Integer baseY = slotBase(context.ground(), world, slot);
 		if (baseY == null) {
-			worksStore.recordGap(rowId, index);
+			worksStore.recordGap(context.rowId(), index);
 			return true;
 		}
+		underpin(context.ground(), world, slot, baseY);
 		placePiece(world, pieceFor(slot.kind(), lastSlot), slot, baseY);
-		buttressGaps(state, world, ring, index, baseY);
+		buttressGaps(context.state(), world, context.ring(), index, baseY);
 		return true;
 	}
 
-	/** The levelled base for a slot, or null when the ground refuses it. */
-	private static Integer slotBase(final org.bukkit.World world,
+	/**
+	 * True when every cell of a slot lies in a chunk somebody has loaded. A
+	 * module is four cells long and can straddle a border; reading the far
+	 * side unloaded would write the slot off for a reason that has nothing
+	 * to do with the ground.
+	 */
+	private static boolean slotLoaded(final org.bukkit.World world,
 		final PalisadeRing.RingModule slot) {
+
+		for (int i = 0; i < PalisadeRing.length(slot.kind()); i++) {
+			final PalisadeRing.RingCell cell = PalisadeRing.cell(slot, i);
+			if (!world.isChunkLoaded(cell.x() >> 4, cell.z() >> 4)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * The levelled base for a slot, or null when the ground refuses it. The
+	 * column is read the way a building crew reads it rather than the way a
+	 * spawner does: down through canopy and undergrowth to the ground under
+	 * them, and across the village's own paths, so a tree overhanging the
+	 * line no longer costs the wall four cells.
+	 */
+	private static Integer slotBase(final SiteGround ground,
+		final org.bukkit.World world, final PalisadeRing.RingModule slot) {
 
 		final int length = PalisadeRing.length(slot.kind());
 		final int[] heights = new int[length];
 		for (int i = 0; i < length; i++) {
-			final Integer height = groundHeight(world, slot, i);
-			if (height == null) {
+			final Integer base =
+				ringBase(ground, world, PalisadeRing.cell(slot, i));
+			if (base == null) {
 				return null;
 			}
-			heights[i] = height;
+			heights[i] = base;
 		}
-		return WorkSite.levelFits(heights, 1)
+		return WorkSite.levelFits(heights, RING_LEVEL_SPREAD)
 			? WorkSite.medianHeight(heights) : null;
 	}
 
-	/** The surface height one step along the slot's run, or null if unusable. */
-	private static Integer groundHeight(final org.bukkit.World world,
-		final PalisadeRing.RingModule slot, final int offset) {
+	/**
+	 * Carries a piece's footing down to the ground under each of its cells.
+	 * One run takes one base, so on anything but a table the low end would
+	 * stand a course clear of the ground; filling that shortfall is what
+	 * lets the wall follow a slope instead of refusing it. Only downward —
+	 * a rise is taken by the wall standing in it, and nothing here quarries.
+	 */
+	private static void underpin(final SiteGround ground,
+		final org.bukkit.World world, final PalisadeRing.RingModule slot,
+		final int baseY) {
 
-		final PalisadeRing.RingCell cell = PalisadeRing.cell(slot, offset);
-		final Location ground = com.adeptum.questai.utility.SpawnGround
-			.findSurface(world, cell.x(), cell.z());
-		return ground == null ? null : ground.getBlockY();
+		final org.bukkit.block.data.BlockData footing =
+			BiomePalette.forBiome(world.getBlockAt(slot.x(), baseY, slot.z())
+				.getBiome()).resolve(PaletteRole.ROUGH_STONE, null);
+		if (footing == null) {
+			return;
+		}
+		for (int i = 0; i < PalisadeRing.length(slot.kind()); i++) {
+			final PalisadeRing.RingCell cell = PalisadeRing.cell(slot, i);
+			final Integer cellBase = ringBase(ground, world, cell);
+			for (int y = cellBase == null ? baseY : cellBase - 1;
+				y < baseY - 1; y++) {
+
+				final org.bukkit.block.Block block =
+					world.getBlockAt(cell.x(), y, cell.z());
+				if (replaceable(block)) {
+					block.setBlockData(footing, false);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Where the wall would stand in one cell of the ring line, or null when
+	 * the ground refuses it.
+	 *
+	 * <p>The wall's own work is looked past rather than read as somebody's
+	 * build: a terminus post an earlier pass stood in a skipped slot caps
+	 * the column, and taking that at face value would freeze for good the
+	 * very slot the mend pass keeps offering back. Its lowest course went in
+	 * where the ground block was, so reading from there gives the same
+	 * answer every time and nothing creeps up or sinks.
+	 */
+	private static Integer ringBase(final SiteGround ground,
+		final org.bukkit.World world, final PalisadeRing.RingCell cell) {
+
+		final int footing = ownFooting(world, cell);
+		if (footing > world.getMinHeight()) {
+			return footing + 1;
+		}
+		final SiteGround.Column column = ground.columnAt(cell.x(), cell.z());
+		return column == null || !column.verdict().footable()
+			? null : column.groundY() + 1;
+	}
+
+	/**
+	 * The lowest course of the village's own wall standing in this column,
+	 * or the world floor when there is none. Only a column that bottoms out
+	 * on natural ground counts, so a player's cobbled build along the line
+	 * is never read through.
+	 */
+	private static int ownFooting(final org.bukkit.World world,
+		final PalisadeRing.RingCell cell) {
+
+		final int top = world.getHighestBlockYAt(cell.x(), cell.z());
+		int y = top;
+		while (y > world.getMinHeight()
+			&& isRingWork(world.getBlockAt(cell.x(), y, cell.z()))) {
+
+			y--;
+		}
+		return y < top && replaceable(world.getBlockAt(cell.x(), y, cell.z()))
+			? y + 1 : world.getMinHeight();
+	}
+
+	/** Wall stock that is not also ordinary ground the wall stands on. */
+	private static boolean isRingWork(final org.bukkit.block.Block block) {
+		return BuiltBlocks.ringMaterial(block.getType())
+			&& !com.adeptum.questai.utility.NaturalTerrain
+				.isSurface(block.getType());
 	}
 
 	/** The filler columns reuse the corner post — a lone braced post reads
@@ -967,7 +1147,11 @@ public class VillageFortification implements SubPlugin {
 				slot.x() + entry.x() - anchor.x(),
 				baseY + entry.y(),
 				slot.z() + entry.z() - anchor.z());
-			if (!replaceable(block)) {
+			// A wall goes through the canopy it stands in, but never
+			// through the timber of somebody's cabin
+			if (!replaceable(block)
+				&& !GroundCover.isGrowth(block.getType())) {
+
 				continue;
 			}
 			final org.bukkit.block.data.BlockData data =
@@ -1082,18 +1266,6 @@ public class VillageFortification implements SubPlugin {
 				y--;
 			}
 		}
-	}
-
-	/** Whether any of a slot's columns still has a stake standing in it. */
-	private static boolean staked(final org.bukkit.World world,
-		final PalisadeRing.RingModule slot) {
-
-		for (int i = 0; i < PalisadeRing.length(slot.kind()); i++) {
-			if (stakeTop(world, PalisadeRing.cell(slot, i)) >= 0) {
-				return true;
-			}
-		}
-		return false;
 	}
 
 	/**

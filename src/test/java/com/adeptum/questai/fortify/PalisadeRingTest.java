@@ -54,6 +54,24 @@ class PalisadeRingTest {
 	}
 
 	@Test
+	void aTerminusStandsAtTheEndTheFrontCameFrom() {
+		final PalisadeRing.RingModule module = new PalisadeRing.RingModule(
+			10, 20, 0, PalisadeRing.Kind.MODULE_A);
+		assertEquals(new PalisadeRing.RingCell(10, 20),
+			PalisadeRing.terminus(module, true));
+		assertEquals(new PalisadeRing.RingCell(13, 20),
+			PalisadeRing.terminus(module, false));
+
+		final PalisadeRing.RingModule filler = new PalisadeRing.RingModule(
+			10, 20, 1, PalisadeRing.Kind.FILLER);
+		assertEquals(new PalisadeRing.RingCell(10, 20),
+			PalisadeRing.terminus(filler, true));
+		assertEquals(new PalisadeRing.RingCell(10, 20),
+			PalisadeRing.terminus(filler, false),
+			"a one-cell slot has only the one end");
+	}
+
+	@Test
 	void everyPerimeterCellIsCoveredExactlyOnce() {
 		final Set<String> cells = new HashSet<>();
 		for (final PalisadeRing.RingModule module : RING) {

@@ -6,6 +6,8 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.bukkit.Material;
+import org.bukkit.Tag;
 
 /**
  * Decides whether a block position belongs to a village's built works.
@@ -143,6 +145,19 @@ public final class BuiltBlocks {
 		}
 		return new Cached(schematic.getWidth(), schematic.getDepth(), maxY,
 			List.copyOf(cells));
+	}
+
+	/**
+	 * The stuff the ring is actually made of. A {@link Hit#RING} is only a
+	 * claim on the line the wall runs along, so callers confirm it against
+	 * the material before treating a block as the village's own.
+	 */
+	public static boolean ringMaterial(final Material type) {
+		return Tag.LOGS.isTagged(type) || Tag.FENCES.isTagged(type)
+			|| Tag.WOODEN_STAIRS.isTagged(type)
+			|| type == Material.COBBLESTONE || type == Material.COARSE_DIRT
+			|| type == Material.LANTERN || type == Material.WALL_TORCH
+			|| type == Material.TORCH;
 	}
 
 	/** What stood at a queried block, if anything. */

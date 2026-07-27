@@ -28,7 +28,7 @@ public final class SiteReport {
 	public void rejected(final GroundCover.Verdict verdict) {
 		switch (verdict) {
 			case BLOCKED -> blocked++;
-			case BUILT -> built++;
+			case BUILT, TRODDEN -> built++;
 			default -> unseen++;
 		}
 	}

@@ -35,6 +35,17 @@ class SiteReportTest {
 	}
 
 	@Test
+	void theVillagesOwnPathsCountAsSpokenFor() {
+		final SiteReport report = new SiteReport();
+		for (int i = 0; i < 5; i++) {
+			report.rejected(GroundCover.Verdict.TRODDEN);
+		}
+		report.rejected(GroundCover.Verdict.BLOCKED);
+		assertTrue(report.describe().contains("already spoken for"),
+			report.describe());
+	}
+
+	@Test
 	void groundNobodyHasSeenIsAdmittedTo() {
 		final SiteReport report = new SiteReport();
 		report.unscanned();
