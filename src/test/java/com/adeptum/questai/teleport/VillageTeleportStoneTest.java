@@ -48,12 +48,31 @@ class VillageTeleportStoneTest {
 	@Test
 	void createBindsTheVillageAndRoundTrips() {
 		final ItemStack stone =
-			VillageTeleportStone.create("world_10_20", "Harrowdale");
+			VillageTeleportStone.create("world_10_20", "Harrowdale", 120);
 
 		assertEquals("world_10_20", VillageTeleportStone.rowIdOf(stone));
 		assertTrue(VillageTeleportStone.isStone(stone));
 		assertTrue(VillageTeleportStone.bound(stone, "world_10_20"));
 		assertFalse(VillageTeleportStone.bound(stone, "world_99_99"));
+	}
+
+	@Test
+	void theLoreSaysHowLongTheStoneCools() {
+		final ItemStack stone =
+			VillageTeleportStone.create("world_10_20", "Harrowdale", 120);
+
+		assertTrue(stone.getItemMeta().getLore().stream()
+			.anyMatch(line -> line.contains("2m")),
+			"the cooldown has to be readable off the stone itself");
+	}
+
+	@Test
+	void aSpanReadsTheWayTheStoneWouldSayIt() {
+		assertEquals("45s", VillageTeleportStone.duration(45));
+		assertEquals("2m", VillageTeleportStone.duration(120));
+		assertEquals("1m 30s", VillageTeleportStone.duration(90));
+		assertEquals("1s", VillageTeleportStone.duration(0),
+			"a countdown that ends on nothing reads as a refusal");
 	}
 
 	@Test
@@ -70,7 +89,7 @@ class VillageTeleportStoneTest {
 	void holdsFindsTheBoundStoneAmongOtherItems() {
 		final ItemStack[] contents = {
 			null, new ItemStack(Material.DIRT),
-			VillageTeleportStone.create("world_10_20", "Harrowdale")
+			VillageTeleportStone.create("world_10_20", "Harrowdale", 120)
 		};
 
 		assertTrue(VillageTeleportStone.holds(contents, "world_10_20"));

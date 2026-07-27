@@ -102,7 +102,7 @@ class ConversationManagerStoneTest {
 		withTier(VillageWork.count());
 		final PlayerMock holder = server.addPlayer();
 		holder.getInventory()
-			.addItem(VillageTeleportStone.create(ROW_ID, "Harrowdale"));
+			.addItem(VillageTeleportStone.create(ROW_ID, "Harrowdale", 120));
 
 		assertFalse(canClaim(server.addPlayer()));
 	}

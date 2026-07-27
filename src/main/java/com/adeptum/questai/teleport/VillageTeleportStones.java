@@ -88,7 +88,8 @@ public class VillageTeleportStones implements SubPlugin {
 		}
 
 		player.getInventory()
-			.addItem(VillageTeleportStone.create(rowId, village.name()))
+			.addItem(VillageTeleportStone.create(rowId, village.name(),
+				(int) (cooldownMillis / 1000)))
 			.values()
 			.forEach(rest -> player.getWorld()
 				.dropItemNaturally(player.getLocation(), rest));
@@ -115,8 +116,13 @@ public class VillageTeleportStones implements SubPlugin {
 	private void useStone(final Player player, final String rowId) {
 		final long now = System.currentTimeMillis();
 		final Long last = lastUse.get(player.getUniqueId());
-		if (last != null && now - last < cooldownMillis) {
-			player.sendActionBar(Component.text("\u00a78The stone is still cold."));
+		final long cooling = last == null ? 0 : cooldownMillis - (now - last);
+		if (cooling > 0) {
+			// Rounded up, so the last fraction of a second never reads as
+			// nought left on a stone that is still refusing
+			player.sendActionBar(Component.text("\u00a78The stone is still cold \u2014 \u00a77"
+				+ VillageTeleportStone.duration((cooling + 999) / 1000)
+				+ "\u00a78 to go."));
 			return;
 		}
 
@@ -134,6 +140,10 @@ public class VillageTeleportStones implements SubPlugin {
 		player.teleport(target);
 		lastUse.put(player.getUniqueId(), now);
 		arriveAt(target);
+		// Said on arrival as well as on the lore: this is the moment the
+		// player wants to know when they can come back
+		player.sendActionBar(Component.text("§8The stone cools — ready again in §7"
+			+ VillageTeleportStone.duration(cooldownMillis / 1000) + "§8."));
 	}
 
 	/** Leaving: motes flung outward in a puff of smoke, a low pull of sound. */

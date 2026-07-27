@@ -50,13 +50,21 @@ public final class VillageTeleportStone {
 	private VillageTeleportStone() {
 	}
 
-	/** A stone bound to the village with this row id and display name. */
-	public static ItemStack create(final String rowId, final String villageName) {
+	/**
+	 * A stone bound to the village with this row id and display name. The
+	 * cooldown is written into the lore rather than left to be discovered:
+	 * a stone that refuses without ever having said it would is read as
+	 * broken, not as spent.
+	 */
+	public static ItemStack create(final String rowId, final String villageName,
+		final int cooldownSeconds) {
+
 		final ItemStack item = GuiItems.item(MATERIAL,
 			"\u00a7b\u00a7lVillage Teleport Stone", List.of(
 				"\u00a77Bound to \u00a76" + villageName,
 				"\u00a7aRight-click to travel there.",
-				"\u00a78Right-click while held"), CMD);
+				"\u00a78Then cools for \u00a77" + duration(cooldownSeconds)
+					+ "\u00a78 before it will answer again"), CMD);
 		final ItemMeta meta = item.getItemMeta();
 		meta.getPersistentDataContainer()
 			.set(VILLAGE_KEY, PersistentDataType.STRING, rowId);
@@ -64,6 +72,21 @@ public final class VillageTeleportStone {
 			.set(NAME_KEY, PersistentDataType.STRING, villageName);
 		item.setItemMeta(meta);
 		return item;
+	}
+
+	/**
+	 * A span of time as the stone speaks it: {@code 45s}, {@code 2m},
+	 * {@code 1m 30s}. Anything under a second still reads as {@code 1s},
+	 * because a countdown that ends on nothing looks like a refusal.
+	 */
+	public static String duration(final long seconds) {
+		final long whole = Math.max(1, seconds);
+		final long minutes = whole / 60;
+		final long rest = whole % 60;
+		if (minutes == 0) {
+			return rest + "s";
+		}
+		return rest == 0 ? minutes + "m" : minutes + "m " + rest + "s";
 	}
 
 	/** The village row id this item is bound to, or null for anything else. */

@@ -60,7 +60,7 @@ class TeleportStoneCensusTest {
 	void findsAStoneInAPlayerInventory() {
 		final PlayerMock player = server.addPlayer();
 		player.getInventory()
-			.addItem(VillageTeleportStone.create("world_10_20", "Harrowdale"));
+			.addItem(VillageTeleportStone.create("world_10_20", "Harrowdale", 120));
 
 		assertTrue(TeleportStoneCensus.exists("world_10_20"));
 		assertFalse(TeleportStoneCensus.exists("world_99_99"));
@@ -70,7 +70,7 @@ class TeleportStoneCensusTest {
 	void findsAStoneInAnEnderChest() {
 		final PlayerMock player = server.addPlayer();
 		player.getEnderChest()
-			.addItem(VillageTeleportStone.create("world_10_20", "Harrowdale"));
+			.addItem(VillageTeleportStone.create("world_10_20", "Harrowdale", 120));
 
 		assertTrue(TeleportStoneCensus.exists("world_10_20"));
 	}
@@ -79,7 +79,7 @@ class TeleportStoneCensusTest {
 	void findsADroppedStoneInALoadedChunk() {
 		final WorldMock world = server.addSimpleWorld("drop-test");
 		world.dropItem(new Location(world, 0, 64, 0),
-			VillageTeleportStone.create("world_10_20", "Harrowdale"));
+			VillageTeleportStone.create("world_10_20", "Harrowdale", 120));
 
 		assertTrue(TeleportStoneCensus.exists("world_10_20"));
 	}
