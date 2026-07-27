@@ -218,8 +218,19 @@ public class ConversationManager {
 		state.setPhase(ConversationPhase.OPTIONS);
 		player.openInventory(
 			DialogueGui.createOptions(npcName, state.getLastAiResponse(),
-				state.isQuestAvailable(), state.isTradeable(),
-				hasOpenWorks(player, state), canClaimStone(player, state)));
+				optionsFor(player, state)));
+	}
+
+	/** Which doors this villager's main screen should show right now. */
+	private DialogueOptions optionsFor(final Player player,
+		final ConversationState state) {
+
+		return DialogueOptions.builder()
+			.questAvailable(state.isQuestAvailable())
+			.tradeable(state.isTradeable())
+			.worksOpen(hasOpenWorks(player, state))
+			.stoneOffer(canClaimStone(player, state))
+			.build();
 	}
 
 	private void handleOptions(final Player player, final int slot,

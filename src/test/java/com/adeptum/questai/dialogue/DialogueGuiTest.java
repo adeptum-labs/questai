@@ -51,12 +51,16 @@ class DialogueGuiTest {
 		MockBukkit.unmock();
 	}
 
+	private static DialogueOptions.DialogueOptionsBuilder options() {
+		return DialogueOptions.builder().questAvailable(true).tradeable(true);
+	}
+
 	@Test
 	void theOptionsScreenOffersTheWorksOnlyWhenOpen() {
 		final Inventory without = DialogueGui.createOptions("Bo", "Hello",
-			true, true, false, false);
+			options().build());
 		final Inventory with = DialogueGui.createOptions("Bo", "Hello",
-			true, true, true, false);
+			options().worksOpen(true).build());
 
 		// A closed ladder leaves the centre slot as border filler
 		assertEquals(Material.GRAY_STAINED_GLASS_PANE,
@@ -68,15 +72,59 @@ class DialogueGuiTest {
 	@Test
 	void theStoneTakesTheCentreOnlyOnceTheWorksAreDone() {
 		final Inventory offered = DialogueGui.createOptions("Bo", "Hello",
-			true, true, false, true);
+			options().stoneOffer(true).build());
 		final Inventory worksWin = DialogueGui.createOptions("Bo", "Hello",
-			true, true, true, true);
+			options().worksOpen(true).stoneOffer(true).build());
 
 		assertEquals(Material.HEART_OF_THE_SEA,
 			offered.getItem(DialogueGui.CENTER_SLOT).getType());
 		// While the ladder is unfinished the works keep the shared slot
 		assertEquals(Material.BRICKS,
 			worksWin.getItem(DialogueGui.CENTER_SLOT).getType());
+	}
+
+	@Test
+	void theCraftSlotShowsAnOfferThenAWaitThenAPickup() {
+		assertEquals(Material.GRAY_STAINED_GLASS_PANE,
+			DialogueGui.createOptions("Bo", "Hello", options().build())
+				.getItem(DialogueGui.CRAFT_SLOT).getType(),
+			"a trade with nothing to offer leaves its slot as filler");
+		assertEquals(Material.ANVIL,
+			DialogueGui.createOptions("Bo", "Hello",
+				options().commissionOffer(true).build())
+				.getItem(DialogueGui.CRAFT_SLOT).getType());
+		assertEquals(Material.CLOCK,
+			DialogueGui.createOptions("Bo", "Hello",
+				options().commissionWaiting(true).build())
+				.getItem(DialogueGui.CRAFT_SLOT).getType());
+		assertEquals(Material.ANVIL,
+			DialogueGui.createOptions("Bo", "Hello",
+				options().commissionReady(true).build())
+				.getItem(DialogueGui.CRAFT_SLOT).getType());
+	}
+
+	@Test
+	void aFinishedPieceOutranksOneStillOnTheBench() {
+		final Inventory both = DialogueGui.createOptions("Bo", "Hello",
+			options().commissionOffer(true).commissionWaiting(true)
+				.commissionReady(true).build());
+
+		assertEquals("§b§lYour commission is ready",
+			both.getItem(DialogueGui.CRAFT_SLOT).getItemMeta()
+				.getDisplayName());
+	}
+
+	@Test
+	void theCraftSlotNeverTouchesTheCentre() {
+		final Inventory everything = DialogueGui.createOptions("Bo", "Hello",
+			options().worksOpen(true).stoneOffer(true).commissionOffer(true)
+				.commissionReady(true).build());
+
+		assertEquals(Material.BRICKS,
+			everything.getItem(DialogueGui.CENTER_SLOT).getType(),
+			"the works must keep the centre whatever the craftsman is doing");
+		assertEquals(Material.ANVIL,
+			everything.getItem(DialogueGui.CRAFT_SLOT).getType());
 	}
 
 	@Test

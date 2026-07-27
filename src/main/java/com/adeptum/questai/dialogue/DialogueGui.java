@@ -23,6 +23,7 @@ package com.adeptum.questai.dialogue;
 import static com.adeptum.questai.resourcepack.ResourcePackManager.CMD;
 import static com.adeptum.questai.resourcepack.ResourcePackManager.DIALOGUE_BANNER_GLYPH;
 
+import com.adeptum.questai.craft.Commission;
 import com.adeptum.questai.fortify.VillageWork;
 import com.adeptum.questai.model.world.quest.Quest;
 import com.adeptum.questai.teleport.VillageTeleportStone;
@@ -64,6 +65,8 @@ public final class DialogueGui {
 	public static final int OPTION_3_SLOT = 23;
 	public static final int OPTION_4_SLOT = 25;
 	public static final int CENTER_SLOT = 22;
+	/** The craftsman's own slot, clear of the contested centre. */
+	public static final int CRAFT_SLOT = 24;
 
 	private static final int[] FILLER_SLOTS = {
 		1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14, 15, 16, 17,
@@ -127,38 +130,58 @@ public final class DialogueGui {
 		return inv;
 	}
 
-	public static Inventory createOptions(final String npcName, final String dialogueText,
-		final boolean questAvailable, final boolean tradeable, final boolean worksOpen,
-		final boolean stoneOffer) {
+	public static Inventory createOptions(final String npcName,
+		final String dialogueText, final DialogueOptions options) {
 
 		final Inventory inv = createBase(npcName, "", dialogueText);
 		inv.setItem(OPTION_1_SLOT,
 			button(Material.YELLOW_DYE,
 				"\u00a7e\u00a7lWhat's new around here?", CMD));
-		if (questAvailable) {
+		if (options.questAvailable()) {
 			inv.setItem(OPTION_2_SLOT,
 				button(Material.GREEN_DYE,
 					"\u00a7a\u00a7lDo you need help with anything?", CMD));
 		}
-		if (tradeable) {
+		if (options.tradeable()) {
 			inv.setItem(OPTION_3_SLOT,
 				button(Material.EMERALD, "\u00a7a\u00a7lLet's trade", CMD));
 		}
 		// The works and the stone share the centre slot; the ladder must be
 		// finished before a stone is offered, so the two never coincide
-		if (worksOpen) {
+		if (options.worksOpen()) {
 			inv.setItem(CENTER_SLOT,
 				button(Material.BRICKS,
 					"\u00a76\u00a7lThe village needs materials", CMD));
-		} else if (stoneOffer) {
+		} else if (options.stoneOffer()) {
 			inv.setItem(CENTER_SLOT,
 				button(Material.HEART_OF_THE_SEA,
 					"\u00a7b\u00a7lThe village offers you a way home",
 					VillageTeleportStone.CMD));
 		}
+		setCraftEntry(inv, options);
 		inv.setItem(OPTION_4_SLOT,
 			button(Material.RED_DYE, "\u00a7c\u00a7lI should get going", CMD));
 		return inv;
+	}
+
+	/**
+	 * The craftsman's entry, which keeps its own slot rather than joining
+	 * the contest for the centre: the works stay open for most of a
+	 * village's life, and a commission behind them would never be seen.
+	 */
+	private static void setCraftEntry(final Inventory inv,
+		final DialogueOptions options) {
+
+		if (options.commissionReady()) {
+			inv.setItem(CRAFT_SLOT, button(Material.ANVIL,
+				"\u00a7b\u00a7lYour commission is ready", CMD));
+		} else if (options.commissionWaiting()) {
+			inv.setItem(CRAFT_SLOT, button(Material.CLOCK,
+				"\u00a77\u00a7lStill at the workbench", CMD));
+		} else if (options.commissionOffer()) {
+			inv.setItem(CRAFT_SLOT, button(Material.ANVIL,
+				"\u00a76\u00a7lCommission a piece of work", CMD));
+		}
 	}
 
 	/** What the village still wants, and what the player is carrying. */
@@ -194,6 +217,56 @@ public final class DialogueGui {
 			VillageTeleportStone.CMD));
 		inv.setItem(OPTION_4_SLOT,
 			button(Material.RED_DYE, "\u00a7c\u00a7lNot now", CMD));
+		return inv;
+	}
+
+	/** What the craftsman wants for the piece, and what the player carries. */
+	public static Inventory createCommissionOffer(final String npcName,
+		final Commission commission, final Map<String, Integer> cost,
+		final Map<String, Integer> carried) {
+
+		final Inventory inv = createBase(npcName, "",
+			"I could make you " + commission.getDisplayName()
+				+ ", if you bring what it takes.");
+
+		final List<String> lore = new ArrayList<>();
+		cost.forEach((role, amount) -> lore.add("§7" + role
+			+ ": §f" + amount + " §8(carrying "
+			+ carried.getOrDefault(role, 0) + ")"));
+		lore.add("§8Ready in about " + commission.getGate().minutes()
+			+ " minutes");
+
+		inv.setItem(OPTION_1_SLOT, GuiItems.item(Material.ANVIL,
+			"§6§lCommission it", lore, CMD));
+		inv.setItem(OPTION_4_SLOT,
+			button(Material.RED_DYE, "§c§lNot now", CMD));
+		return inv;
+	}
+
+	/** How much longer the piece on the workbench needs. */
+	public static Inventory createCommissionWait(final String npcName,
+		final Commission commission, final long remainingMinutes) {
+
+		final Inventory inv = createBase(npcName, "",
+			"I am still at " + commission.getDisplayName()
+				+ ". Come back and it will be waiting.");
+		inv.setItem(CENTER_SLOT, GuiItems.item(Material.CLOCK,
+			"§7§lStill at the workbench",
+			List.of("§8About " + remainingMinutes + " minutes to go"), CMD));
+		return inv;
+	}
+
+	/** The finished piece, waiting to be taken. */
+	public static Inventory createCommissionCollect(final String npcName,
+		final Commission commission) {
+
+		final Inventory inv = createBase(npcName, "",
+			"Here it is, " + commission.getDisplayName()
+				+ ", as good as these hands can make it.");
+		inv.setItem(OPTION_1_SLOT, GuiItems.item(commission.icon(),
+			"§b§lTake it", List.of("§7" + commission.getDisplayName()), CMD));
+		inv.setItem(OPTION_4_SLOT,
+			button(Material.RED_DYE, "§c§lLeave it a while", CMD));
 		return inv;
 	}
 
