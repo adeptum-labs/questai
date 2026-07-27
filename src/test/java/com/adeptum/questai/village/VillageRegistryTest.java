@@ -32,6 +32,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -250,5 +251,56 @@ class VillageRegistryTest {
 	void anUnknownIdResolvesToItself() {
 		assertEquals("nobody", registry().resolve("nobody"));
 		assertNull(registry().resolve(null));
+	}
+
+	@Test
+	void aRetiredIdIsNeverReissuedToANewVillage() {
+		final VillageRegistry registry = registry();
+		final NamedVillage original = registry.claim(
+			VillageKey.from(WORLD_ID, 200, 0), at(200, 0), "Frostmere");
+		final NamedVillage keep = registry.claim(VillageKey.from(WORLD_ID, 0, 0),
+			at(0, 0), "Ravenhollow");
+		registry.absorb(original.id(), keep.id());
+
+		final NamedVillage rebuilt = registry.claim(
+			VillageKey.from(WORLD_ID, 200, 0), at(200, 0), "Frostmere Reborn");
+
+		assertNotEquals(original.id(), rebuilt.id());
+		assertEquals(rebuilt.id(), registry.byRowId(rebuilt.id()).id());
+	}
+
+	@Test
+	void absorbIgnoresNullOrEqualIds() {
+		final VillageRegistry registry = registry();
+		final NamedVillage village = registry.claim(
+			VillageKey.from(WORLD_ID, 0, 0), at(0, 0), "Ravenhollow");
+
+		registry.absorb(null, village.id());
+		registry.absorb(village.id(), null);
+		registry.absorb(village.id(), village.id());
+
+		assertEquals(1, registry.size());
+		assertEquals(village.id(), registry.resolve(village.id()));
+	}
+
+	@Test
+	@Timeout(2)
+	void resolveTerminatesOnACyclicAliasTable() throws Exception {
+		// Unreachable through absorb, which never links an id to itself or
+		// back onto a survivor already in its own chain; written by hand to
+		// prove the hop bound holds even if that ever stopped being true
+		final Path file = tempDir.resolve("village-names.yml");
+		Files.writeString(file, "aliases:\n  a: b\n  b: a\n");
+
+		assertNotNull(registry().resolve("a"));
+	}
+
+	@Test
+	@Timeout(2)
+	void resolveTerminatesOnASelfAlias() throws Exception {
+		final Path file = tempDir.resolve("village-names.yml");
+		Files.writeString(file, "aliases:\n  a: a\n");
+
+		assertEquals("a", registry().resolve("a"));
 	}
 }

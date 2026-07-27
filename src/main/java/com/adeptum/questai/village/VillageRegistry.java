@@ -171,7 +171,10 @@ public class VillageRegistry {
 		final String base = centre.worldId() + "_" + (int) Math.floor(centre.x())
 			+ "_" + (int) Math.floor(centre.z());
 		String id = base;
-		for (int suffix = 2; villages.containsKey(id); suffix++) {
+		// A retired id must stay retired, or a new village at the same
+		// column would be shadowed by the alias its predecessor left behind
+		for (int suffix = 2; villages.containsKey(id) || aliases.containsKey(id);
+			suffix++) {
 			id = base + "_" + suffix;
 		}
 		return id;
