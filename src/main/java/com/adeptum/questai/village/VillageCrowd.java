@@ -60,19 +60,22 @@ public final class VillageCrowd {
 	}
 
 	/**
-	 * The centre this village's crowd describes, or null when too few of
-	 * them are about for the answer to be worth having. Keeps the stored
-	 * height: the crowd speaks to where a village is, not how high.
+	 * The centre this village's crowd describes, or null when fewer than
+	 * {@link VillageExtent#MIN_POINTS} villagers are about for the answer
+	 * to be worth having. A sufficient crowd whose median happens to land
+	 * back on the stored centre still returns that centre rather than
+	 * null — whether an unchanged answer is worth acting on is for the
+	 * caller to decide, not this method. Keeps the stored height: the
+	 * crowd speaks to where a village is, not how high.
 	 */
 	public static StoredLocation measure(final StoredLocation stored) {
 		final Location centre = stored.toLocation();
 		final List<VillageExtent.Point> crowd = points(centre, CROWD_RADIUS);
-		final VillageExtent.Extent extent =
-			VillageExtent.measure(crowd, stored.x(), stored.z());
-		if (extent.centreX() == (int) Math.round(stored.x())
-			&& extent.centreZ() == (int) Math.round(stored.z())) {
+		if (crowd.size() < VillageExtent.MIN_POINTS) {
 			return null;
 		}
+		final VillageExtent.Extent extent =
+			VillageExtent.measure(crowd, stored.x(), stored.z());
 		return new StoredLocation(stored.worldId(), extent.centreX(),
 			stored.y(), extent.centreZ());
 	}
