@@ -24,6 +24,8 @@ import com.adeptum.questai.SubPlugin;
 import com.adeptum.questai.event.VillageCheckListener;
 import com.adeptum.questai.event.VillageKey;
 import com.adeptum.questai.model.VillageInfo;
+import com.adeptum.questai.reputation.Reputation;
+import com.adeptum.questai.reputation.Standings;
 import com.adeptum.questai.utility.AiChat;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import java.time.Duration;
@@ -85,6 +87,7 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 	private final JavaPlugin plugin;
 	private final OpenAiChatModel chatModel;
 	private final VillageRegistry registry;
+	private final Standings standings;
 	private final boolean enabled;
 
 	/** The village name each player was last greeted in. */
@@ -98,11 +101,13 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 	private long nextProbeAt;
 
 	public VillageNameplate(final JavaPlugin plugin,
-		final OpenAiChatModel chatModel, final VillageRegistry registry) {
+		final OpenAiChatModel chatModel, final VillageRegistry registry,
+		final Standings standings) {
 
 		this.plugin = plugin;
 		this.chatModel = chatModel;
 		this.registry = registry;
+		this.standings = standings;
 		this.enabled = plugin.getConfig()
 			.getBoolean("villages.nameplate.enabled", true);
 	}
@@ -158,7 +163,7 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 				leaveTick(player.getUniqueId());
 				probe(player);
 			} else {
-				greet(player, village.name());
+				greet(player, village);
 			}
 		}
 	}
@@ -167,15 +172,47 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 	 * Shows the title once per stay. A different name while already greeted
 	 * means the player walked straight from one village into another, which
 	 * greets again without requiring a spell outside.
+	 *
+	 * <p>The standing rides in the subtitle, which the client already draws
+	 * smaller than the name it sits under. It is read at the moment of the
+	 * greeting: the title fades, so it is a snapshot of how the village felt
+	 * as the player walked in, not a running total.
 	 */
-	private void greet(final Player player, final String name) {
+	private void greet(final Player player, final NamedVillage village) {
 		misses.remove(player.getUniqueId());
-		if (!name.equals(inside.get(player.getUniqueId()))) {
-			inside.put(player.getUniqueId(), name);
-			player.showTitle(Title.title(
-				Component.text(name, NamedTextColor.GOLD),
-				Component.empty(), TITLE_TIMES));
+		if (village.name().equals(inside.get(player.getUniqueId()))) {
+			return;
 		}
+		inside.put(player.getUniqueId(), village.name());
+		final int rep = standingIn(village, player.getUniqueId());
+		player.showTitle(Title.title(
+			Component.text(village.name(), NamedTextColor.GOLD),
+			Component.text(standingLine(rep), standingColour(rep)),
+			TITLE_TIMES));
+	}
+
+	/** What this village thinks of this player; nothing when unwired. */
+	/* default */ int standingIn(final NamedVillage village,
+		final UUID playerId) {
+
+		return standings == null ? 0
+			: standings.of(VillageRegistry.rowIdFor(village), playerId);
+	}
+
+	/** The line under the name: how the village feels, and by how much. */
+	/* default */ static String standingLine(final int rep) {
+		return Reputation.standingLabel(rep) + " · " + rep;
+	}
+
+	/** Warm for goodwill, cold for a grudge, grey while they have neither. */
+	private static NamedTextColor standingColour(final int rep) {
+		return switch (Reputation.standing(rep)) {
+			case HATED -> NamedTextColor.DARK_RED;
+			case DISLIKED -> NamedTextColor.RED;
+			case NEUTRAL -> NamedTextColor.GRAY;
+			case RESPECTED -> NamedTextColor.GREEN;
+			case REVERED -> NamedTextColor.AQUA;
+		};
 	}
 
 	/**

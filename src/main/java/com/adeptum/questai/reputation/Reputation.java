@@ -95,6 +95,20 @@ public final class Reputation {
 	}
 
 	/**
+	 * How a standing reads to the player holding it — the word a village
+	 * would use, which is what makes a bare number mean anything.
+	 */
+	public static String standingLabel(final int rep) {
+		return switch (standing(rep)) {
+			case HATED -> "Hated";
+			case DISLIKED -> "Disliked";
+			case NEUTRAL -> "Neutral";
+			case RESPECTED -> "Respected";
+			case REVERED -> "Revered";
+		};
+	}
+
+	/**
 	 * A dialogue-prompt clause voicing the standing, or null while the
 	 * village has no strong feelings either way.
 	 */

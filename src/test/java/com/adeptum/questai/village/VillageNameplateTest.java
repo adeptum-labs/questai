@@ -21,6 +21,9 @@
 package com.adeptum.questai.village;
 
 import com.adeptum.questai.event.VillageKey;
+import com.adeptum.questai.reputation.Reputation;
+import com.adeptum.questai.reputation.Standings;
+import com.adeptum.questai.reputation.VillageReputationStore;
 import java.nio.file.Path;
 import java.util.logging.Logger;
 import org.bukkit.Location;
@@ -55,6 +58,7 @@ class VillageNameplateTest {
 	private ServerMock server;
 	private World world;
 	private VillageRegistry registry;
+	private VillageReputationStore reputationStore;
 	private VillageNameplate nameplate;
 
 	@BeforeEach
@@ -68,7 +72,9 @@ class VillageNameplateTest {
 		when(plugin.getConfig()).thenReturn(new YamlConfiguration());
 
 		registry = new VillageRegistry(plugin, RADIUS);
-		nameplate = new VillageNameplate(plugin, null, registry);
+		reputationStore = new VillageReputationStore(plugin);
+		nameplate = new VillageNameplate(plugin, null, registry,
+			new Standings(registry, reputationStore));
 	}
 
 	@AfterEach
@@ -98,6 +104,35 @@ class VillageNameplateTest {
 		nameplate.tick();
 
 		assertEquals("Ravenhollow", stateOf(player));
+	}
+
+	@Test
+	void theGreetingReadsTheStandingOfTheVillageWalkedInto() {
+		claimRavenhollow();
+		registry.claim(VillageKey.from(world.getUID(), 200, 0), at(200, 0),
+			"Frostmere");
+		final PlayerMock player = server.addPlayer();
+		reputationStore.adjust(
+			VillageRegistry.rowIdFor(registry.find(at(0, 0))),
+			player.getUniqueId(), 30);
+
+		final int home =
+			nameplate.standingIn(registry.find(at(0, 0)), player.getUniqueId());
+		final int away = nameplate.standingIn(registry.find(at(200, 0)),
+			player.getUniqueId());
+
+		assertEquals(30, home);
+		assertEquals("Respected · 30", VillageNameplate.standingLine(home));
+		assertEquals(0, away, "standing is held per village, not per player");
+	}
+
+	@Test
+	void aVillageWithNoOpinionStillSaysSo() {
+		assertEquals("Neutral · 0", VillageNameplate.standingLine(0));
+		assertEquals("Disliked · -12", VillageNameplate.standingLine(-12));
+		assertEquals("Hated · -60",
+			VillageNameplate.standingLine(Reputation.NO_TRADE_AT - 20));
+		assertEquals("Revered · 80", VillageNameplate.standingLine(80));
 	}
 
 	@Test

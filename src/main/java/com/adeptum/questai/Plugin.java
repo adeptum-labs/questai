@@ -116,7 +116,7 @@ public class Plugin extends JavaPlugin implements Listener {
 		final WanderingPeasantPlugin peasantPlugin = new WanderingPeasantPlugin(
 			this, conversationManager, questService, chatModel);
 		final VillageNameplate nameplate = new VillageNameplate(this, chatModel,
-			registry);
+			registry, standings);
 		final AutoVillagerPlugin autoVillager =
 			new AutoVillagerPlugin(this, List.of(eventManager, nameplate));
 		// The scanner also feeds the nameplate its village checks, so the
