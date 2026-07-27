@@ -40,15 +40,16 @@ import org.bukkit.plugin.java.JavaPlugin;
  * <p>Lookups are by distance to a stored centre rather than by cell.
  * {@link VillageKey} buckets the world into 64-block columns, so a village
  * spanning a boundary would otherwise answer to two names depending on
- * which half the player stood in. The key only identifies the row.
+ * which half the player stood in. The key only identifies the cell a
+ * village was discovered in; its id is what a row is filed under.
  */
 public class VillageRegistry {
 
 	private final JavaPlugin plugin;
 	private final File file;
 	private final double claimRadius;
-	// Keyed by the centre's block column, not by VillageKey: two villages can
-	// share one 64-block cell, and a cell-keyed map would evict the first
+	// Keyed by id, not by VillageKey: two villages can share one 64-block
+	// cell, and a cell-keyed map would evict the first
 	private final Map<String, NamedVillage> villages = new HashMap<>();
 
 	public VillageRegistry(final JavaPlugin plugin, final double claimRadius) {
