@@ -24,6 +24,7 @@ import com.adeptum.questai.event.VillageKey;
 import com.adeptum.questai.villager.StoredLocation;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.UUID;
 import java.util.logging.Logger;
 import org.bukkit.Location;
@@ -32,7 +33,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
@@ -284,23 +284,27 @@ class VillageRegistryTest {
 	}
 
 	@Test
-	@Timeout(2)
 	void resolveTerminatesOnACyclicAliasTable() throws Exception {
 		// Unreachable through absorb, which never links an id to itself or
 		// back onto a survivor already in its own chain; written by hand to
-		// prove the hop bound holds even if that ever stopped being true
+		// prove the hop bound holds even if that ever stopped being true.
+		// Preemptive, not just elapsed-time: an unbounded walk must be
+		// killed rather than let the test thread spin forever
 		final Path file = tempDir.resolve("village-names.yml");
 		Files.writeString(file, "aliases:\n  a: b\n  b: a\n");
 
-		assertNotNull(registry().resolve("a"));
+		final VillageRegistry registry = registry();
+		assertTimeoutPreemptively(Duration.ofSeconds(2),
+			() -> assertNotNull(registry.resolve("a")));
 	}
 
 	@Test
-	@Timeout(2)
 	void resolveTerminatesOnASelfAlias() throws Exception {
 		final Path file = tempDir.resolve("village-names.yml");
 		Files.writeString(file, "aliases:\n  a: a\n");
 
-		assertEquals("a", registry().resolve("a"));
+		final VillageRegistry registry = registry();
+		assertTimeoutPreemptively(Duration.ofSeconds(2),
+			() -> assertEquals("a", registry.resolve("a")));
 	}
 }
