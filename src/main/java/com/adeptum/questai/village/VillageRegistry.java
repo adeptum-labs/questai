@@ -153,6 +153,8 @@ public class VillageRegistry {
 			}
 			id = next;
 		}
+		plugin.getLogger().warning("[VillageRegistry] The alias chain from "
+			+ rowId + " does not settle; stopping at " + id + ".");
 		return id;
 	}
 

@@ -25,7 +25,12 @@ import com.adeptum.questai.villager.StoredLocation;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -52,6 +57,7 @@ class VillageRegistryTest {
 	@TempDir
 	private Path tempDir;
 	private AutoCloseable mocks;
+	private final List<LogRecord> logged = new ArrayList<>();
 
 	@BeforeEach
 	void setUp() {
@@ -61,6 +67,21 @@ class VillageRegistryTest {
 		// skip-and-warn path, and its stack trace would read as a failure
 		final Logger quiet = Logger.getAnonymousLogger();
 		quiet.setUseParentHandlers(false);
+		logged.clear();
+		quiet.addHandler(new Handler() {
+			@Override
+			public void publish(final LogRecord record) {
+				logged.add(record);
+			}
+
+			@Override
+			public void flush() {
+			}
+
+			@Override
+			public void close() {
+			}
+		});
 		when(plugin.getLogger()).thenReturn(quiet);
 		when(world.getUID()).thenReturn(WORLD_ID);
 	}
@@ -68,6 +89,12 @@ class VillageRegistryTest {
 	@AfterEach
 	void tearDown() throws Exception {
 		mocks.close();
+	}
+
+	/** Whether anything was logged at this level or worse. */
+	private boolean loggedAtLeast(final Level level) {
+		return logged.stream().anyMatch(
+			record -> record.getLevel().intValue() >= level.intValue());
 	}
 
 	private Location at(final double x, final double z) {
@@ -312,6 +339,34 @@ class VillageRegistryTest {
 		final VillageRegistry registry = registry();
 		assertTimeoutPreemptively(Duration.ofSeconds(2),
 			() -> assertNotNull(registry.resolve("a")));
+	}
+
+	@Test
+	void anAliasChainThatNeverSettlesIsComplainedAbout() throws Exception {
+		// Giving up quietly leaves every lookup through this id answering for
+		// the wrong village with nothing in the log to say why
+		final Path file = tempDir.resolve("village-names.yml");
+		Files.writeString(file, "aliases:\n  a: b\n  b: a\n");
+
+		final VillageRegistry registry = registry();
+		logged.clear();
+		registry.resolve("a");
+
+		assertTrue(loggedAtLeast(Level.WARNING),
+			"a chain that runs out of hops has to say so");
+	}
+
+	@Test
+	void anOrdinaryLookupSaysNothing() {
+		final VillageRegistry registry = registry();
+		final NamedVillage village = registry.claim(
+			VillageKey.from(WORLD_ID, 0, 0), at(0, 0), "Ravenhollow");
+		logged.clear();
+
+		registry.resolve(village.id());
+		registry.resolve("nobody");
+
+		assertFalse(loggedAtLeast(Level.WARNING));
 	}
 
 	@Test
