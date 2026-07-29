@@ -1,0 +1,25 @@
+villages:
+  a9d0d6a7-60c9-4724-bc8e-d5a3dde494f9_140_135:
+    name: Woldmere Hamlets
+    world: a9d0d6a7-60c9-4724-bc8e-d5a3dde494f9
+    x: 140.95378397209174
+    y: 66.17675927506424
+    z: 135.88616588083372
+  a9d0d6a7-60c9-4724-bc8e-d5a3dde494f9_205_135:
+    name: Larkspur Hollow
+    world: a9d0d6a7-60c9-4724-bc8e-d5a3dde494f9
+    x: 205.516688688394
+    y: 71.24918707874468
+    z: 135.13792746061893
+  a9d0d6a7-60c9-4724-bc8e-d5a3dde494f9_128_208:
+    name: Hawthorn Hurst
+    world: a9d0d6a7-60c9-4724-bc8e-d5a3dde494f9
+    x: 128.34413570277712
+    y: 69.0
+    z: 208.03244424779797
+  a9d0d6a7-60c9-4724-bc8e-d5a3dde494f9_31_0:
+    name: Hawthorn Hollow
+    world: a9d0d6a7-60c9-4724-bc8e-d5a3dde494f9
+    x: 31.038566323209984
+    y: 64.79673560066871
+    z: 0.8864931750821341
