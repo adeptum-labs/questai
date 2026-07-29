@@ -220,6 +220,22 @@ class VillageRegistryTest {
 	}
 
 	@Test
+	void anAbsorbedIdStillAnswersButIsNoLongerALivingRow() {
+		final VillageRegistry registry = registry();
+		final NamedVillage keep = registry.claim(VillageKey.from(WORLD_ID, 0, 0),
+			at(0, 0), "Ravenhollow");
+		final NamedVillage gone = registry.claim(
+			VillageKey.from(WORLD_ID, 200, 0), at(200, 0), "Frostmere");
+
+		registry.absorb(gone.id(), keep.id());
+
+		assertTrue(registry.isLive(keep.id()));
+		assertFalse(registry.isLive(gone.id()));
+		assertFalse(registry.isLive("nobody"));
+		assertFalse(registry.isLive(null));
+	}
+
+	@Test
 	void anAliasChainResolvesToTheLastSurvivor() {
 		final VillageRegistry registry = registry();
 		final NamedVillage keep = registry.claim(VillageKey.from(WORLD_ID, 0, 0),

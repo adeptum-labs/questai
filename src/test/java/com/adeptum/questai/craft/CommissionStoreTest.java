@@ -218,4 +218,15 @@ class CommissionStoreTest {
 		assertEquals(Commission.KEEN_BLADE.name(),
 			store.get(ROW, PLAYER).commission());
 	}
+
+	@Test
+	void aVillageKnowsHowManyOrdersItHasInHand(@TempDir final Path folder) {
+		final CommissionStore store = new CommissionStore(pluginIn(folder));
+		store.place(ROW, PLAYER, order(Commission.KEEN_BLADE));
+		store.place(ROW, OTHER_PLAYER, order(Commission.PLATED_HELM));
+
+		assertEquals(2, store.orderCount(ROW));
+		assertEquals(0, store.orderCount(OTHER_ROW));
+		assertEquals(0, store.orderCount(null));
+	}
 }

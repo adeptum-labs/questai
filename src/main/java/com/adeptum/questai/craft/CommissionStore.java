@@ -76,6 +76,12 @@ public final class CommissionStore {
 		save();
 	}
 
+	/** How many orders this village has on its shelf. */
+	public synchronized int orderCount(final String rowId) {
+		final Map<UUID, CommissionOrder> orders = villages.get(rowId);
+		return orders == null ? 0 : orders.size();
+	}
+
 	/** Clears the shelf once the piece has been handed over. */
 	public synchronized void clear(final String rowId, final UUID playerId) {
 		final Map<UUID, CommissionOrder> players = villages.get(rowId);

@@ -129,6 +129,16 @@ public class VillageRegistry {
 	}
 
 	/**
+	 * Whether this id names a village that is still its own row. Deliberately
+	 * blind to the alias table: an absorbed id goes on resolving to the row
+	 * that took it in, so a lookup that followed aliases would answer for a
+	 * village that no longer exists.
+	 */
+	public synchronized boolean isLive(final String rowId) {
+		return rowId != null && villages.containsKey(rowId);
+	}
+
+	/**
 	 * The live id this one stands for. Ids handed out before a merge keep
 	 * turning up on stones and in conversations long afterwards, so every
 	 * lookup goes through here rather than trusting the id it was given.

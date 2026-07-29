@@ -191,4 +191,18 @@ class VillageReputationStoreTest {
 
 		assertEquals(9, store.getAt(ROW, PLAYER, NOON));
 	}
+
+	@Test
+	void aVillageKnowsHowManyPlayersItHasAnOpinionOf(
+		@TempDir final Path folder) {
+
+		final VillageReputationStore store =
+			new VillageReputationStore(pluginIn(folder));
+		store.adjustAt(ROW, PLAYER, 5, NOON);
+		store.adjustAt(ROW, UUID.randomUUID(), -3, NOON);
+
+		assertEquals(2, store.playerCount(ROW));
+		assertEquals(0, store.playerCount("nobody"));
+		assertEquals(0, store.playerCount(null));
+	}
 }

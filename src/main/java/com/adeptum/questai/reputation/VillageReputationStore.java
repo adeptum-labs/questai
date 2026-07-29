@@ -71,6 +71,12 @@ public final class VillageReputationStore {
 		return value;
 	}
 
+	/** How many players this village holds an opinion of. */
+	public synchronized int playerCount(final String rowId) {
+		final Map<UUID, Entry> players = villages.get(rowId);
+		return players == null ? 0 : players.size();
+	}
+
 	/** Folds one village's ledger into another's. */
 	public synchronized void merge(final String fromId, final String intoId) {
 		mergeAt(fromId, intoId, System.currentTimeMillis());
