@@ -45,6 +45,7 @@ import com.adeptum.questai.star.StarfallManager;
 import com.adeptum.questai.service.QuestGenerationService;
 import com.adeptum.questai.villager.VillagerProfileStore;
 import dev.langchain4j.model.openai.OpenAiChatModel;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import org.bukkit.Bukkit;
@@ -77,6 +78,14 @@ public class Plugin extends JavaPlugin implements Listener {
 		final OpenAiChatModel chatModel = OpenAiChatModel.builder()
 			.apiKey(apiKey)
 			.modelName("gpt-5.4-nano")
+			// A player sits in front of an open dialogue for the whole of
+			// this call, so it is bounded to seconds rather than the
+			// library's minute, and given one further go rather than two.
+			// Left unbounded, a single hung request holds the window blank
+			// for three minutes before the fallback line ever shows.
+			.timeout(Duration.ofSeconds(
+				Math.max(1L, config.getLong("openai.timeout-seconds", 10))))
+			.maxRetries(Math.max(0, config.getInt("openai.max-retries", 1)))
 			.build();
 
 		final VillagerProfileStore profileStore = new VillagerProfileStore(this);
