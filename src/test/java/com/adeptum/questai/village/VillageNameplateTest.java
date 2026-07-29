@@ -20,10 +20,13 @@
 
 package com.adeptum.questai.village;
 
+import com.adeptum.questai.craft.CommissionStore;
 import com.adeptum.questai.event.VillageKey;
+import com.adeptum.questai.fortify.VillageWorksStore;
 import com.adeptum.questai.reputation.Reputation;
 import com.adeptum.questai.reputation.Standings;
 import com.adeptum.questai.reputation.VillageReputationStore;
+import com.adeptum.questai.teleport.TeleportStoneStore;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.logging.Logger;
@@ -76,8 +79,11 @@ class VillageNameplateTest {
 
 		registry = new VillageRegistry(plugin, RADIUS);
 		reputationStore = new VillageReputationStore(plugin);
+		final VillageMerger merger = new VillageMerger(registry, reputationStore,
+			new VillageWorksStore(plugin), new TeleportStoneStore(plugin),
+			new CommissionStore(plugin));
 		nameplate = new VillageNameplate(plugin, null, registry,
-			new Standings(registry, reputationStore));
+			new Standings(registry, reputationStore), merger);
 	}
 
 	@AfterEach
@@ -288,5 +294,35 @@ class VillageNameplateTest {
 
 		assertEquals(140, village.centre().x(), 0.5);
 		assertEquals(135, village.centre().z(), 0.5);
+	}
+
+	@Test
+	void standingInAVillageDrawsItsCentreTowardTheCrowd() {
+		final NamedVillage village = claimFrom(140, 135);
+		stubCrowd(point(130, 150), point(137, 161), point(150, 170));
+		final PlayerMock player = server.addPlayer();
+		player.setLocation(at(140, 135));
+
+		nameplate.tick();
+
+		final double moved = registry.byRowId(village.id()).centre().z();
+		assertTrue(moved > village.centre().z() + 8,
+			"expected the centre to be drawn north, got z=" + moved);
+	}
+
+	@Test
+	void aVillageThatDriftsOntoAnotherTakesItIn() {
+		// The live geometry: two rows 65 blocks apart on one settlement
+		claimFrom(140, 135);
+		claimFrom(205, 135);
+		assertEquals(2, registry.size());
+
+		stubCrowd(point(130, 150), point(137, 161), point(150, 170));
+		final PlayerMock player = server.addPlayer();
+		player.setLocation(at(205, 135));
+
+		nameplate.tick();
+
+		assertEquals(1, registry.size());
 	}
 }

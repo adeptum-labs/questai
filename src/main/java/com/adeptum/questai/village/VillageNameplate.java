@@ -89,6 +89,7 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 	private final OpenAiChatModel chatModel;
 	private final VillageRegistry registry;
 	private final Standings standings;
+	private final VillageMerger merger;
 	private final boolean enabled;
 
 	/** The village name each player was last greeted in. */
@@ -103,12 +104,13 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 
 	public VillageNameplate(final JavaPlugin plugin,
 		final OpenAiChatModel chatModel, final VillageRegistry registry,
-		final Standings standings) {
+		final Standings standings, final VillageMerger merger) {
 
 		this.plugin = plugin;
 		this.chatModel = chatModel;
 		this.registry = registry;
 		this.standings = standings;
+		this.merger = merger;
 		this.enabled = plugin.getConfig()
 			.getBoolean("villages.nameplate.enabled", true);
 	}
@@ -125,6 +127,11 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 	public void onEnable() {
 		if (!enabled) {
 			return;
+		}
+		final int absorbed = merger.sweep();
+		if (absorbed > 0) {
+			plugin.getLogger().info("[VillageNameplate] Took in " + absorbed
+				+ " village row(s) that named one settlement twice.");
 		}
 		plugin.getLogger().info("[VillageNameplate] Enabled with "
 			+ registry.size() + " named villages.");
@@ -164,9 +171,21 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 				leaveTick(player.getUniqueId());
 				probe(player);
 			} else {
-				greet(player, village);
+				greet(player, resurvey(village));
 			}
 		}
+	}
+
+	/**
+	 * Draws a village's stored centre toward where its people are, and
+	 * takes in any row that has thereby come close enough to be the same
+	 * village. Runs off the greeting tick because that is already the
+	 * moment a player is known to be standing in the place.
+	 */
+	private NamedVillage resurvey(final NamedVillage village) {
+		final NamedVillage moved =
+			registry.recentre(village, VillageCrowd.measure(village.centre()));
+		return moved == null ? village : merger.settle(moved);
 	}
 
 	/**
