@@ -41,6 +41,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
@@ -71,8 +72,13 @@ class ConversationManagerStoneTest {
 		when(plugin.getLogger()).thenReturn(Logger.getLogger("test"));
 		when(plugin.getConfig()).thenReturn(new YamlConfiguration());
 		stoneStore = new TeleportStoneStore(plugin);
-		final VillageTeleportStones stones = new VillageTeleportStones(
-			plugin, mock(VillageRegistry.class), stoneStore);
+		// No village here has ever been taken into another, so every id
+		// stands for itself; the books are kept under whatever comes in
+		final VillageRegistry registry = mock(VillageRegistry.class);
+		when(registry.resolve(anyString()))
+			.thenAnswer(call -> call.getArgument(0));
+		final VillageTeleportStones stones =
+			new VillageTeleportStones(plugin, registry, stoneStore);
 
 		manager = new ConversationManager(null, null, null);
 		manager.setWorksStore(worksStore);

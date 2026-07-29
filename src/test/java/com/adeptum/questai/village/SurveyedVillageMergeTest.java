@@ -26,6 +26,7 @@ import com.adeptum.questai.fortify.WorkState;
 import com.adeptum.questai.reputation.Reputation;
 import com.adeptum.questai.reputation.VillageReputationStore;
 import com.adeptum.questai.teleport.TeleportStoneStore;
+import com.adeptum.questai.teleport.VillageTeleportStones;
 import com.adeptum.questai.villager.StoredLocation;
 import java.io.IOException;
 import java.io.InputStream;
@@ -97,9 +98,12 @@ class SurveyedVillageMergeTest {
 	/**
 	 * Every village id found on an item in any player's inventory in the
 	 * snapshot, read out of the region files. Each has to go on naming a
-	 * living village or the stone carrying it stops working.
+	 * living village or the stone carrying it stops working. Two of the three
+	 * rows that turn out to be one settlement had handed a stone over before
+	 * they met, so one of these ids is retired by the time the dust settles
+	 * and the stone bearing it is still in a pocket.
 	 */
-	private static final List<String> CARRIED_IDS = List.of(WOLDMERE);
+	private static final List<String> CARRIED_IDS = List.of(WOLDMERE, LARKSPUR);
 
 	/** How many passes a stable outcome is confirmed over. */
 	private static final int MAX_ROUNDS = 8;
@@ -122,6 +126,7 @@ class SurveyedVillageMergeTest {
 	private VillageReputationStore reputation;
 	private VillageWorksStore works;
 	private TeleportStoneStore stones;
+	private VillageTeleportStones teleportStones;
 	private VillageMerger merger;
 
 	@BeforeEach
@@ -131,6 +136,7 @@ class SurveyedVillageMergeTest {
 		quiet.setUseParentHandlers(false);
 		when(plugin.getLogger()).thenReturn(quiet);
 		when(plugin.getDataFolder()).thenReturn(dataFolder.toFile());
+		when(plugin.getConfig()).thenReturn(new YamlConfiguration());
 		when(world.getUID()).thenReturn(WORLD_ID);
 
 		bukkit = mockStatic(Bukkit.class);
@@ -147,6 +153,7 @@ class SurveyedVillageMergeTest {
 		reputation = new VillageReputationStore(plugin);
 		works = new VillageWorksStore(plugin);
 		stones = new TeleportStoneStore(plugin);
+		teleportStones = new VillageTeleportStones(plugin, registry, stones);
 		merger = new VillageMerger(registry, reputation, works, stones,
 			new CommissionStore(plugin));
 	}
@@ -231,9 +238,21 @@ class SurveyedVillageMergeTest {
 		for (final String carried : CARRIED_IDS) {
 			assertTrue(registry.isLive(registry.resolve(carried)), carried);
 			assertNotNull(registry.byRowId(carried), carried);
+			assertTrue(teleportStones.stoneIssued(carried), carried);
 		}
 		assertEquals(PLAYER, stones.holderOf(registry.resolve(WOLDMERE)));
 		assertTrue(stones.issued(registry.resolve(WOLDMERE)));
+	}
+
+	@Test
+	void theStoneLedgerIsKeptUnderTheSurvivingIdAlone() {
+		roundsToSettle();
+
+		// Both rows had handed a stone over before they met; the settlement
+		// keeps one record, and it is the one an absorbed id resolves onto
+		assertFalse(stones.issued(LARKSPUR));
+		assertEquals(1, stones.size());
+		assertTrue(stones.issued(registry.resolve(LARKSPUR)));
 	}
 
 	@Test
