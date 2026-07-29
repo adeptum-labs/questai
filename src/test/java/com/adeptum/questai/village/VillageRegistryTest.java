@@ -365,4 +365,19 @@ class VillageRegistryTest {
 
 		assertTrue(registry.overlapping(first).isEmpty());
 	}
+
+	@Test
+	void rowsInAnotherWorldNeverOverlapEvenWhenClose() {
+		final VillageRegistry registry = registry();
+		final NamedVillage first = registry.claim(
+			VillageKey.from(WORLD_ID, 0, 0), at(0, 0), "Ravenhollow");
+
+		final World other = mock(World.class);
+		final UUID otherWorldId = UUID.randomUUID();
+		when(other.getUID()).thenReturn(otherWorldId);
+		registry.claim(VillageKey.from(otherWorldId, 0, 0),
+			new Location(other, 0, 64, 0), "Frostmere");
+
+		assertTrue(registry.overlapping(first).isEmpty());
+	}
 }
