@@ -1,3 +1,4 @@
+.claude/
 /nb-configuration.xml
 /dependency-reduced-pom.xml
 /src/main/resources/config.yml
