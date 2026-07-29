@@ -246,6 +246,12 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 		if (scanner == null || now < nextProbeAt) {
 			return;
 		}
+		// Spend the interval on the attempt, not just on a scan that got
+		// through: the villager gate is an entity sweep of its own, and a
+		// player standing in an already-searched cell would otherwise pay
+		// for it every single tick
+		nextProbeAt = now + PROBE_INTERVAL_MILLIS;
+
 		final Location location = player.getLocation();
 		if (!worthScanning(location)) {
 			return;
@@ -254,18 +260,18 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 		if (searchedRecently(key, now)) {
 			return;
 		}
-
-		nextProbeAt = now + PROBE_INTERVAL_MILLIS;
 		prune(now);
 
-		final VillageInfo info = scanner.scan(location);
-		if (info.village()) {
-			nameVillage(location, info);
-		} else {
-			// Only a miss cools the cell down; a success gets named and the
-			// registry answers from then on
-			probedUntil.put(key, now + CELL_RETRY_MILLIS);
-		}
+		scanner.scan(location, info -> {
+			if (info.village()) {
+				nameVillage(location, info);
+			} else {
+				// Only a miss cools the cell down; a success gets named and
+				// the registry answers from then on. Timed from when the
+				// survey came back, not when it was asked for.
+				probedUntil.put(key, System.currentTimeMillis() + CELL_RETRY_MILLIS);
+			}
+		});
 	}
 
 	/** The two cheap gates that keep the block survey off the hot path. */

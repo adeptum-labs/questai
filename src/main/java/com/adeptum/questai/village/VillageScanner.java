@@ -21,12 +21,14 @@
 package com.adeptum.questai.village;
 
 import com.adeptum.questai.model.VillageInfo;
+import java.util.function.Consumer;
 import org.bukkit.Location;
 
 /**
  * On-demand village detection, so a player entering an unknown village need
  * not wait out the periodic sweep. {@link #scan} reads tens of thousands of
- * blocks on the calling thread, hence the two cheap guards in front of it.
+ * blocks, so it reads them off the server thread; the two cheap guards in
+ * front of it keep it from being asked at all where there is nothing to find.
  */
 public interface VillageScanner {
 
@@ -36,6 +38,12 @@ public interface VillageScanner {
 	/** Whether any villager stands nearby, as a cheap gate before a scan. */
 	boolean hasVillagersNearby(Location location);
 
-	/** The full block survey around the location. Expensive. */
-	VillageInfo scan(Location location);
+	/**
+	 * Surveys the blocks around the location. Only the copy of the ground is
+	 * taken on the calling thread; the survey itself runs off it, and the
+	 * result is handed to {@code whenDone} back on the server thread.
+	 *
+	 * <p>Must be called from the server thread.
+	 */
+	void scan(Location location, Consumer<VillageInfo> whenDone);
 }

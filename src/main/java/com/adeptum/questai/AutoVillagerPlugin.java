@@ -23,15 +23,17 @@ package com.adeptum.questai;
 import com.adeptum.questai.event.VillageCheckListener;
 import com.adeptum.questai.model.VillageInfo;
 import com.adeptum.questai.village.VillageScanner;
+import com.adeptum.questai.village.VillageSurvey;
 import com.adeptum.questai.utility.EnumUtil;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
+import java.util.function.Consumer;
 import org.bukkit.Bukkit;
+import org.bukkit.ChunkSnapshot;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.Tag;
 import org.bukkit.World;
-import org.bukkit.block.Block;
 import org.bukkit.block.data.Bisected;
 import org.bukkit.block.data.type.Door;
 import org.bukkit.entity.EntityType;
@@ -67,17 +69,6 @@ public class AutoVillagerPlugin implements SubPlugin, VillageScanner {
 		Villager.Profession.FISHERMAN, Villager.Profession.FLETCHER, Villager.Profession.LIBRARIAN,
 		Villager.Profession.TOOLSMITH
 	};
-	private static final Set<Material> VILLAGE_WORKSTATION_MATERIALS = Set.of(
-		Material.LECTERN,
-		Material.CRAFTING_TABLE,
-		Material.FLETCHING_TABLE,
-		Material.BLAST_FURNACE,
-		Material.SMITHING_TABLE,
-		Material.COMPOSTER,
-		Material.BARREL,
-		Material.JUKEBOX,
-		Material.BELL
-	);
 
 	private final JavaPlugin plugin;
 	private final List<VillageCheckListener> villageCheckListeners;
@@ -119,14 +110,22 @@ public class AutoVillagerPlugin implements SubPlugin, VillageScanner {
 	 * @param logger The logger for spawn messages.
 	 */
 	private void checkAndRepopulateNearbyVillages(Player player, Logger logger) {
-		Location playerLoc = player.getLocation();
-		World world = playerLoc.getWorld();
+		final Location playerLoc = player.getLocation();
+		final World world = playerLoc.getWorld();
 		if (world == null || !isNearSurface(world, playerLoc)) {
 			return;
 		}
+		survey(world, playerLoc,
+			info -> repopulate(player, playerLoc, world, info, logger));
+	}
 
-		// Retrieve village information
-		VillageInfo villageInfo = getVillageInfo(world, playerLoc);
+	/**
+	 * Tops a village up once its survey is back. The player may have walked
+	 * on by then, so the spawn works off the surveyed spot rather than
+	 * wherever they now stand.
+	 */
+	private void repopulate(Player player, Location playerLoc, World world,
+		VillageInfo villageInfo, Logger logger) {
 
 		if (!villageInfo.village()) {
 			// Not within a village; no action needed
@@ -180,78 +179,96 @@ public class AutoVillagerPlugin implements SubPlugin, VillageScanner {
 	}
 
 	/**
-	 * Determines whether a specific location is within a genuine village by checking for the presence of multiple doors
-	 * and workstations within a defined search radius.
+	 * Surveys the ground around a location for the doors and workstations
+	 * that make a place a village, and hands the verdict back on the server
+	 * thread.
 	 *
-	 * @param world The world to search in.
-	 * @param location The central location to check for village presence.
-	 * @return A VillageInfo object containing details about the village status.
+	 * <p>Only the copy of the chunks happens here; walking the tens of
+	 * thousands of blocks inside them happens off the server thread, where it
+	 * costs the game nothing. Snapshots are what makes that safe — they are
+	 * a detached copy, so no world state is touched from the other thread.
 	 */
-	private VillageInfo getVillageInfo(World world, Location location) {
-		final VillageBlocks villageBlocks = countVillageBlocks(world, location);
-		final boolean village = hasRequiredVillageBlocks(villageBlocks);
-		final int villagerCount = village ? countNearbyVillagers(world, location) : 0;
+	private void survey(final World world, final Location location,
+		final Consumer<VillageInfo> whenDone) {
 
-		return new VillageInfo(village, villageBlocks.doorCount(), villageBlocks.workstationCount(), villagerCount);
+		final VillageSurvey.Bounds bounds = VillageSurvey.around(
+			location.getBlockX(), location.getBlockY(), location.getBlockZ(),
+			SEARCH_RADIUS, VERTICAL_SEARCH_RADIUS,
+			world.getMinHeight(), world.getMaxHeight());
+		final Map<Long, ChunkSnapshot> ground = captureGround(world, bounds);
+
+		Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+			final VillageSurvey.Tally tally =
+				VillageSurvey.count(bounds, new SnapshotBlocks(ground));
+			// A server stopping mid-survey takes its scheduler with it
+			if (plugin.isEnabled()) {
+				Bukkit.getScheduler().runTask(plugin,
+					() -> whenDone.accept(verdict(world, location, tally)));
+			}
+		});
 	}
 
-	@SuppressWarnings({"PMD.CognitiveComplexity", "checkstyle:CyclomaticComplexity"})
-	private VillageBlocks countVillageBlocks(World world, Location location) {
-		final int centerX = location.getBlockX();
-		final int centerY = location.getBlockY();
-		final int centerZ = location.getBlockZ();
-		final int minX = centerX - SEARCH_RADIUS;
-		final int maxX = centerX + SEARCH_RADIUS;
-		final int minZ = centerZ - SEARCH_RADIUS;
-		final int maxZ = centerZ + SEARCH_RADIUS;
-		final int minY = Math.max(centerY - VERTICAL_SEARCH_RADIUS, world.getMinHeight());
-		final int maxY = Math.min(centerY + VERTICAL_SEARCH_RADIUS, world.getMaxHeight());
-		int doorCount = 0;
-		int workstationCount = 0;
+	/** Copies every loaded chunk the box reaches into, ready to read away. */
+	private static Map<Long, ChunkSnapshot> captureGround(final World world,
+		final VillageSurvey.Bounds bounds) {
 
-		// Iterate chunk-by-chunk for cache locality, skipping unloaded chunks
-		final int minChunkX = minX >> 4;
-		final int maxChunkX = maxX >> 4;
-		final int minChunkZ = minZ >> 4;
-		final int maxChunkZ = maxZ >> 4;
-
-		for (int cx = minChunkX; cx <= maxChunkX; cx++) {
-			for (int cz = minChunkZ; cz <= maxChunkZ; cz++) {
-				if (!world.isChunkLoaded(cx, cz)) {
-					continue;
-				}
-
-				final int startX = Math.max(minX, cx << 4);
-				final int endX = Math.min(maxX, (cx << 4) + 15);
-				final int startZ = Math.max(minZ, cz << 4);
-				final int endZ = Math.min(maxZ, (cz << 4) + 15);
-
-				for (int x = startX; x <= endX; x++) {
-					for (int z = startZ; z <= endZ; z++) {
-						for (int y = minY; y <= maxY; y++) {
-							final Block block = world.getBlockAt(x, y, z);
-							final Material type = block.getType();
-
-							if (isDoor(type) && block.getBlockData() instanceof Door door
-								&& door.getHalf() == Bisected.Half.BOTTOM) {
-								doorCount++;
-							}
-
-							if (isWorkstation(type)) {
-								workstationCount++;
-							}
-						}
-					}
+		final Map<Long, ChunkSnapshot> ground = new HashMap<>();
+		for (int cx = bounds.minX() >> 4; cx <= bounds.maxX() >> 4; cx++) {
+			for (int cz = bounds.minZ() >> 4; cz <= bounds.maxZ() >> 4; cz++) {
+				if (world.isChunkLoaded(cx, cz)) {
+					ground.put(chunkKey(cx, cz), world.getChunkAt(cx, cz)
+						.getChunkSnapshot(false, false, false));
 				}
 			}
 		}
-
-		return new VillageBlocks(doorCount, workstationCount);
+		return ground;
 	}
 
-	private boolean hasRequiredVillageBlocks(VillageBlocks villageBlocks) {
-		return villageBlocks.doorCount() >= MIN_DOORS
-			&& villageBlocks.workstationCount() >= MIN_WORKSTATIONS;
+	private static long chunkKey(final int chunkX, final int chunkZ) {
+		return (long) chunkX << 32 | chunkZ & 0xffff_ffffL;
+	}
+
+	/** Counts the villagers only where the blocks already say village. */
+	private VillageInfo verdict(final World world, final Location location,
+		final VillageSurvey.Tally tally) {
+
+		final boolean village = tally.doors() >= MIN_DOORS
+			&& tally.workstations() >= MIN_WORKSTATIONS;
+		final int villagerCount = village ? countNearbyVillagers(world, location) : 0;
+
+		return new VillageInfo(village, tally.doors(), tally.workstations(), villagerCount);
+	}
+
+	/**
+	 * Reads a survey off chunk snapshots rather than the world itself. A
+	 * snapshot answers straight out of the chunk's packed block data, where
+	 * {@code World#getBlockAt} builds a throwaway block object for every one
+	 * of the tens of thousands of reads a survey makes.
+	 */
+	private static final class SnapshotBlocks implements VillageSurvey.Blocks {
+		private final Map<Long, ChunkSnapshot> ground;
+		private ChunkSnapshot snapshot;
+
+		SnapshotBlocks(final Map<Long, ChunkSnapshot> ground) {
+			this.ground = ground;
+		}
+
+		@Override
+		public boolean openChunk(final int chunkX, final int chunkZ) {
+			snapshot = ground.get(chunkKey(chunkX, chunkZ));
+			return snapshot != null;
+		}
+
+		@Override
+		public Material typeAt(final int x, final int y, final int z) {
+			return snapshot.getBlockType(x & 15, y, z & 15);
+		}
+
+		@Override
+		public boolean isDoorBottom(final int x, final int y, final int z) {
+			return snapshot.getBlockData(x & 15, y, z & 15) instanceof Door door
+				&& door.getHalf() == Bisected.Half.BOTTOM;
+		}
 	}
 
 	private boolean isNearSurface(World world, Location location) {
@@ -272,8 +289,13 @@ public class AutoVillagerPlugin implements SubPlugin, VillageScanner {
 	}
 
 	@Override
-	public VillageInfo scan(final Location location) {
-		return getVillageInfo(location.getWorld(), location);
+	public void scan(final Location location, final Consumer<VillageInfo> whenDone) {
+		final World world = location.getWorld();
+		if (world == null) {
+			whenDone.accept(new VillageInfo(false, 0, 0, 0));
+			return;
+		}
+		survey(world, location, whenDone);
 	}
 
 	private int countNearbyVillagers(World world, Location location) {
@@ -284,26 +306,4 @@ public class AutoVillagerPlugin implements SubPlugin, VillageScanner {
 			.count();
 	}
 
-	/**
-	 * Determines if the given material is a wooden door.
-	 *
-	 * @param type The material to check.
-	 * @return True if the material is a wooden door, false otherwise.
-	 */
-	private boolean isDoor(Material type) {
-		return Tag.WOODEN_DOORS.isTagged(type);
-	}
-
-	/**
-	 * Determines if the given material is a workstation.
-	 *
-	 * @param type The material to check.
-	 * @return True if the material is a workstation, false otherwise.
-	 */
-	private boolean isWorkstation(Material type) {
-		return VILLAGE_WORKSTATION_MATERIALS.contains(type);
-	}
-
-	private record VillageBlocks(int doorCount, int workstationCount) {
-	}
 }
