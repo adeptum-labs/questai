@@ -143,7 +143,7 @@ public class Plugin extends JavaPlugin implements Listener {
 		// sub-plugin has had a chance to read a ledger under a doomed id
 		final int absorbed = merger.sweep();
 		if (absorbed > 0) {
-			getLogger().info("[VillageNameplate] Took in " + absorbed
+			getLogger().info("[VillageMerger] Took in " + absorbed
 				+ " village row(s) that named one settlement twice.");
 		}
 		final VillageNameplate nameplate = new VillageNameplate(this, chatModel,
