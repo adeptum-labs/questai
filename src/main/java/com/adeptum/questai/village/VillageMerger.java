@@ -25,6 +25,9 @@ import com.adeptum.questai.fortify.VillageWorksStore;
 import com.adeptum.questai.fortify.WorkState;
 import com.adeptum.questai.reputation.VillageReputationStore;
 import com.adeptum.questai.teleport.TeleportStoneStore;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * Settles what happens when two names turn out to describe one village.
@@ -32,6 +35,12 @@ import com.adeptum.questai.teleport.TeleportStoneStore;
  * <p>The registry knows only geometry and the stores know only their own
  * ledgers; deciding which name a merged village answers to, and seeing the
  * state carried across, belongs to neither. It lives here.
+ *
+ * <p>Each registry and store call is atomic but a sweep is not, so this must
+ * be run from the main thread. A village claimed part way through one would
+ * be counted against the registry's size as though it were a row that had
+ * been folded away, and a row could be taken in between being listed and
+ * being asked whether it is still standing.
  */
 public final class VillageMerger {
 
@@ -112,15 +121,33 @@ public final class VillageMerger {
 	/**
 	 * Merges every row that has come to overlap this one, and answers with
 	 * the village that came out of it.
+	 *
+	 * <p>The name is settled on before anything is moved. Choosing as the
+	 * folding went along would weigh each row against a survivor already
+	 * carrying what it had taken in, so whichever row came first would
+	 * gather the others' ledgers and win on them.
+	 *
+	 * <p>The rows are also put in a fixed order first, which matters even
+	 * with nothing moving. Age settles some pairs and investment others, and
+	 * the two rules need not agree on one line: rows can form a ring where
+	 * each outranks the next. Working through a ring in pairs lands wherever
+	 * it was entered, and the registry lists overlaps in an order that
+	 * distance ties leave to the map.
 	 */
 	public NamedVillage settle(final NamedVillage village) {
-		NamedVillage survivor = village;
-		for (final NamedVillage other : registry.overlapping(village)) {
-			final NamedVillage keep = survivorOf(survivor, other);
-			final NamedVillage drop =
-				keep.id().equals(survivor.id()) ? other : survivor;
-			mergeInto(keep, drop);
-			survivor = keep;
+		final List<NamedVillage> candidates =
+			new ArrayList<>(registry.overlapping(village));
+		candidates.add(village);
+		candidates.sort(Comparator.comparing(NamedVillage::id));
+
+		NamedVillage survivor = candidates.get(0);
+		for (final NamedVillage candidate : candidates) {
+			survivor = survivorOf(survivor, candidate);
+		}
+		for (final NamedVillage candidate : candidates) {
+			if (!candidate.id().equals(survivor.id())) {
+				mergeInto(survivor, candidate);
+			}
 		}
 		return survivor;
 	}

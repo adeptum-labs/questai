@@ -27,7 +27,9 @@ import com.adeptum.questai.fortify.WorkState;
 import com.adeptum.questai.reputation.VillageReputationStore;
 import com.adeptum.questai.teleport.TeleportStoneStore;
 import com.adeptum.questai.villager.StoredLocation;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -72,9 +74,34 @@ class VillageMergerTest {
 	}
 
 	private WorkState tierFour() {
+		return tier(4);
+	}
+
+	private WorkState tier(final int reached) {
 		final WorkState state = new WorkState();
-		state.setTier(4);
+		state.setTier(reached);
 		return state;
+	}
+
+	/**
+	 * Settles a village against its overlaps, with a standing ledger that
+	 * really moves when the store is told to merge, as the live one does.
+	 */
+	private NamedVillage settleAmong(final NamedVillage village,
+		final List<NamedVillage> overlaps, final Map<String, Integer> standing) {
+
+		final Map<String, Integer> ledger = new HashMap<>(standing);
+		when(reputation.playerCount(anyString())).thenAnswer(
+			call -> ledger.getOrDefault(call.<String>getArgument(0), 0));
+		doAnswer(call -> {
+			final Integer moved = ledger.remove(call.<String>getArgument(0));
+			if (moved != null) {
+				ledger.merge(call.getArgument(1), moved, Integer::sum);
+			}
+			return null;
+		}).when(reputation).merge(anyString(), anyString());
+		when(registry.overlapping(village)).thenReturn(overlaps);
+		return merger().settle(village);
 	}
 
 	@Test
@@ -171,6 +198,43 @@ class VillageMergerTest {
 	}
 
 	@Test
+	void theNameKeptDoesNotFollowTheOrderTheOverlapsAreListedIn() {
+		// None of the three dated, so what has been put into them settles it.
+		// Either of the plain pair would outweigh the built village if it
+		// were let to take the other in first and count that standing as its
+		// own, and which of them got to do so would be down to the listing
+		final NamedVillage built = village("ashford", 0L);
+		final NamedVillage plain = village("brookvale", 0L);
+		final NamedVillage third = village("creekmoor", 0L);
+		final Map<String, Integer> standing =
+			Map.of("brookvale", 25, "creekmoor", 30);
+		when(works.get("ashford")).thenReturn(tierFour());
+
+		assertEquals(built, settleAmong(plain, List.of(built, third), standing));
+		assertEquals(built, settleAmong(plain, List.of(third, built), standing));
+	}
+
+	@Test
+	void rowsThatCannotBeRankedInOneLineStillSettleTheSameWay() {
+		// Two dated rows are ranked against each other by age but against
+		// an undated one by what has been put into them, and those rules
+		// disagree here: the elder outranks the built village, the built
+		// village outranks the undated one, and the undated one outranks
+		// the elder. Working through such a ring in pairs lands wherever
+		// the listing happens to lead, and it must land in one place
+		final NamedVillage elder = village("ashford", 100L);
+		final NamedVillage built = village("brookvale", 200L);
+		final NamedVillage undated = village("creekmoor", 0L);
+		final NamedVillage youngest = village("duskmere", 300L);
+		final Map<String, Integer> standing = Map.of("creekmoor", 30);
+		when(works.get("brookvale")).thenReturn(tier(6));
+
+		assertEquals(
+			settleAmong(youngest, List.of(elder, built, undated), standing),
+			settleAmong(youngest, List.of(built, undated, elder), standing));
+	}
+
+	@Test
 	void aVillageThatOverlapsNothingIsLeftAsItIs() {
 		final NamedVillage alone = village("larkspur", 0L);
 
@@ -227,9 +291,9 @@ class VillageMergerTest {
 
 		assertEquals(woldmere, merger().settle(first));
 
-		// The first two rows have nothing to choose between and pair off on
-		// their ids, and that pairing is then taken in by the built village
-		verify(registry).absorb("marrowfen", "hawthorn");
+		// Both of the others are folded straight into the survivor, so
+		// neither leaves an alias pointing at a row that is itself gone
 		verify(registry).absorb("hawthorn", "woldmere");
+		verify(registry).absorb("marrowfen", "woldmere");
 	}
 }
