@@ -140,6 +140,20 @@ class VillageReputationStoreTest {
 	}
 
 	@Test
+	void aMergeSurvivesAReload(@TempDir final Path folder) {
+		final VillageReputationStore store =
+			new VillageReputationStore(pluginIn(folder));
+		store.adjustAt("hawthorn", PLAYER, 7, NOON);
+
+		store.mergeAt("hawthorn", "woldmere", NOON);
+
+		final VillageReputationStore reloaded =
+			new VillageReputationStore(pluginIn(folder));
+		assertEquals(7, reloaded.getAt("woldmere", PLAYER, NOON));
+		assertEquals(0, reloaded.getAt("hawthorn", PLAYER, NOON));
+	}
+
+	@Test
 	void mergingClampsRatherThanOverflowing(@TempDir final Path folder) {
 		final VillageReputationStore store =
 			new VillageReputationStore(pluginIn(folder));

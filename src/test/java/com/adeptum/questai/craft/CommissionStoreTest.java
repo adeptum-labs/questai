@@ -146,7 +146,7 @@ class CommissionStoreTest {
 	}
 
 	@Test
-	void mergingKeepsTheEarlierOrderForAPlayerInBoth(
+	void mergingKeepsTheEarlierOrderWhenTheAbsorbedRowIsOlder(
 		@TempDir final Path folder) {
 
 		final CommissionStore store = new CommissionStore(pluginIn(folder));
@@ -164,6 +164,23 @@ class CommissionStoreTest {
 	}
 
 	@Test
+	void mergingKeepsTheEarlierOrderWhenTheSurvivorsRowIsOlder(
+		@TempDir final Path folder) {
+
+		final CommissionStore store = new CommissionStore(pluginIn(folder));
+		store.place("woldmere", PLAYER, new CommissionOrder(
+			Commission.KEEN_BLADE.name(), SMITH, NOON - 1_000,
+			NOON - 1_000 + 60_000));
+		store.place("hawthorn", PLAYER, new CommissionOrder(
+			Commission.PLATED_HELM.name(), SMITH, NOON, NOON + 60_000));
+
+		store.merge("hawthorn", "woldmere");
+
+		assertEquals(Commission.KEEN_BLADE.name(),
+			store.get("woldmere", PLAYER).commission());
+	}
+
+	@Test
 	void mergingCarriesAnOrderForAPlayerTheSurvivorNeverServed(
 		@TempDir final Path folder) {
 
@@ -174,6 +191,19 @@ class CommissionStoreTest {
 
 		assertEquals(Commission.QUIVER_OF_ARROWS.name(),
 			store.get("woldmere", OTHER_PLAYER).commission());
+	}
+
+	@Test
+	void aMergeSurvivesAReload(@TempDir final Path folder) {
+		final CommissionStore store = new CommissionStore(pluginIn(folder));
+		store.place("hawthorn", OTHER_PLAYER, order(Commission.QUIVER_OF_ARROWS));
+
+		store.merge("hawthorn", "woldmere");
+
+		final CommissionStore reloaded = new CommissionStore(pluginIn(folder));
+		assertEquals(Commission.QUIVER_OF_ARROWS.name(),
+			reloaded.get("woldmere", OTHER_PLAYER).commission());
+		assertNull(reloaded.get("hawthorn", OTHER_PLAYER));
 	}
 
 	@Test

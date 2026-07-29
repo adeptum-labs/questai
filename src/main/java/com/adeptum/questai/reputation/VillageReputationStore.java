@@ -88,18 +88,29 @@ public final class VillageReputationStore {
 			return;
 		}
 		final Map<UUID, Entry> from = villages.remove(fromId);
-		if (from == null) {
+		if (from == null || from.isEmpty()) {
 			return;
 		}
-		for (final UUID playerId : from.keySet()) {
-			final int carried = Reputation.mend(from.get(playerId).value(),
-				now - from.get(playerId).at());
-			final int value =
-				Reputation.clamp(getAt(intoId, playerId, now) + carried);
-			villages.computeIfAbsent(intoId, key -> new HashMap<>())
-				.put(playerId, new Entry(value, now));
-		}
+		foldInto(from, intoId, now);
 		save();
+	}
+
+	/**
+	 * Mends each of the departing row's entries to this instant and sums
+	 * it onto the survivor's, one player at a time.
+	 */
+	private void foldInto(final Map<UUID, Entry> from, final String intoId,
+		final long now) {
+
+		final Map<UUID, Entry> into =
+			villages.computeIfAbsent(intoId, key -> new HashMap<>());
+		for (final Map.Entry<UUID, Entry> player : from.entrySet()) {
+			final int carried = Reputation.mend(player.getValue().value(),
+				now - player.getValue().at());
+			final int value = Reputation.clamp(
+				getAt(intoId, player.getKey(), now) + carried);
+			into.put(player.getKey(), new Entry(value, now));
+		}
 	}
 
 	private void load() {

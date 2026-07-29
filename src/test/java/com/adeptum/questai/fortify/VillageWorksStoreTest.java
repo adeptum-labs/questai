@@ -217,6 +217,7 @@ class VillageWorksStoreTest {
 		final VillageWorksStore store = new VillageWorksStore(pluginIn(folder));
 		store.donate("woldmere", "logs", 12);
 		store.completeTier("woldmere");
+		store.donate("woldmere", "logs", 4);
 		store.donate("hawthorn", "logs", 5);
 		store.donate("hawthorn", "rough_stone", 3);
 
@@ -224,9 +225,35 @@ class VillageWorksStoreTest {
 
 		final WorkState state = store.get("woldmere");
 		assertEquals(1, state.getTier());
-		assertEquals(5, state.getTally().get("logs"));
+		assertEquals(9, state.getTally().get("logs"));
 		assertEquals(3, state.getTally().get("rough_stone"));
 		assertNull(store.get("hawthorn"));
+	}
+
+	@Test
+	void mergingKeepsTheHigherTierWhenTheAbsorbedIsFurtherAlong(
+		@TempDir final Path folder) {
+
+		final VillageWorksStore store = new VillageWorksStore(pluginIn(folder));
+		store.donate("woldmere", "logs", 1);
+		store.donate("hawthorn", "logs", 12);
+		store.completeTier("hawthorn");
+
+		store.merge("hawthorn", "woldmere");
+
+		assertEquals(1, store.get("woldmere").getTier());
+	}
+
+	@Test
+	void aMergeSurvivesAReload(@TempDir final Path folder) {
+		final VillageWorksStore store = new VillageWorksStore(pluginIn(folder));
+		store.donate("hawthorn", "logs", 5);
+
+		store.merge("hawthorn", "woldmere");
+
+		final VillageWorksStore reloaded = new VillageWorksStore(pluginIn(folder));
+		assertEquals(5, reloaded.get("woldmere").getTally().get("logs"));
+		assertNull(reloaded.get("hawthorn"));
 	}
 
 	@Test

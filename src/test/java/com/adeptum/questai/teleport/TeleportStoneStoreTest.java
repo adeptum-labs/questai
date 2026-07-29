@@ -38,6 +38,7 @@ class TeleportStoneStoreTest {
 	private static final String ROW = "world_100_100";
 	private static final UUID FIRST_HOLDER = UUID.randomUUID();
 	private static final UUID SECOND_HOLDER = UUID.randomUUID();
+	private static final long NOON = 1_700_000_000_000L;
 
 	private static JavaPlugin pluginIn(final Path folder) {
 		final JavaPlugin plugin = mock(JavaPlugin.class);
@@ -78,14 +79,27 @@ class TeleportStoneStoreTest {
 	@Test
 	void mergingKeepsTheEarlierStone(@TempDir final Path folder) {
 		final TeleportStoneStore store = store(folder);
-		store.issue("woldmere", FIRST_HOLDER);
-		store.issue("hawthorn", SECOND_HOLDER);
+		store.issueAt("woldmere", FIRST_HOLDER, NOON);
+		store.issueAt("hawthorn", SECOND_HOLDER, NOON + 1_000);
 
 		store.merge("hawthorn", "woldmere");
 
 		assertEquals(FIRST_HOLDER, store.holderOf("woldmere"));
 		assertFalse(store.issued("hawthorn"));
 		assertEquals(1, store.size());
+	}
+
+	@Test
+	void mergingReplacesTheSurvivorsStoneWhenTheAbsorbedIsEarlier(
+		@TempDir final Path folder) {
+
+		final TeleportStoneStore store = store(folder);
+		store.issueAt("woldmere", SECOND_HOLDER, NOON + 1_000);
+		store.issueAt("hawthorn", FIRST_HOLDER, NOON);
+
+		store.merge("hawthorn", "woldmere");
+
+		assertEquals(FIRST_HOLDER, store.holderOf("woldmere"));
 	}
 
 	@Test
@@ -98,6 +112,18 @@ class TeleportStoneStoreTest {
 		store.merge("hawthorn", "woldmere");
 
 		assertEquals(SECOND_HOLDER, store.holderOf("woldmere"));
+	}
+
+	@Test
+	void aMergeSurvivesAReload(@TempDir final Path folder) {
+		final TeleportStoneStore store = store(folder);
+		store.issue("hawthorn", SECOND_HOLDER);
+
+		store.merge("hawthorn", "woldmere");
+
+		final TeleportStoneStore reloaded = store(folder);
+		assertEquals(SECOND_HOLDER, reloaded.holderOf("woldmere"));
+		assertFalse(reloaded.issued("hawthorn"));
 	}
 
 	@Test

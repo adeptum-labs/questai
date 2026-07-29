@@ -81,10 +81,16 @@ public final class TeleportStoneStore {
 
 	/** Writes down that this village has handed its stone to this player. */
 	public synchronized void issue(final String rowId, final UUID holder) {
+		issueAt(rowId, holder, System.currentTimeMillis());
+	}
+
+	synchronized void issueAt(final String rowId, final UUID holder,
+		final long at) {
+
 		if (rowId == null) {
 			return;
 		}
-		issued.put(rowId, new Entry(holder, System.currentTimeMillis()));
+		issued.put(rowId, new Entry(holder, at));
 		save();
 	}
 
