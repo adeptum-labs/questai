@@ -138,6 +138,14 @@ public class Plugin extends JavaPlugin implements Listener {
 			this, conversationManager, questService, chatModel);
 		final VillageMerger merger = new VillageMerger(registry, reputationStore,
 			worksStore, teleportStoneStore, commissionStore);
+		// Registry hygiene, not display: rows that name one settlement twice
+		// are collapsed whatever the greeting title is set to, and before any
+		// sub-plugin has had a chance to read a ledger under a doomed id
+		final int absorbed = merger.sweep();
+		if (absorbed > 0) {
+			getLogger().info("[VillageNameplate] Took in " + absorbed
+				+ " village row(s) that named one settlement twice.");
+		}
 		final VillageNameplate nameplate = new VillageNameplate(this, chatModel,
 			registry, standings, merger);
 		final AutoVillagerPlugin autoVillager =
