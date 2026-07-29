@@ -330,6 +330,8 @@ class VillageRegistryTest {
 		assertNotNull(moved);
 		assertEquals(50, moved.centre().x(), 0.001);
 		assertEquals(village.id(), moved.id());
+		assertEquals(village.key(), moved.key());
+		assertEquals(village.discoveredAt(), moved.discoveredAt());
 		assertEquals("Ravenhollow", moved.name());
 	}
 
