@@ -112,4 +112,97 @@ class VillageReputationStoreTest {
 		assertEquals(7, reloaded.getAt(ROW, PLAYER, NOON));
 		assertEquals(0, reloaded.getAt("broken", PLAYER, NOON));
 	}
+
+	@Test
+	void mergingSumsWhatEachSideIsWorthNow(@TempDir final Path folder) {
+		final VillageReputationStore store =
+			new VillageReputationStore(pluginIn(folder));
+		store.adjustAt("woldmere", PLAYER, -3, NOON);
+		store.adjustAt("hawthorn", PLAYER, 3, NOON);
+
+		store.mergeAt("hawthorn", "woldmere", NOON);
+
+		assertEquals(0, store.getAt("woldmere", PLAYER, NOON));
+		assertEquals(0, store.getAt("hawthorn", PLAYER, NOON));
+	}
+
+	@Test
+	void mergingCarriesAcrossAPlayerTheSurvivorNeverMet(
+		@TempDir final Path folder) {
+
+		final VillageReputationStore store =
+			new VillageReputationStore(pluginIn(folder));
+		store.adjustAt("hawthorn", PLAYER, 7, NOON);
+
+		store.mergeAt("hawthorn", "woldmere", NOON);
+
+		assertEquals(7, store.getAt("woldmere", PLAYER, NOON));
+	}
+
+	@Test
+	void aMergeSurvivesAReload(@TempDir final Path folder) {
+		final VillageReputationStore store =
+			new VillageReputationStore(pluginIn(folder));
+		store.adjustAt("hawthorn", PLAYER, 7, NOON);
+
+		store.mergeAt("hawthorn", "woldmere", NOON);
+
+		final VillageReputationStore reloaded =
+			new VillageReputationStore(pluginIn(folder));
+		assertEquals(7, reloaded.getAt("woldmere", PLAYER, NOON));
+		assertEquals(0, reloaded.getAt("hawthorn", PLAYER, NOON));
+	}
+
+	@Test
+	void mergingClampsRatherThanOverflowing(@TempDir final Path folder) {
+		final VillageReputationStore store =
+			new VillageReputationStore(pluginIn(folder));
+		store.adjustAt("woldmere", PLAYER, Reputation.MAX, NOON);
+		store.adjustAt("hawthorn", PLAYER, Reputation.MAX, NOON);
+
+		store.mergeAt("hawthorn", "woldmere", NOON);
+
+		assertEquals(Reputation.MAX, store.getAt("woldmere", PLAYER, NOON));
+	}
+
+	@Test
+	void mergingMendsEachSideBeforeSumming(@TempDir final Path folder) {
+		final VillageReputationStore store =
+			new VillageReputationStore(pluginIn(folder));
+		store.adjustAt("hawthorn", PLAYER, -10, NOON);
+
+		final long mergeTime = NOON + 3 * TWO_HOURS;
+		store.mergeAt("hawthorn", "woldmere", mergeTime);
+
+		// -10 mends by one point per two hours elapsed, so three
+		// intervals later it is worth -7, not the raw -10 still on file
+		assertEquals(-7, store.getAt("woldmere", PLAYER, mergeTime));
+	}
+
+	@Test
+	void mergingAVillageIntoItselfLeavesItsStandingIntact(
+		@TempDir final Path folder) {
+
+		final VillageReputationStore store =
+			new VillageReputationStore(pluginIn(folder));
+		store.adjustAt(ROW, PLAYER, 9, NOON);
+
+		store.mergeAt(ROW, ROW, NOON);
+
+		assertEquals(9, store.getAt(ROW, PLAYER, NOON));
+	}
+
+	@Test
+	void aVillageKnowsHowManyPlayersItHasAnOpinionOf(
+		@TempDir final Path folder) {
+
+		final VillageReputationStore store =
+			new VillageReputationStore(pluginIn(folder));
+		store.adjustAt(ROW, PLAYER, 5, NOON);
+		store.adjustAt(ROW, UUID.randomUUID(), -3, NOON);
+
+		assertEquals(2, store.playerCount(ROW));
+		assertEquals(0, store.playerCount("nobody"));
+		assertEquals(0, store.playerCount(null));
+	}
 }

@@ -156,6 +156,38 @@ public final class VillageWorksStore {
 		save();
 	}
 
+	/**
+	 * Folds one village's works into another's: the tallies add up, and the
+	 * further-advanced tier is the one the merged village has reached.
+	 * Where both had a build under way the survivor's is kept, since its
+	 * ring is already staked out on the ground.
+	 */
+	public synchronized void merge(final String fromId, final String intoId) {
+		if (fromId == null || intoId == null || fromId.equals(intoId)) {
+			return;
+		}
+		final WorkState from = states.remove(fromId);
+		if (from == null) {
+			return;
+		}
+		final WorkState into = states.putIfAbsent(intoId, from);
+		if (into != null) {
+			foldInto(from, into);
+		}
+		save();
+	}
+
+	/**
+	 * Combines a departing row's tally, tier and finished sites onto the
+	 * survivor's, leaving the survivor's in-flight build untouched.
+	 */
+	private static void foldInto(final WorkState from, final WorkState into) {
+		from.getTally().forEach((role, amount) ->
+			into.getTally().merge(role, amount, Integer::sum));
+		into.setTier(Math.max(into.getTier(), from.getTier()));
+		from.getBuiltSites().forEach(into.getBuiltSites()::putIfAbsent);
+	}
+
 	private void load() {
 		if (!file.exists()) {
 			return;

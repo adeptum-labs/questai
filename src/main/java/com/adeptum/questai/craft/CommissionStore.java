@@ -76,6 +76,12 @@ public final class CommissionStore {
 		save();
 	}
 
+	/** How many orders this village has on its shelf. */
+	public synchronized int orderCount(final String rowId) {
+		final Map<UUID, CommissionOrder> orders = villages.get(rowId);
+		return orders == null ? 0 : orders.size();
+	}
+
 	/** Clears the shelf once the piece has been handed over. */
 	public synchronized void clear(final String rowId, final UUID playerId) {
 		final Map<UUID, CommissionOrder> players = villages.get(rowId);
@@ -85,6 +91,27 @@ public final class CommissionStore {
 		if (players.isEmpty()) {
 			villages.remove(rowId);
 		}
+		save();
+	}
+
+	/**
+	 * Folds one village's orders into another's. A player may only have one
+	 * order open per village, so where both rows hold one the earlier is
+	 * kept — it is the one they have been waiting longer for.
+	 */
+	public synchronized void merge(final String fromId, final String intoId) {
+		if (fromId == null || intoId == null || fromId.equals(intoId)) {
+			return;
+		}
+		final Map<UUID, CommissionOrder> from = villages.remove(fromId);
+		if (from == null) {
+			return;
+		}
+		final Map<UUID, CommissionOrder> into =
+			villages.computeIfAbsent(intoId, key -> new HashMap<>());
+		from.forEach((playerId, order) -> into.merge(playerId, order,
+			(kept, incoming) ->
+				kept.placedAt() <= incoming.placedAt() ? kept : incoming));
 		save();
 	}
 

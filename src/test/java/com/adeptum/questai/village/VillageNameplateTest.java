@@ -20,15 +20,21 @@
 
 package com.adeptum.questai.village;
 
+import com.adeptum.questai.craft.CommissionStore;
 import com.adeptum.questai.event.VillageKey;
+import com.adeptum.questai.fortify.VillageWorksStore;
 import com.adeptum.questai.reputation.Reputation;
 import com.adeptum.questai.reputation.Standings;
 import com.adeptum.questai.reputation.VillageReputationStore;
+import com.adeptum.questai.teleport.TeleportStoneStore;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.logging.Logger;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Villager;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.AfterEach;
@@ -73,8 +79,11 @@ class VillageNameplateTest {
 
 		registry = new VillageRegistry(plugin, RADIUS);
 		reputationStore = new VillageReputationStore(plugin);
+		final VillageMerger merger = new VillageMerger(registry, reputationStore,
+			new VillageWorksStore(plugin), new TeleportStoneStore(plugin),
+			new CommissionStore(plugin));
 		nameplate = new VillageNameplate(plugin, null, registry,
-			new Standings(registry, reputationStore));
+			new Standings(registry, reputationStore), merger);
 	}
 
 	@AfterEach
@@ -88,6 +97,29 @@ class VillageNameplateTest {
 
 	private void claimRavenhollow() {
 		registry.claim(VillageKey.from(world.getUID(), 0, 0), at(0, 0),
+			"Ravenhollow");
+	}
+
+	/** A villager standing at this spot in the mock world. */
+	private Villager point(final double x, final double z) {
+		return world.spawn(new Location(world, x, 64, z), Villager.class);
+	}
+
+	/** Leaves only this crowd standing, for the next nearby-entity sweep. */
+	private void stubCrowd(final Villager... crowd) {
+		final List<Villager> keep = List.of(crowd);
+		world.getEntitiesByClass(Villager.class).stream()
+			.filter(villager -> !keep.contains(villager))
+			.forEach(Entity::remove);
+	}
+
+	/** Claims a village from this spot, with these villagers about. */
+	private NamedVillage claimFrom(final double x, final double z,
+		final Villager... crowd) {
+
+		stubCrowd(crowd);
+		return nameplate.claimSurveyed(
+			VillageKey.from(world.getUID(), (int) x, (int) z), at(x, z),
 			"Ravenhollow");
 	}
 
@@ -244,5 +276,135 @@ class VillageNameplateTest {
 
 		assertNull(stateOf(first));
 		assertNull(stateOf(second));
+	}
+
+	@Test
+	void aClaimLandsOnTheCrowdNotTheClaimant() {
+		// Three villagers well north of where the player is standing
+		final NamedVillage village = claimFrom(140, 135,
+			point(130, 150), point(137, 161), point(150, 170));
+
+		assertEquals(137, village.centre().x(), 0.5);
+		assertEquals(161, village.centre().z(), 0.5);
+	}
+
+	@Test
+	void aClaimWithNoCrowdKeepsTheClaimantsSpot() {
+		final NamedVillage village = claimFrom(140, 135);
+
+		assertEquals(140, village.centre().x(), 0.5);
+		assertEquals(135, village.centre().z(), 0.5);
+	}
+
+	@Test
+	void standingInAVillageDrawsItsCentreTowardTheCrowd() {
+		final NamedVillage village = claimFrom(140, 135);
+		stubCrowd(point(130, 150), point(137, 161), point(150, 170));
+		final PlayerMock player = server.addPlayer();
+		player.setLocation(at(140, 135));
+
+		nameplate.tick();
+
+		final double moved = registry.byRowId(village.id()).centre().z();
+		assertTrue(moved > village.centre().z() + 8,
+			"expected the centre to be drawn north, got z=" + moved);
+	}
+
+	@Test
+	void aVillageThatDriftsOntoAnotherTakesItIn() {
+		// The live geometry: two rows 65 blocks apart on one settlement
+		claimFrom(140, 135);
+		claimFrom(205, 135);
+		assertEquals(2, registry.size());
+
+		stubCrowd(point(130, 150), point(137, 161), point(150, 170));
+		final PlayerMock player = server.addPlayer();
+		player.setLocation(at(205, 135));
+
+		nameplate.tick();
+
+		assertEquals(1, registry.size());
+	}
+
+	@Test
+	void theGreetingIsNotWhatCollapsesDuplicateRows() {
+		// Registry hygiene rides on the merger, which the plugin drives on its
+		// own. Hanging it off the greeting would mean a server that wanted no
+		// titles quietly got no duplicate collapsing and no centre correction
+		// either, and there is no setting that is meant to say that
+		claimRavenhollow();
+		registry.claim(VillageKey.from(world.getUID(), 20, 0), at(20, 0),
+			"Frostmere");
+		assertEquals(2, registry.size());
+
+		nameplate.onEnable();
+
+		assertEquals(2, registry.size(),
+			"the greeting must not be the thing that folds rows together");
+		nameplate.onDisable();
+	}
+
+	@Test
+	void aClaimLandingOnAKnownVillageIsTakenStraightIn() {
+		// A settlement wider than two claim radii: the far side is outside
+		// every stored centre's reach, so standing there is enough to set a
+		// second naming going even though the village is already known
+		final NamedVillage first = claimFrom(0, 0);
+		assertNull(registry.find(at(0, 100)), "the far side reads as unclaimed");
+
+		final NamedVillage settled = claimFrom(0, 100, point(0, 30),
+			point(5, 35), point(-5, 40));
+
+		assertEquals(1, registry.size(),
+			"a second row inside the first's reach must not be left standing");
+		assertEquals(first.id(), settled.id());
+		assertEquals(first.id(), registry.resolve(settled.id()));
+	}
+
+	@Test
+	void aClaimOutOfEveryoneElsesReachStandsOnItsOwn() {
+		claimFrom(0, 0);
+
+		final NamedVillage far = claimFrom(400, 400);
+
+		assertEquals(2, registry.size());
+		assertTrue(registry.isLive(far.id()));
+	}
+
+	@Test
+	void aSecondTickRightAfterTheFirstDoesNotReSurveyAgain() {
+		// A gap wide enough that an un-throttled second tick would still
+		// find more than DRIFT_THRESHOLD left to close: the first tick
+		// halves it from 40 to 20, and 20 alone would still move the centre
+		final NamedVillage village = claimFrom(140, 135);
+		stubCrowd(point(140, 160), point(140, 175), point(140, 220));
+		final PlayerMock player = server.addPlayer();
+		player.setLocation(at(140, 135));
+
+		nameplate.tick();
+		final double afterFirst = registry.byRowId(village.id()).centre().z();
+
+		nameplate.tick();
+		final double afterSecond = registry.byRowId(village.id()).centre().z();
+
+		assertEquals(afterFirst, afterSecond, 0.001,
+			"expected the second tick to be throttled, not measured again");
+	}
+
+	@Test
+	void twoPlayersInOneTickDriftTheCentreOnlyOnce() {
+		// Same geometry as the throttle test: a second, un-throttled
+		// measurement in this one tick would still find 20 blocks to close
+		final NamedVillage village = claimFrom(140, 135);
+		stubCrowd(point(140, 160), point(140, 175), point(140, 220));
+		final PlayerMock first = server.addPlayer();
+		final PlayerMock second = server.addPlayer();
+		first.setLocation(at(140, 135));
+		second.setLocation(at(140, 135));
+
+		nameplate.tick();
+
+		assertEquals(155, registry.byRowId(village.id()).centre().z(), 0.001,
+			"a second player in the same tick must not drift the centre again");
 	}
 }

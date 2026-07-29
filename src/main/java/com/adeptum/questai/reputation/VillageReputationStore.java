@@ -71,6 +71,54 @@ public final class VillageReputationStore {
 		return value;
 	}
 
+	/** How many players this village holds an opinion of. */
+	public synchronized int playerCount(final String rowId) {
+		final Map<UUID, Entry> players = villages.get(rowId);
+		return players == null ? 0 : players.size();
+	}
+
+	/** Folds one village's ledger into another's. */
+	public synchronized void merge(final String fromId, final String intoId) {
+		mergeAt(fromId, intoId, System.currentTimeMillis());
+	}
+
+	/**
+	 * Sums what each side is worth at one instant rather than adding the
+	 * stored values, which are only true as of their own timestamps and
+	 * would otherwise carry decay that has not yet happened.
+	 */
+	synchronized void mergeAt(final String fromId, final String intoId,
+		final long now) {
+
+		if (fromId == null || intoId == null || fromId.equals(intoId)) {
+			return;
+		}
+		final Map<UUID, Entry> from = villages.remove(fromId);
+		if (from == null || from.isEmpty()) {
+			return;
+		}
+		foldInto(from, intoId, now);
+		save();
+	}
+
+	/**
+	 * Mends each of the departing row's entries to this instant and sums
+	 * it onto the survivor's, one player at a time.
+	 */
+	private void foldInto(final Map<UUID, Entry> from, final String intoId,
+		final long now) {
+
+		final Map<UUID, Entry> into =
+			villages.computeIfAbsent(intoId, key -> new HashMap<>());
+		for (final Map.Entry<UUID, Entry> player : from.entrySet()) {
+			final int carried = Reputation.mend(player.getValue().value(),
+				now - player.getValue().at());
+			final int value = Reputation.clamp(
+				getAt(intoId, player.getKey(), now) + carried);
+			into.put(player.getKey(), new Entry(value, now));
+		}
+	}
+
 	private void load() {
 		if (!file.exists()) {
 			return;

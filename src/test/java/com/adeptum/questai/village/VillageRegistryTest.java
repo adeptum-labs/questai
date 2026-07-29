@@ -21,9 +21,16 @@
 package com.adeptum.questai.village;
 
 import com.adeptum.questai.event.VillageKey;
+import com.adeptum.questai.villager.StoredLocation;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -50,6 +57,7 @@ class VillageRegistryTest {
 	@TempDir
 	private Path tempDir;
 	private AutoCloseable mocks;
+	private final List<LogRecord> logged = new ArrayList<>();
 
 	@BeforeEach
 	void setUp() {
@@ -59,6 +67,21 @@ class VillageRegistryTest {
 		// skip-and-warn path, and its stack trace would read as a failure
 		final Logger quiet = Logger.getAnonymousLogger();
 		quiet.setUseParentHandlers(false);
+		logged.clear();
+		quiet.addHandler(new Handler() {
+			@Override
+			public void publish(final LogRecord record) {
+				logged.add(record);
+			}
+
+			@Override
+			public void flush() {
+			}
+
+			@Override
+			public void close() {
+			}
+		});
 		when(plugin.getLogger()).thenReturn(quiet);
 		when(world.getUID()).thenReturn(WORLD_ID);
 	}
@@ -66,6 +89,12 @@ class VillageRegistryTest {
 	@AfterEach
 	void tearDown() throws Exception {
 		mocks.close();
+	}
+
+	/** Whether anything was logged at this level or worse. */
+	private boolean loggedAtLeast(final Level level) {
+		return logged.stream().anyMatch(
+			record -> record.getLevel().intValue() >= level.intValue());
 	}
 
 	private Location at(final double x, final double z) {
@@ -167,5 +196,259 @@ class VillageRegistryTest {
 			+ "  not_a_key:\n    name: Broken\n    world: nonsense\n");
 
 		assertEquals("Ravenhollow", registry().find(at(0, 0)).name());
+	}
+
+	@Test
+	void aVillageKeepsItsIdWhenItsCentreMoves() {
+		final VillageRegistry registry = registry();
+		final NamedVillage claimed = registry.claim(
+			VillageKey.from(WORLD_ID, 100, 100), at(100, 100), "Ravenhollow");
+
+		final String id = VillageRegistry.rowIdFor(claimed);
+		final NamedVillage moved = new NamedVillage(claimed.id(), claimed.key(),
+			new StoredLocation(WORLD_ID, 300, 64, 300), claimed.name(),
+			claimed.discoveredAt());
+
+		assertEquals(id, VillageRegistry.rowIdFor(moved));
+	}
+
+	@Test
+	void aRowWrittenBeforeStampingLoadsAsAgeless() throws Exception {
+		final Path file = tempDir.resolve("village-names.yml");
+		Files.writeString(file, "villages:\n  " + WORLD_ID + "_140_135:\n"
+			+ "    name: Woldmere Hamlets\n    world: " + WORLD_ID + "\n"
+			+ "    x: 140.0\n    y: 66.0\n    z: 135.0\n");
+
+		assertEquals(0L, registry().find(at(140, 135)).discoveredAt());
+	}
+
+	@Test
+	void aRowOnDiskAdoptsItsKeyAsItsId() {
+		registry().claim(VillageKey.from(WORLD_ID, 140, 135), at(140, 135),
+			"Woldmere Hamlets");
+
+		final NamedVillage reloaded = registry().find(at(140, 135));
+		assertEquals(WORLD_ID + "_140_135", reloaded.id());
+	}
+
+	@Test
+	void anAbsorbedIdResolvesToItsSurvivor() {
+		final VillageRegistry registry = registry();
+		final NamedVillage keep = registry.claim(VillageKey.from(WORLD_ID, 0, 0),
+			at(0, 0), "Ravenhollow");
+		final NamedVillage gone = registry.claim(
+			VillageKey.from(WORLD_ID, 200, 0), at(200, 0), "Frostmere");
+
+		registry.absorb(gone.id(), keep.id());
+
+		assertEquals(keep.id(), registry.resolve(gone.id()));
+		assertEquals(keep.id(), registry.byRowId(gone.id()).id());
+		assertEquals(1, registry.size());
+	}
+
+	@Test
+	void anAbsorbedIdStillAnswersButIsNoLongerALivingRow() {
+		final VillageRegistry registry = registry();
+		final NamedVillage keep = registry.claim(VillageKey.from(WORLD_ID, 0, 0),
+			at(0, 0), "Ravenhollow");
+		final NamedVillage gone = registry.claim(
+			VillageKey.from(WORLD_ID, 200, 0), at(200, 0), "Frostmere");
+
+		registry.absorb(gone.id(), keep.id());
+
+		assertTrue(registry.isLive(keep.id()));
+		assertFalse(registry.isLive(gone.id()));
+		assertFalse(registry.isLive("nobody"));
+		assertFalse(registry.isLive(null));
+	}
+
+	@Test
+	void anAliasChainResolvesToTheLastSurvivor() {
+		final VillageRegistry registry = registry();
+		final NamedVillage keep = registry.claim(VillageKey.from(WORLD_ID, 0, 0),
+			at(0, 0), "Ravenhollow");
+		final NamedVillage first = registry.claim(
+			VillageKey.from(WORLD_ID, 200, 0), at(200, 0), "Frostmere");
+		final NamedVillage second = registry.claim(
+			VillageKey.from(WORLD_ID, 400, 0), at(400, 0), "Elder Mere");
+
+		registry.absorb(second.id(), first.id());
+		registry.absorb(first.id(), keep.id());
+
+		assertEquals(keep.id(), registry.resolve(second.id()));
+	}
+
+	@Test
+	void aliasesSurviveAcrossInstances() {
+		final VillageRegistry registry = registry();
+		final NamedVillage keep = registry.claim(VillageKey.from(WORLD_ID, 0, 0),
+			at(0, 0), "Ravenhollow");
+		final NamedVillage gone = registry.claim(
+			VillageKey.from(WORLD_ID, 200, 0), at(200, 0), "Frostmere");
+		registry.absorb(gone.id(), keep.id());
+
+		assertEquals(keep.id(), registry().resolve(gone.id()));
+	}
+
+	@Test
+	void anUnknownIdResolvesToItself() {
+		assertEquals("nobody", registry().resolve("nobody"));
+		assertNull(registry().resolve(null));
+	}
+
+	@Test
+	void aRetiredIdIsNeverReissuedToANewVillage() {
+		final VillageRegistry registry = registry();
+		final NamedVillage original = registry.claim(
+			VillageKey.from(WORLD_ID, 200, 0), at(200, 0), "Frostmere");
+		final NamedVillage keep = registry.claim(VillageKey.from(WORLD_ID, 0, 0),
+			at(0, 0), "Ravenhollow");
+		registry.absorb(original.id(), keep.id());
+
+		final NamedVillage rebuilt = registry.claim(
+			VillageKey.from(WORLD_ID, 200, 0), at(200, 0), "Frostmere Reborn");
+
+		assertNotEquals(original.id(), rebuilt.id());
+		assertEquals(rebuilt.id(), registry.byRowId(rebuilt.id()).id());
+	}
+
+	@Test
+	void absorbIgnoresNullOrEqualIds() {
+		final VillageRegistry registry = registry();
+		final NamedVillage village = registry.claim(
+			VillageKey.from(WORLD_ID, 0, 0), at(0, 0), "Ravenhollow");
+
+		registry.absorb(null, village.id());
+		registry.absorb(village.id(), null);
+		registry.absorb(village.id(), village.id());
+
+		assertEquals(1, registry.size());
+		assertEquals(village.id(), registry.resolve(village.id()));
+	}
+
+	@Test
+	void resolveTerminatesOnACyclicAliasTable() throws Exception {
+		// Unreachable through absorb, which never links an id to itself or
+		// back onto a survivor already in its own chain; written by hand to
+		// prove the hop bound holds even if that ever stopped being true.
+		// Preemptive, not just elapsed-time: an unbounded walk must be
+		// killed rather than let the test thread spin forever
+		final Path file = tempDir.resolve("village-names.yml");
+		Files.writeString(file, "aliases:\n  a: b\n  b: a\n");
+
+		final VillageRegistry registry = registry();
+		assertTimeoutPreemptively(Duration.ofSeconds(2),
+			() -> assertNotNull(registry.resolve("a")));
+	}
+
+	@Test
+	void anAliasChainThatNeverSettlesIsComplainedAbout() throws Exception {
+		// Giving up quietly leaves every lookup through this id answering for
+		// the wrong village with nothing in the log to say why
+		final Path file = tempDir.resolve("village-names.yml");
+		Files.writeString(file, "aliases:\n  a: b\n  b: a\n");
+
+		final VillageRegistry registry = registry();
+		logged.clear();
+		registry.resolve("a");
+
+		assertTrue(loggedAtLeast(Level.WARNING),
+			"a chain that runs out of hops has to say so");
+	}
+
+	@Test
+	void anOrdinaryLookupSaysNothing() {
+		final VillageRegistry registry = registry();
+		final NamedVillage village = registry.claim(
+			VillageKey.from(WORLD_ID, 0, 0), at(0, 0), "Ravenhollow");
+		logged.clear();
+
+		registry.resolve(village.id());
+		registry.resolve("nobody");
+
+		assertFalse(loggedAtLeast(Level.WARNING));
+	}
+
+	@Test
+	void resolveTerminatesOnASelfAlias() throws Exception {
+		final Path file = tempDir.resolve("village-names.yml");
+		Files.writeString(file, "aliases:\n  a: a\n");
+
+		final VillageRegistry registry = registry();
+		assertTimeoutPreemptively(Duration.ofSeconds(2),
+			() -> assertEquals("a", registry.resolve("a")));
+	}
+
+	@Test
+	void aSmallDriftLeavesTheCentreWhereItIs() {
+		final VillageRegistry registry = registry();
+		final NamedVillage village = registry.claim(
+			VillageKey.from(WORLD_ID, 0, 0), at(0, 0), "Ravenhollow");
+
+		assertNull(registry.recentre(village,
+			new StoredLocation(WORLD_ID, 10, 64, 0)));
+	}
+
+	@Test
+	void aLargeDriftMovesTheCentreHalfway() {
+		final VillageRegistry registry = registry();
+		final NamedVillage village = registry.claim(
+			VillageKey.from(WORLD_ID, 0, 0), at(0, 0), "Ravenhollow");
+
+		final NamedVillage moved = registry.recentre(village,
+			new StoredLocation(WORLD_ID, 100, 64, 0));
+
+		assertNotNull(moved);
+		assertEquals(50, moved.centre().x(), 0.001);
+		assertEquals(village.id(), moved.id());
+		assertEquals(village.key(), moved.key());
+		assertEquals(village.discoveredAt(), moved.discoveredAt());
+		assertEquals("Ravenhollow", moved.name());
+	}
+
+	@Test
+	void aMovedCentreSurvivesAcrossInstances() {
+		final VillageRegistry registry = registry();
+		final NamedVillage village = registry.claim(
+			VillageKey.from(WORLD_ID, 0, 0), at(0, 0), "Ravenhollow");
+		registry.recentre(village, new StoredLocation(WORLD_ID, 100, 64, 0));
+
+		assertEquals(50, registry().byRowId(village.id()).centre().x(), 0.001);
+	}
+
+	@Test
+	void rowsInsideTheRadiusAreSeenAsOneVillage() {
+		final VillageRegistry registry = registry();
+		final NamedVillage first = registry.claim(
+			VillageKey.from(WORLD_ID, 0, 0), at(0, 0), "Ravenhollow");
+		registry.claim(VillageKey.from(WORLD_ID, 30, 0), at(30, 0), "Frostmere");
+
+		assertEquals(1, registry.overlapping(first).size());
+		assertEquals("Frostmere", registry.overlapping(first).get(0).name());
+	}
+
+	@Test
+	void rowsBeyondTheRadiusStayApart() {
+		final VillageRegistry registry = registry();
+		final NamedVillage first = registry.claim(
+			VillageKey.from(WORLD_ID, 0, 0), at(0, 0), "Ravenhollow");
+		registry.claim(VillageKey.from(WORLD_ID, 200, 0), at(200, 0), "Frostmere");
+
+		assertTrue(registry.overlapping(first).isEmpty());
+	}
+
+	@Test
+	void rowsInAnotherWorldNeverOverlapEvenWhenClose() {
+		final VillageRegistry registry = registry();
+		final NamedVillage first = registry.claim(
+			VillageKey.from(WORLD_ID, 0, 0), at(0, 0), "Ravenhollow");
+
+		final World other = mock(World.class);
+		final UUID otherWorldId = UUID.randomUUID();
+		when(other.getUID()).thenReturn(otherWorldId);
+		registry.claim(VillageKey.from(otherWorldId, 0, 0),
+			new Location(other, 0, 64, 0), "Frostmere");
+
+		assertTrue(registry.overlapping(first).isEmpty());
 	}
 }

@@ -211,4 +211,89 @@ class VillageWorksStoreTest {
 		assertTrue(new VillageWorksStore(pluginIn(folder))
 			.get(ROW).getRingGaps().isEmpty());
 	}
+
+	@Test
+	void mergingAddsTalliesAndKeepsTheFurtherTier(@TempDir final Path folder) {
+		final VillageWorksStore store = new VillageWorksStore(pluginIn(folder));
+		store.donate("woldmere", "logs", 12);
+		store.completeTier("woldmere");
+		store.donate("woldmere", "logs", 4);
+		store.donate("hawthorn", "logs", 5);
+		store.donate("hawthorn", "rough_stone", 3);
+
+		store.merge("hawthorn", "woldmere");
+
+		final WorkState state = store.get("woldmere");
+		assertEquals(1, state.getTier());
+		assertEquals(9, state.getTally().get("logs"));
+		assertEquals(3, state.getTally().get("rough_stone"));
+		assertNull(store.get("hawthorn"));
+	}
+
+	@Test
+	void mergingKeepsTheHigherTierWhenTheAbsorbedIsFurtherAlong(
+		@TempDir final Path folder) {
+
+		final VillageWorksStore store = new VillageWorksStore(pluginIn(folder));
+		store.donate("woldmere", "logs", 1);
+		store.donate("hawthorn", "logs", 12);
+		store.completeTier("hawthorn");
+
+		store.merge("hawthorn", "woldmere");
+
+		assertEquals(1, store.get("woldmere").getTier());
+	}
+
+	@Test
+	void aMergeSurvivesAReload(@TempDir final Path folder) {
+		final VillageWorksStore store = new VillageWorksStore(pluginIn(folder));
+		store.donate("hawthorn", "logs", 5);
+
+		store.merge("hawthorn", "woldmere");
+
+		final VillageWorksStore reloaded = new VillageWorksStore(pluginIn(folder));
+		assertEquals(5, reloaded.get("woldmere").getTally().get("logs"));
+		assertNull(reloaded.get("hawthorn"));
+	}
+
+	@Test
+	void mergingKeepsTheSurvivorsInFlightBuild(@TempDir final Path folder) {
+		final UUID world = UUID.randomUUID();
+		final VillageWorksStore store = new VillageWorksStore(pluginIn(folder));
+		store.beginBuild("woldmere", new StoredLocation(world, 1, 2, 3), 1);
+		store.beginBuild("hawthorn", new StoredLocation(world, 9, 9, 9), 2);
+
+		store.merge("hawthorn", "woldmere");
+
+		final WorkState state = store.get("woldmere");
+		assertEquals(1, state.getSite().x());
+		assertEquals(1, state.getRotation());
+	}
+
+	@Test
+	void mergingCarriesTheWholeStateWhenTheSurvivorNeverBuilt(
+		@TempDir final Path folder) {
+
+		final VillageWorksStore store = new VillageWorksStore(pluginIn(folder));
+		store.donate("hawthorn", "logs", 5);
+
+		store.merge("hawthorn", "woldmere");
+
+		assertEquals(5, store.get("woldmere").getTally().get("logs"));
+		assertNull(store.get("hawthorn"));
+	}
+
+	@Test
+	void mergingAVillageIntoItselfLeavesItsWorksIntact(
+		@TempDir final Path folder) {
+
+		final VillageWorksStore store = new VillageWorksStore(pluginIn(folder));
+		store.donate(ROW, "logs", 12);
+		store.completeTier(ROW);
+
+		store.merge(ROW, ROW);
+
+		final WorkState state = store.get(ROW);
+		assertEquals(1, state.getTier());
+	}
 }

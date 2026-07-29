@@ -27,6 +27,7 @@ import com.adeptum.questai.model.VillageInfo;
 import com.adeptum.questai.reputation.Reputation;
 import com.adeptum.questai.reputation.Standings;
 import com.adeptum.questai.utility.AiChat;
+import com.adeptum.questai.villager.StoredLocation;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import java.time.Duration;
 import java.util.HashMap;
@@ -78,6 +79,17 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 	/** Consecutive outside ticks before the title re-arms. */
 	private static final int LEAVE_MISSES = 3;
 
+	/**
+	 * Floor between two re-surveys of one village, across every player who
+	 * might be standing in it. Loose on purpose: drift is a slow correction
+	 * toward an already-converged centre, not something that needs second
+	 * granularity, while the entity sweep behind
+	 * {@link VillageCrowd#measure} walks every chunk within a 96-block
+	 * radius and is too costly to pay every tick for every player in a
+	 * crowded village.
+	 */
+	private static final long RESURVEY_INTERVAL_MILLIS = 45_000L;
+
 	private static final Title.Times TITLE_TIMES = Title.Times.times(
 		Duration.ofMillis(500), Duration.ofSeconds(3), Duration.ofSeconds(1));
 
@@ -88,6 +100,7 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 	private final OpenAiChatModel chatModel;
 	private final VillageRegistry registry;
 	private final Standings standings;
+	private final VillageMerger merger;
 	private final boolean enabled;
 
 	/** The village name each player was last greeted in. */
@@ -95,6 +108,7 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 	private final Map<UUID, Integer> misses = new HashMap<>();
 	private final Set<VillageKey> naming = new HashSet<>();
 	private final Map<VillageKey, Long> probedUntil = new HashMap<>();
+	private final Map<String, Long> resurveyedUntil = new HashMap<>();
 
 	private VillageScanner scanner;
 	private BukkitTask task;
@@ -102,12 +116,13 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 
 	public VillageNameplate(final JavaPlugin plugin,
 		final OpenAiChatModel chatModel, final VillageRegistry registry,
-		final Standings standings) {
+		final Standings standings, final VillageMerger merger) {
 
 		this.plugin = plugin;
 		this.chatModel = chatModel;
 		this.registry = registry;
 		this.standings = standings;
+		this.merger = merger;
 		this.enabled = plugin.getConfig()
 			.getBoolean("villages.nameplate.enabled", true);
 	}
@@ -163,9 +178,40 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 				leaveTick(player.getUniqueId());
 				probe(player);
 			} else {
-				greet(player, village);
+				greet(player, resurvey(village));
 			}
 		}
+	}
+
+	/**
+	 * Draws a village's stored centre toward where its people are, and
+	 * takes in any row that has thereby come close enough to be the same
+	 * village. Runs off the greeting tick because that is already the
+	 * moment a player is known to be standing in the place.
+	 *
+	 * <p>Throttled per village rather than per player: the entity sweep
+	 * behind a measurement is the costly half, and without a floor here it
+	 * would run once per player standing in the village every tick, with
+	 * each call also compounding the damping the registry applies, since a
+	 * second player's {@code recentre} would land on a centre the first
+	 * player already moved.
+	 */
+	private NamedVillage resurvey(final NamedVillage village) {
+		final long now = System.currentTimeMillis();
+		if (resurveyedRecently(village.id(), now)) {
+			return village;
+		}
+		resurveyedUntil.put(village.id(), now + RESURVEY_INTERVAL_MILLIS);
+		prune(resurveyedUntil, now);
+
+		final NamedVillage moved =
+			registry.recentre(village, VillageCrowd.measure(village.centre()));
+		return moved == null ? village : merger.settle(moved);
+	}
+
+	private boolean resurveyedRecently(final String rowId, final long now) {
+		final Long quietUntil = resurveyedUntil.get(rowId);
+		return quietUntil != null && now < quietUntil;
 	}
 
 	/**
@@ -260,7 +306,7 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 		if (searchedRecently(key, now)) {
 			return;
 		}
-		prune(now);
+		prune(probedUntil, now);
 
 		scanner.scan(location, info -> {
 			if (info.village()) {
@@ -305,10 +351,31 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 			}
 			final String chosen = name == null ? VillageNames.fallbackName(key) : name;
 			Bukkit.getScheduler().runTask(plugin, () -> {
-				registry.claim(key, centre, chosen);
+				claimSurveyed(key, centre, chosen);
 				naming.remove(key);
 			});
 		});
+	}
+
+	/**
+	 * Claims a village on the centre its villagers describe, falling back
+	 * to the claimant's own spot when too few are about to survey, or the
+	 * surveyed world turns out not to be loaded.
+	 *
+	 * <p>Settled straight away, because a claim is only ever made from a spot
+	 * outside every stored centre's reach, and a settlement wider than two
+	 * claim radii has plenty of those in the middle of it. The survey then
+	 * lands the new row within reach of one that was already there, and
+	 * neither would afterwards drift far enough to notice the other.
+	 */
+	/* default */ NamedVillage claimSurveyed(final VillageKey key,
+		final Location centre, final String name) {
+
+		final StoredLocation surveyed =
+			VillageCrowd.measure(StoredLocation.from(centre));
+		final Location claimAt = surveyed == null ? null : surveyed.toLocation();
+		return merger.settle(
+			registry.claim(key, claimAt == null ? centre : claimAt, name));
 	}
 
 	private static VillageKey keyOf(final Location location) {
@@ -324,13 +391,12 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 		}
 	}
 
-	/** Drops expired cells once the map grows, as relic cooldowns do. */
-	private void prune(final long now) {
-		if (probedUntil.size() < PRUNE_THRESHOLD) {
+	/** Drops expired cooldowns once a map grows, whichever one it is. */
+	private static <K> void prune(final Map<K, Long> cooldowns, final long now) {
+		if (cooldowns.size() < PRUNE_THRESHOLD) {
 			return;
 		}
-		final Iterator<Map.Entry<VillageKey, Long>> it =
-			probedUntil.entrySet().iterator();
+		final Iterator<Map.Entry<K, Long>> it = cooldowns.entrySet().iterator();
 		while (it.hasNext()) {
 			if (it.next().getValue() < now) {
 				it.remove();

@@ -89,11 +89,23 @@ public class VillageTeleportStones implements SubPlugin {
 	 * only ever adds to them.
 	 */
 	public boolean stoneIssued(final String rowId) {
-		if (stones.issued(rowId)) {
+		final String live = live(rowId);
+		if (stones.issued(live)) {
 			return true;
 		}
 		// A stone the books never knew about is adopted, not ignored
-		return TeleportStoneCensus.exists(rowId) && stones.adopt(rowId, null);
+		return TeleportStoneCensus.exists(rowId) && stones.adopt(live, null);
+	}
+
+	/**
+	 * The id the books are kept under for the village this one names. A stone
+	 * carries whichever id its village had on the day it was handed over, and
+	 * that row may since have been taken into another; filing it under the id
+	 * on the item would leave a record nothing ever looks at again, while the
+	 * living village went on believing its stone was still out there.
+	 */
+	private String live(final String rowId) {
+		return registry.resolve(rowId);
 	}
 
 	/** False keeps the stone's claim entry out of the dialogue GUI. */
@@ -134,7 +146,7 @@ public class VillageTeleportStones implements SubPlugin {
 	private int adopt(final Map<String, UUID> found) {
 		int adopted = 0;
 		for (final Map.Entry<String, UUID> stone : found.entrySet()) {
-			if (stones.adopt(stone.getKey(), stone.getValue())) {
+			if (stones.adopt(live(stone.getKey()), stone.getValue())) {
 				adopted++;
 			}
 		}
@@ -168,9 +180,10 @@ public class VillageTeleportStones implements SubPlugin {
 		}
 		final String rowId = VillageTeleportStone.rowIdOf(item.getItemStack());
 		if (rowId != null) {
-			stones.release(rowId);
+			final String live = live(rowId);
+			stones.release(live);
 			plugin.getLogger().info("[VillageTeleportStones] The stone of "
-				+ rowId + " was destroyed; the village may issue another.");
+				+ live + " was destroyed; the village may issue another.");
 		}
 	}
 
@@ -185,10 +198,11 @@ public class VillageTeleportStones implements SubPlugin {
 			player.sendMessage("\u00a77The stone will not answer to you just now.");
 			return;
 		}
-		stones.issue(rowId, player.getUniqueId());
+		final String live = live(rowId);
+		stones.issue(live, player.getUniqueId());
 
 		player.getInventory()
-			.addItem(VillageTeleportStone.create(rowId, village.name(),
+			.addItem(VillageTeleportStone.create(live, village.name(),
 				(int) (cooldownMillis / 1000)))
 			.values()
 			.forEach(rest -> player.getWorld()
@@ -216,7 +230,7 @@ public class VillageTeleportStones implements SubPlugin {
 	private void useStone(final Player player, final String rowId) {
 		// Using one proves it exists and names who has it, which is the
 		// surest adoption point of all
-		stones.adopt(rowId, player.getUniqueId());
+		stones.adopt(live(rowId), player.getUniqueId());
 		final long now = System.currentTimeMillis();
 		final Long last = lastUse.get(player.getUniqueId());
 		final long cooling = last == null ? 0 : cooldownMillis - (now - last);

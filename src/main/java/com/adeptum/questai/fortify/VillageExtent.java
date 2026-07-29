@@ -15,7 +15,7 @@ import java.util.List;
 public final class VillageExtent {
 
 	/** Below this many villagers the crowd says nothing worth trusting. */
-	private static final int MIN_POINTS = 3;
+	public static final int MIN_POINTS = 3;
 	private static final int MIN_RADIUS = 16;
 	private static final int MAX_RADIUS = 64;
 	/** How wide a village is assumed to be when nobody is about. */

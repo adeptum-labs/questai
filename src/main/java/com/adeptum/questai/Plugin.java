@@ -24,6 +24,7 @@ import com.adeptum.questai.dialogue.ConversationManager;
 import com.adeptum.questai.event.VillageEventManager;
 import com.adeptum.questai.fortify.VillageFortification;
 import com.adeptum.questai.fortify.VillageWorksStore;
+import com.adeptum.questai.village.VillageMerger;
 import com.adeptum.questai.village.VillageNameplate;
 import com.adeptum.questai.village.VillageRegistry;
 import com.adeptum.questai.mob.MobForge;
@@ -116,8 +117,9 @@ public class Plugin extends JavaPlugin implements Listener {
 			conversationManager.setWorkDonationHandler(fortification::donate);
 		}
 		conversationManager.setStandings(standings);
+		final TeleportStoneStore teleportStoneStore = new TeleportStoneStore(this);
 		final VillageTeleportStones teleportStones = new VillageTeleportStones(
-			this, registry, new TeleportStoneStore(this));
+			this, registry, teleportStoneStore);
 		// A disabled teleport feature keeps its claim entry out of the GUI
 		if (teleportStones.isEnabled()) {
 			conversationManager.setRegistry(registry);
@@ -143,8 +145,18 @@ public class Plugin extends JavaPlugin implements Listener {
 		randomQuestPlugin.setStandings(standings);
 		final WanderingPeasantPlugin peasantPlugin = new WanderingPeasantPlugin(
 			this, conversationManager, questService, chatModel);
+		final VillageMerger merger = new VillageMerger(registry, reputationStore,
+			worksStore, teleportStoneStore, commissionStore);
+		// Registry hygiene, not display: rows that name one settlement twice
+		// are collapsed whatever the greeting title is set to, and before any
+		// sub-plugin has had a chance to read a ledger under a doomed id
+		final int absorbed = merger.sweep();
+		if (absorbed > 0) {
+			getLogger().info("[VillageMerger] Took in " + absorbed
+				+ " village row(s) that named one settlement twice.");
+		}
 		final VillageNameplate nameplate = new VillageNameplate(this, chatModel,
-			registry, standings);
+			registry, standings, merger);
 		final AutoVillagerPlugin autoVillager =
 			new AutoVillagerPlugin(this, List.of(eventManager, nameplate));
 		// The scanner also feeds the nameplate its village checks, so the

@@ -144,4 +144,89 @@ class CommissionStoreTest {
 		final File file = new File(folder.toFile(), "village-commissions.yml");
 		Files.writeString(file.toPath(), "commissions:\n" + rows);
 	}
+
+	@Test
+	void mergingKeepsTheEarlierOrderWhenTheAbsorbedRowIsOlder(
+		@TempDir final Path folder) {
+
+		final CommissionStore store = new CommissionStore(pluginIn(folder));
+		store.place("woldmere", PLAYER, new CommissionOrder(
+			Commission.KEEN_BLADE.name(), SMITH, NOON, NOON + 60_000));
+		store.place("hawthorn", PLAYER, new CommissionOrder(
+			Commission.PLATED_HELM.name(), SMITH, NOON - 1_000,
+			NOON - 1_000 + 60_000));
+
+		store.merge("hawthorn", "woldmere");
+
+		assertEquals(Commission.PLATED_HELM.name(),
+			store.get("woldmere", PLAYER).commission());
+		assertNull(store.get("hawthorn", PLAYER));
+	}
+
+	@Test
+	void mergingKeepsTheEarlierOrderWhenTheSurvivorsRowIsOlder(
+		@TempDir final Path folder) {
+
+		final CommissionStore store = new CommissionStore(pluginIn(folder));
+		store.place("woldmere", PLAYER, new CommissionOrder(
+			Commission.KEEN_BLADE.name(), SMITH, NOON - 1_000,
+			NOON - 1_000 + 60_000));
+		store.place("hawthorn", PLAYER, new CommissionOrder(
+			Commission.PLATED_HELM.name(), SMITH, NOON, NOON + 60_000));
+
+		store.merge("hawthorn", "woldmere");
+
+		assertEquals(Commission.KEEN_BLADE.name(),
+			store.get("woldmere", PLAYER).commission());
+	}
+
+	@Test
+	void mergingCarriesAnOrderForAPlayerTheSurvivorNeverServed(
+		@TempDir final Path folder) {
+
+		final CommissionStore store = new CommissionStore(pluginIn(folder));
+		store.place("hawthorn", OTHER_PLAYER, order(Commission.QUIVER_OF_ARROWS));
+
+		store.merge("hawthorn", "woldmere");
+
+		assertEquals(Commission.QUIVER_OF_ARROWS.name(),
+			store.get("woldmere", OTHER_PLAYER).commission());
+	}
+
+	@Test
+	void aMergeSurvivesAReload(@TempDir final Path folder) {
+		final CommissionStore store = new CommissionStore(pluginIn(folder));
+		store.place("hawthorn", OTHER_PLAYER, order(Commission.QUIVER_OF_ARROWS));
+
+		store.merge("hawthorn", "woldmere");
+
+		final CommissionStore reloaded = new CommissionStore(pluginIn(folder));
+		assertEquals(Commission.QUIVER_OF_ARROWS.name(),
+			reloaded.get("woldmere", OTHER_PLAYER).commission());
+		assertNull(reloaded.get("hawthorn", OTHER_PLAYER));
+	}
+
+	@Test
+	void mergingAVillageIntoItselfLeavesItsOrdersIntact(
+		@TempDir final Path folder) {
+
+		final CommissionStore store = new CommissionStore(pluginIn(folder));
+		store.place(ROW, PLAYER, order(Commission.KEEN_BLADE));
+
+		store.merge(ROW, ROW);
+
+		assertEquals(Commission.KEEN_BLADE.name(),
+			store.get(ROW, PLAYER).commission());
+	}
+
+	@Test
+	void aVillageKnowsHowManyOrdersItHasInHand(@TempDir final Path folder) {
+		final CommissionStore store = new CommissionStore(pluginIn(folder));
+		store.place(ROW, PLAYER, order(Commission.KEEN_BLADE));
+		store.place(ROW, OTHER_PLAYER, order(Commission.PLATED_HELM));
+
+		assertEquals(2, store.orderCount(ROW));
+		assertEquals(0, store.orderCount(OTHER_ROW));
+		assertEquals(0, store.orderCount(null));
+	}
 }

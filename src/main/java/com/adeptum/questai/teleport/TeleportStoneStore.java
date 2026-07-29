@@ -81,10 +81,16 @@ public final class TeleportStoneStore {
 
 	/** Writes down that this village has handed its stone to this player. */
 	public synchronized void issue(final String rowId, final UUID holder) {
+		issueAt(rowId, holder, System.currentTimeMillis());
+	}
+
+	synchronized void issueAt(final String rowId, final UUID holder,
+		final long at) {
+
 		if (rowId == null) {
 			return;
 		}
-		issued.put(rowId, new Entry(holder, System.currentTimeMillis()));
+		issued.put(rowId, new Entry(holder, at));
 		save();
 	}
 
@@ -106,6 +112,24 @@ public final class TeleportStoneStore {
 		if (rowId != null && issued.remove(rowId) != null) {
 			save();
 		}
+	}
+
+	/**
+	 * Folds one village's stone record into another's, keeping whichever
+	 * was issued first. A village may only have one stone out, and the
+	 * later holder's item now aliases onto the survivor.
+	 */
+	public synchronized void merge(final String fromId, final String intoId) {
+		if (fromId == null || intoId == null || fromId.equals(intoId)) {
+			return;
+		}
+		final Entry from = issued.remove(fromId);
+		if (from == null) {
+			return;
+		}
+		issued.merge(intoId, from,
+			(into, incoming) -> into.at() <= incoming.at() ? into : incoming);
+		save();
 	}
 
 	private void load() {
