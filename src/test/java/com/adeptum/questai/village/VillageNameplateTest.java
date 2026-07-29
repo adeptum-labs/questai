@@ -325,4 +325,41 @@ class VillageNameplateTest {
 
 		assertEquals(1, registry.size());
 	}
+
+	@Test
+	void aSecondTickRightAfterTheFirstDoesNotReSurveyAgain() {
+		// A gap wide enough that an un-throttled second tick would still
+		// find more than DRIFT_THRESHOLD left to close: the first tick
+		// halves it from 40 to 20, and 20 alone would still move the centre
+		final NamedVillage village = claimFrom(140, 135);
+		stubCrowd(point(140, 160), point(140, 175), point(140, 220));
+		final PlayerMock player = server.addPlayer();
+		player.setLocation(at(140, 135));
+
+		nameplate.tick();
+		final double afterFirst = registry.byRowId(village.id()).centre().z();
+
+		nameplate.tick();
+		final double afterSecond = registry.byRowId(village.id()).centre().z();
+
+		assertEquals(afterFirst, afterSecond, 0.001,
+			"expected the second tick to be throttled, not measured again");
+	}
+
+	@Test
+	void twoPlayersInOneTickDriftTheCentreOnlyOnce() {
+		// Same geometry as the throttle test: a second, un-throttled
+		// measurement in this one tick would still find 20 blocks to close
+		final NamedVillage village = claimFrom(140, 135);
+		stubCrowd(point(140, 160), point(140, 175), point(140, 220));
+		final PlayerMock first = server.addPlayer();
+		final PlayerMock second = server.addPlayer();
+		first.setLocation(at(140, 135));
+		second.setLocation(at(140, 135));
+
+		nameplate.tick();
+
+		assertEquals(155, registry.byRowId(village.id()).centre().z(), 0.001,
+			"a second player in the same tick must not drift the centre again");
+	}
 }

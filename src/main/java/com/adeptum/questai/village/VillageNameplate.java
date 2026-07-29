@@ -79,6 +79,17 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 	/** Consecutive outside ticks before the title re-arms. */
 	private static final int LEAVE_MISSES = 3;
 
+	/**
+	 * Floor between two re-surveys of one village, across every player who
+	 * might be standing in it. Loose on purpose: drift is a slow correction
+	 * toward an already-converged centre, not something that needs second
+	 * granularity, while the entity sweep behind
+	 * {@link VillageCrowd#measure} walks every chunk within a 96-block
+	 * radius and is too costly to pay every tick for every player in a
+	 * crowded village.
+	 */
+	private static final long RESURVEY_INTERVAL_MILLIS = 45_000L;
+
 	private static final Title.Times TITLE_TIMES = Title.Times.times(
 		Duration.ofMillis(500), Duration.ofSeconds(3), Duration.ofSeconds(1));
 
@@ -97,6 +108,7 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 	private final Map<UUID, Integer> misses = new HashMap<>();
 	private final Set<VillageKey> naming = new HashSet<>();
 	private final Map<VillageKey, Long> probedUntil = new HashMap<>();
+	private final Map<String, Long> resurveyedUntil = new HashMap<>();
 
 	private VillageScanner scanner;
 	private BukkitTask task;
@@ -181,11 +193,30 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 	 * takes in any row that has thereby come close enough to be the same
 	 * village. Runs off the greeting tick because that is already the
 	 * moment a player is known to be standing in the place.
+	 *
+	 * <p>Throttled per village rather than per player: the entity sweep
+	 * behind a measurement is the costly half, and without a floor here it
+	 * would run once per player standing in the village every tick, with
+	 * each call also compounding the damping the registry applies, since a
+	 * second player's {@code recentre} would land on a centre the first
+	 * player already moved.
 	 */
 	private NamedVillage resurvey(final NamedVillage village) {
+		final long now = System.currentTimeMillis();
+		if (resurveyedRecently(village.id(), now)) {
+			return village;
+		}
+		resurveyedUntil.put(village.id(), now + RESURVEY_INTERVAL_MILLIS);
+		prune(resurveyedUntil, now);
+
 		final NamedVillage moved =
 			registry.recentre(village, VillageCrowd.measure(village.centre()));
 		return moved == null ? village : merger.settle(moved);
+	}
+
+	private boolean resurveyedRecently(final String rowId, final long now) {
+		final Long quietUntil = resurveyedUntil.get(rowId);
+		return quietUntil != null && now < quietUntil;
 	}
 
 	/**
@@ -276,7 +307,7 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 		}
 
 		nextProbeAt = now + PROBE_INTERVAL_MILLIS;
-		prune(now);
+		prune(probedUntil, now);
 
 		final VillageInfo info = scanner.scan(location);
 		if (info.village()) {
@@ -352,13 +383,12 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 		}
 	}
 
-	/** Drops expired cells once the map grows, as relic cooldowns do. */
-	private void prune(final long now) {
-		if (probedUntil.size() < PRUNE_THRESHOLD) {
+	/** Drops expired cooldowns once a map grows, whichever one it is. */
+	private static <K> void prune(final Map<K, Long> cooldowns, final long now) {
+		if (cooldowns.size() < PRUNE_THRESHOLD) {
 			return;
 		}
-		final Iterator<Map.Entry<VillageKey, Long>> it =
-			probedUntil.entrySet().iterator();
+		final Iterator<Map.Entry<K, Long>> it = cooldowns.entrySet().iterator();
 		while (it.hasNext()) {
 			if (it.next().getValue() < now) {
 				it.remove();
