@@ -344,4 +344,25 @@ class VillageRegistryTest {
 
 		assertEquals(50, registry().byRowId(village.id()).centre().x(), 0.001);
 	}
+
+	@Test
+	void rowsInsideTheRadiusAreSeenAsOneVillage() {
+		final VillageRegistry registry = registry();
+		final NamedVillage first = registry.claim(
+			VillageKey.from(WORLD_ID, 0, 0), at(0, 0), "Ravenhollow");
+		registry.claim(VillageKey.from(WORLD_ID, 30, 0), at(30, 0), "Frostmere");
+
+		assertEquals(1, registry.overlapping(first).size());
+		assertEquals("Frostmere", registry.overlapping(first).get(0).name());
+	}
+
+	@Test
+	void rowsBeyondTheRadiusStayApart() {
+		final VillageRegistry registry = registry();
+		final NamedVillage first = registry.claim(
+			VillageKey.from(WORLD_ID, 0, 0), at(0, 0), "Ravenhollow");
+		registry.claim(VillageKey.from(WORLD_ID, 200, 0), at(200, 0), "Frostmere");
+
+		assertTrue(registry.overlapping(first).isEmpty());
+	}
 }

@@ -24,7 +24,9 @@ import com.adeptum.questai.event.VillageKey;
 import com.adeptum.questai.villager.StoredLocation;
 import java.io.File;
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -205,6 +207,34 @@ public class VillageRegistry {
 		villages.put(moved.id(), moved);
 		save();
 		return moved;
+	}
+
+	/** Every village currently known, in no particular order. */
+	public synchronized List<NamedVillage> all() {
+		return List.copyOf(villages.values());
+	}
+
+	/**
+	 * The other rows close enough to this one to be the same village on the
+	 * ground, nearest first. Two names within a claim radius of each other
+	 * describe one settlement that was walked into twice.
+	 */
+	public synchronized List<NamedVillage> overlapping(
+		final NamedVillage village) {
+
+		if (village == null) {
+			return List.of();
+		}
+		final double limit = claimRadius * claimRadius;
+		return villages.values().stream()
+			.filter(other -> !other.id().equals(village.id()))
+			.filter(other -> other.centre().worldId()
+				.equals(village.centre().worldId()))
+			.filter(other -> other.centre().distanceSquaredXz(
+				village.centre().x(), village.centre().z()) <= limit)
+			.sorted(Comparator.comparingDouble(other -> other.centre()
+				.distanceSquaredXz(village.centre().x(), village.centre().z())))
+			.toList();
 	}
 
 	/** The id a newly discovered village is given, unique among the known. */
