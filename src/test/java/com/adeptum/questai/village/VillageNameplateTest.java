@@ -327,6 +327,51 @@ class VillageNameplateTest {
 	}
 
 	@Test
+	void theGreetingIsNotWhatCollapsesDuplicateRows() {
+		// Registry hygiene rides on the merger, which the plugin drives on its
+		// own. Hanging it off the greeting would mean a server that wanted no
+		// titles quietly got no duplicate collapsing and no centre correction
+		// either, and there is no setting that is meant to say that
+		claimRavenhollow();
+		registry.claim(VillageKey.from(world.getUID(), 20, 0), at(20, 0),
+			"Frostmere");
+		assertEquals(2, registry.size());
+
+		nameplate.onEnable();
+
+		assertEquals(2, registry.size(),
+			"the greeting must not be the thing that folds rows together");
+		nameplate.onDisable();
+	}
+
+	@Test
+	void aClaimLandingOnAKnownVillageIsTakenStraightIn() {
+		// A settlement wider than two claim radii: the far side is outside
+		// every stored centre's reach, so standing there is enough to set a
+		// second naming going even though the village is already known
+		final NamedVillage first = claimFrom(0, 0);
+		assertNull(registry.find(at(0, 100)), "the far side reads as unclaimed");
+
+		final NamedVillage settled = claimFrom(0, 100, point(0, 30),
+			point(5, 35), point(-5, 40));
+
+		assertEquals(1, registry.size(),
+			"a second row inside the first's reach must not be left standing");
+		assertEquals(first.id(), settled.id());
+		assertEquals(first.id(), registry.resolve(settled.id()));
+	}
+
+	@Test
+	void aClaimOutOfEveryoneElsesReachStandsOnItsOwn() {
+		claimFrom(0, 0);
+
+		final NamedVillage far = claimFrom(400, 400);
+
+		assertEquals(2, registry.size());
+		assertTrue(registry.isLive(far.id()));
+	}
+
+	@Test
 	void aSecondTickRightAfterTheFirstDoesNotReSurveyAgain() {
 		// A gap wide enough that an un-throttled second tick would still
 		// find more than DRIFT_THRESHOLD left to close: the first tick

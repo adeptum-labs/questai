@@ -140,11 +140,6 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 		if (!enabled) {
 			return;
 		}
-		final int absorbed = merger.sweep();
-		if (absorbed > 0) {
-			plugin.getLogger().info("[VillageNameplate] Took in " + absorbed
-				+ " village row(s) that named one settlement twice.");
-		}
 		plugin.getLogger().info("[VillageNameplate] Enabled with "
 			+ registry.size() + " named villages.");
 		task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick,
@@ -360,6 +355,12 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 	 * Claims a village on the centre its villagers describe, falling back
 	 * to the claimant's own spot when too few are about to survey, or the
 	 * surveyed world turns out not to be loaded.
+	 *
+	 * <p>Settled straight away, because a claim is only ever made from a spot
+	 * outside every stored centre's reach, and a settlement wider than two
+	 * claim radii has plenty of those in the middle of it. The survey then
+	 * lands the new row within reach of one that was already there, and
+	 * neither would afterwards drift far enough to notice the other.
 	 */
 	/* default */ NamedVillage claimSurveyed(final VillageKey key,
 		final Location centre, final String name) {
@@ -367,7 +368,8 @@ public class VillageNameplate implements SubPlugin, VillageCheckListener {
 		final StoredLocation surveyed =
 			VillageCrowd.measure(StoredLocation.from(centre));
 		final Location claimAt = surveyed == null ? null : surveyed.toLocation();
-		return registry.claim(key, claimAt == null ? centre : claimAt, name);
+		return merger.settle(
+			registry.claim(key, claimAt == null ? centre : claimAt, name));
 	}
 
 	private static VillageKey keyOf(final Location location) {
