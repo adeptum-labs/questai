@@ -45,6 +45,11 @@ import org.bukkit.plugin.java.JavaPlugin;
  */
 public class VillageRegistry {
 
+	/** How far a centre must be out before it is worth moving at all. */
+	public static final double DRIFT_THRESHOLD = 16.0;
+	/** The share of the gap closed per move. */
+	private static final double DRIFT_DAMPING = 0.5;
+
 	private final JavaPlugin plugin;
 	private final File file;
 	private final double claimRadius;
@@ -164,6 +169,42 @@ public class VillageRegistry {
 	 */
 	public static String rowIdFor(final NamedVillage village) {
 		return village.id();
+	}
+
+	/**
+	 * Moves a village's stored centre part of the way toward where its
+	 * people say it is, and answers with the moved village or null when it
+	 * was already close enough to leave alone.
+	 *
+	 * <p>Half the gap rather than all of it: a survey taken while the
+	 * villagers are fleeing a siege is a poor description of where they
+	 * live, and must not be able to fling a village across the map on its
+	 * own. Several honest surveys converge; one bad one barely tells.
+	 */
+	public synchronized NamedVillage recentre(final NamedVillage village,
+		final StoredLocation measured) {
+
+		if (village == null || measured == null) {
+			return null;
+		}
+		final double gap = Math.hypot(measured.x() - village.centre().x(),
+			measured.z() - village.centre().z());
+		if (gap < DRIFT_THRESHOLD) {
+			return null;
+		}
+		final StoredLocation centre = new StoredLocation(
+			village.centre().worldId(),
+			village.centre().x()
+				+ (measured.x() - village.centre().x()) * DRIFT_DAMPING,
+			village.centre().y(),
+			village.centre().z()
+				+ (measured.z() - village.centre().z()) * DRIFT_DAMPING);
+
+		final NamedVillage moved = new NamedVillage(village.id(),
+			village.key(), centre, village.name(), village.discoveredAt());
+		villages.put(moved.id(), moved);
+		save();
+		return moved;
 	}
 
 	/** The id a newly discovered village is given, unique among the known. */

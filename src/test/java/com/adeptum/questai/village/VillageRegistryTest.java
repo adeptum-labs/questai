@@ -307,4 +307,39 @@ class VillageRegistryTest {
 		assertTimeoutPreemptively(Duration.ofSeconds(2),
 			() -> assertEquals("a", registry.resolve("a")));
 	}
+
+	@Test
+	void aSmallDriftLeavesTheCentreWhereItIs() {
+		final VillageRegistry registry = registry();
+		final NamedVillage village = registry.claim(
+			VillageKey.from(WORLD_ID, 0, 0), at(0, 0), "Ravenhollow");
+
+		assertNull(registry.recentre(village,
+			new StoredLocation(WORLD_ID, 10, 64, 0)));
+	}
+
+	@Test
+	void aLargeDriftMovesTheCentreHalfway() {
+		final VillageRegistry registry = registry();
+		final NamedVillage village = registry.claim(
+			VillageKey.from(WORLD_ID, 0, 0), at(0, 0), "Ravenhollow");
+
+		final NamedVillage moved = registry.recentre(village,
+			new StoredLocation(WORLD_ID, 100, 64, 0));
+
+		assertNotNull(moved);
+		assertEquals(50, moved.centre().x(), 0.001);
+		assertEquals(village.id(), moved.id());
+		assertEquals("Ravenhollow", moved.name());
+	}
+
+	@Test
+	void aMovedCentreSurvivesAcrossInstances() {
+		final VillageRegistry registry = registry();
+		final NamedVillage village = registry.claim(
+			VillageKey.from(WORLD_ID, 0, 0), at(0, 0), "Ravenhollow");
+		registry.recentre(village, new StoredLocation(WORLD_ID, 100, 64, 0));
+
+		assertEquals(50, registry().byRowId(village.id()).centre().x(), 0.001);
+	}
 }
