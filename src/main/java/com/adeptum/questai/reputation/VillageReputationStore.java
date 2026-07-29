@@ -71,6 +71,37 @@ public final class VillageReputationStore {
 		return value;
 	}
 
+	/** Folds one village's ledger into another's. */
+	public synchronized void merge(final String fromId, final String intoId) {
+		mergeAt(fromId, intoId, System.currentTimeMillis());
+	}
+
+	/**
+	 * Sums what each side is worth at one instant rather than adding the
+	 * stored values, which are only true as of their own timestamps and
+	 * would otherwise carry decay that has not yet happened.
+	 */
+	synchronized void mergeAt(final String fromId, final String intoId,
+		final long now) {
+
+		if (fromId == null || intoId == null || fromId.equals(intoId)) {
+			return;
+		}
+		final Map<UUID, Entry> from = villages.remove(fromId);
+		if (from == null) {
+			return;
+		}
+		for (final UUID playerId : from.keySet()) {
+			final int carried = Reputation.mend(from.get(playerId).value(),
+				now - from.get(playerId).at());
+			final int value =
+				Reputation.clamp(getAt(intoId, playerId, now) + carried);
+			villages.computeIfAbsent(intoId, key -> new HashMap<>())
+				.put(playerId, new Entry(value, now));
+		}
+		save();
+	}
+
 	private void load() {
 		if (!file.exists()) {
 			return;

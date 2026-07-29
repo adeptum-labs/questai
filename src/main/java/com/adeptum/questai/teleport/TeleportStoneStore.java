@@ -108,6 +108,24 @@ public final class TeleportStoneStore {
 		}
 	}
 
+	/**
+	 * Folds one village's stone record into another's, keeping whichever
+	 * was issued first. A village may only have one stone out, and the
+	 * later holder's item now aliases onto the survivor.
+	 */
+	public synchronized void merge(final String fromId, final String intoId) {
+		if (fromId == null || intoId == null || fromId.equals(intoId)) {
+			return;
+		}
+		final Entry from = issued.remove(fromId);
+		if (from == null) {
+			return;
+		}
+		issued.merge(intoId, from,
+			(into, incoming) -> into.at() <= incoming.at() ? into : incoming);
+		save();
+	}
+
 	private void load() {
 		if (!file.exists()) {
 			return;

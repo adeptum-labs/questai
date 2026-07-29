@@ -88,6 +88,27 @@ public final class CommissionStore {
 		save();
 	}
 
+	/**
+	 * Folds one village's orders into another's. A player may only have one
+	 * order open per village, so where both rows hold one the earlier is
+	 * kept — it is the one they have been waiting longer for.
+	 */
+	public synchronized void merge(final String fromId, final String intoId) {
+		if (fromId == null || intoId == null || fromId.equals(intoId)) {
+			return;
+		}
+		final Map<UUID, CommissionOrder> from = villages.remove(fromId);
+		if (from == null) {
+			return;
+		}
+		final Map<UUID, CommissionOrder> into =
+			villages.computeIfAbsent(intoId, key -> new HashMap<>());
+		from.forEach((playerId, order) -> into.merge(playerId, order,
+			(kept, incoming) ->
+				kept.placedAt() <= incoming.placedAt() ? kept : incoming));
+		save();
+	}
+
 	private void load() {
 		if (!file.exists()) {
 			return;
